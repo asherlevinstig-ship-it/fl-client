@@ -1,22 +1,14 @@
 {
-  "extends": "../tsconfig.base.json",
   "compilerOptions": {
-    "outDir": "dist",
     "module": "ESNext",
     "target": "ES2020",
-    
-    // --- FIXED: Added "DOM" and "DOM.Iterable" so TS knows about browsers! ---
     "lib": ["ES2020", "DOM", "DOM.Iterable"],
-    
     "moduleResolution": "node",
-    "declaration": true,
     "sourceMap": true,
-    
-    // --- The Colyseus Lifesavers ---
     "experimentalDecorators": true,
-    "useDefineForClassFields": false
+    "useDefineForClassFields": false,
+    "types": ["vite/client", "node"],
+    "skipLibCheck": true
   },
-  
-  // Notice we removed "rootDir": "src" so you can share files with the server!
   "include": ["src/**/*"]
 }

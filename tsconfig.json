@@ -1,5 +1,4 @@
 {
-  "extends": "../tsconfig.base.json",
   "compilerOptions": {
     "module": "ESNext",
     "target": "ES2020",
@@ -8,8 +7,10 @@
     "sourceMap": true,
     "experimentalDecorators": true,
     "useDefineForClassFields": false,
-    "types": ["vite/client", "node"],
-    "skipLibCheck": true
+    "types": ["vite/client"],
+    "skipLibCheck": true,
+    "strict": true,
+    "esModuleInterop": true
   },
   "include": ["src/**/*"]
 }

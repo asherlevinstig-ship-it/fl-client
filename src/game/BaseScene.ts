@@ -554,66 +554,77 @@ export abstract class BaseScene {
     this.playerMeshes.set(id, playerGroup as any);
   }
 
-  public updatePlayer(
-      id: string, x: number, z: number, name?: string, 
-      equippedItem?: string, equipBack?: string, 
-      isSleeping: boolean = false, sleepRot: number = 0, 
-      isSwimming: boolean = false, height: number = 0, 
-      equipHead?: string, equipChest?: string, equipLegs?: string, equipFeet?: string, equipOffHand?: string,
-      isWolfVisual: boolean = false,
-      isSprinting: boolean = false,
-      isMeditating: boolean = false,
-      teamId: number = 0,
-      mountedFamiliarId: string = "" // Added Mount Tracking
-  ) {
-    const visual = this.playerVisuals.get(id);
-    if (!visual) return;
+public updatePlayer(
+  id: string,
+  x: number,
+  z: number,
+  name?: string,
+  equippedItem?: string,
+  equipBack?: string,
+  isSleeping: boolean = false,
+  sleepRot: number = 0,
+  isSwimming: boolean = false,
+  height: number = 0,
+  equipHead?: string,
+  equipChest?: string,
+  equipLegs?: string,
+  equipFeet?: string,
+  equipOffHand?: string,
+  isWolfVisual: boolean = false,
+  isSprinting: boolean = false,
+  isMeditating: boolean = false,
+  teamId: number = 0,
+  mountedFamiliarId: string = "",
+  isAuraActive: boolean = false,
+  auraStyle: string = "tyrant"
+) {
+  const visual = this.playerVisuals.get(id);
+  if (!visual) return;
 
-    visual.targetPosition.set(x, height, z); 
-    visual.isSleeping = isSleeping;
-    visual.sleepRot = sleepRot;
-    visual.isSwimming = isSwimming;
-    visual.isSprinting = isSprinting;
-    visual.isMeditating = isMeditating;
-    visual.mountedFamiliarId = mountedFamiliarId;
+  visual.targetPosition.set(x, height, z);
+  visual.isSleeping = isSleeping;
+  visual.sleepRot = sleepRot;
+  visual.isSwimming = isSwimming;
+  visual.isSprinting = isSprinting;
+  visual.isMeditating = isMeditating;
+  visual.mountedFamiliarId = mountedFamiliarId;
 
-    if (name && visual.labelSprite.material instanceof THREE.SpriteMaterial) {
-      const subText = teamId > 0 ? `Team ${teamId}` : undefined;
-      const expectedLabelText = name + (subText ? `\n${subText}` : "");
+  if (name && visual.labelSprite.material instanceof THREE.SpriteMaterial) {
+    const subText = teamId > 0 ? `Team ${teamId}` : undefined;
+    const expectedLabelText = name + (subText ? `\n${subText}` : "");
 
-      const currentMap = visual.labelSprite.material.map;
-      const currentText = currentMap?.name;
-      
-      if (currentText !== expectedLabelText) {
-        const newLabel = this.createNameLabel(name, subText);
-        visual.mesh.remove(visual.labelSprite);
-        visual.labelSprite.material.dispose();
-        visual.labelSprite = newLabel;
-        visual.labelSprite.position.set(0, 3.5, 0);
-        visual.mesh.add(visual.labelSprite);
-      }
+    const currentMap = visual.labelSprite.material.map;
+    const currentText = currentMap?.name;
+
+    if (currentText !== expectedLabelText) {
+      const newLabel = this.createNameLabel(name, subText);
+      visual.mesh.remove(visual.labelSprite);
+      visual.labelSprite.material.dispose();
+      visual.labelSprite = newLabel;
+      visual.labelSprite.position.set(0, 3.5, 0);
+      visual.mesh.add(visual.labelSprite);
     }
-
-    // --- DELEGATED BACK EQUIPMENT ---
-    this.equipmentBuilder.updateBackEquipment(visual, equipBack);
-
-    const slots = [
-        { slot: "mainhand", item: equippedItem },
-        { slot: "offhand", item: equipOffHand },
-        { slot: "head", item: equipHead },
-        { slot: "chest", item: equipChest },
-        { slot: "legs", item: equipLegs },
-        { slot: "feet", item: equipFeet }
-    ] as const;
-
-    slots.forEach(({slot, item}) => {
-        const equipKey = `current_${slot}` as keyof PlayerVisual;
-        if (item !== undefined && (visual as any)[equipKey] !== item) {
-            (visual as any)[equipKey] = item;
-            this.updatePlayerEquipment(id, item, slot);
-        }
-    });
   }
+
+  this.equipmentBuilder.updateBackEquipment(visual, equipBack);
+
+  const slots = [
+    { slot: "mainhand", item: equippedItem },
+    { slot: "offhand", item: equipOffHand },
+    { slot: "head", item: equipHead },
+    { slot: "chest", item: equipChest },
+    { slot: "legs", item: equipLegs },
+    { slot: "feet", item: equipFeet }
+  ] as const;
+
+  slots.forEach(({ slot, item }) => {
+    const equipKey = `current_${slot}` as keyof PlayerVisual;
+    if (item !== undefined && (visual as any)[equipKey] !== item) {
+      (visual as any)[equipKey] = item;
+      this.updatePlayerEquipment(id, item, slot);
+    }
+  });
+}
 
   protected updatePlayerEquipment(id: string, itemName: string, slot: "mainhand" | "offhand" | "head" | "chest" | "legs" | "feet" = "mainhand") {
     const visual = this.playerVisuals.get(id);

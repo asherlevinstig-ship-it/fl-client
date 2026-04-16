@@ -312,19 +312,53 @@ export class TownScene extends BaseScene {
   }
 
   public override updatePlayer(
-        id: string, x: number, z: number, name?: string, 
-        equippedItem?: string, equipBack?: string, 
-        isSleeping: boolean = false, sleepRot: number = 0, 
-        isSwimming: boolean = false, height: number = 0, 
-        equipHead?: string, equipChest?: string, equipLegs?: string, equipFeet?: string, equipOffHand?: string,
-        isWolfVisual: boolean = false,
-        isSprinting: boolean = false,
-        isMeditating: boolean = false,
-        teamId: number = 0,
-        isAuraActive: boolean = false,
-        auraStyle: string = "tyrant"
+      id: string,
+      x: number,
+      z: number,
+      name?: string,
+      equippedItem?: string,
+      equipBack?: string,
+      isSleeping: boolean = false,
+      sleepRot: number = 0,
+      isSwimming: boolean = false,
+      height: number = 0,
+      equipHead?: string,
+      equipChest?: string,
+      equipLegs?: string,
+      equipFeet?: string,
+      equipOffHand?: string,
+      isWolfVisual: boolean = false,
+      isSprinting: boolean = false,
+      isMeditating: boolean = false,
+      teamId: number = 0,
+      mountedFamiliarId: string = "",
+      isAuraActive: boolean = false,
+      auraStyle: string = "tyrant"
   ) {
-      super.updatePlayer(id, x, z, name, equippedItem, equipBack, isSleeping, sleepRot, isSwimming, height, equipHead, equipChest, equipLegs, equipFeet, equipOffHand, isWolfVisual, isSprinting, isMeditating, teamId);
+      super.updatePlayer(
+    id,
+    x,
+    z,
+    name,
+    equippedItem,
+    equipBack,
+    isSleeping,
+    sleepRot,
+    isSwimming,
+    height,
+    equipHead,
+    equipChest,
+    equipLegs,
+    equipFeet,
+    equipOffHand,
+    isWolfVisual,
+    isSprinting,
+    isMeditating,
+    teamId,
+    mountedFamiliarId,
+    isAuraActive,
+    auraStyle
+);
 
       const visual = this.playerVisuals.get(id);
       if (!visual) return;

@@ -331,34 +331,32 @@ export class TownScene extends BaseScene {
       isSprinting: boolean = false,
       isMeditating: boolean = false,
       teamId: number = 0,
-      mountedFamiliarId: string = "",
-      isAuraActive: boolean = false,
-      auraStyle: string = "tyrant"
+      mountedFamiliarId: string = "", // MUST match the 20th parameter in BaseScene
+      isAuraActive: boolean = false,  // Added AFTER base parameters
+      auraStyle: string = "tyrant"    // Added AFTER base parameters
   ) {
       super.updatePlayer(
-    id,
-    x,
-    z,
-    name,
-    equippedItem,
-    equipBack,
-    isSleeping,
-    sleepRot,
-    isSwimming,
-    height,
-    equipHead,
-    equipChest,
-    equipLegs,
-    equipFeet,
-    equipOffHand,
-    isWolfVisual,
-    isSprinting,
-    isMeditating,
-    teamId,
-    mountedFamiliarId,
-    isAuraActive,
-    auraStyle
-);
+          id,
+          x,
+          z,
+          name,
+          equippedItem,
+          equipBack,
+          isSleeping,
+          sleepRot,
+          isSwimming,
+          height,
+          equipHead,
+          equipChest,
+          equipLegs,
+          equipFeet,
+          equipOffHand,
+          isWolfVisual,
+          isSprinting,
+          isMeditating,
+          teamId,
+          mountedFamiliarId // Pass EXACTLY what BaseScene expects
+      );
 
       const visual = this.playerVisuals.get(id);
       if (!visual) return;

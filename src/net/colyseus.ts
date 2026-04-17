@@ -1,7 +1,8 @@
 import { Client } from "colyseus.js";
 
 // Ensure this matches your server URL
-export const client = new Client(window.location.hostname === "localhost" ? "ws://localhost:2567" : "wss://your-server-url.com");
+// Ensure this matches your server URL
+export const client = new Client(window.location.hostname === "localhost" ? "ws://localhost:2567" : "wss://us-mia-ea26ba04.colyseus.cloud");
 
 export async function connectToTown(name: string, classId: string, pathwayId: string) {
     return await client.joinOrCreate<any>("town", { name, classId, pathwayId });

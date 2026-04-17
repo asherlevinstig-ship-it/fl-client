@@ -554,7 +554,7 @@ export abstract class BaseScene {
     this.playerMeshes.set(id, playerGroup as any);
   }
 
-  public updatePlayer(
+public updatePlayer(
     id: string,
     x: number,
     z: number,

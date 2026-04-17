@@ -311,7 +311,7 @@ export class TownScene extends BaseScene {
     this.start();
   }
 
-  public override updatePlayer(
+ public override updatePlayer(
       id: string,
       x: number,
       z: number,
@@ -331,9 +331,9 @@ export class TownScene extends BaseScene {
       isSprinting: boolean = false,
       isMeditating: boolean = false,
       teamId: number = 0,
-      mountedFamiliarId: string = "", // MUST match the 20th parameter in BaseScene
-      isAuraActive: boolean = false,  // Added AFTER base parameters
-      auraStyle: string = "tyrant"    // Added AFTER base parameters
+      mountedFamiliarId: string = "", 
+      isAuraActive: boolean = false,  
+      auraStyle: string = "tyrant"    
   ) {
       super.updatePlayer(
           id,

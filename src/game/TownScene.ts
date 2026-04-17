@@ -310,7 +310,7 @@ export class TownScene extends BaseScene {
 
     this.start();
   }
-
+//chicken
  public override updatePlayer(
       id: string,
       x: number,

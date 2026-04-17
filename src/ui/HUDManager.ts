@@ -7,8 +7,8 @@ export let isWorldMapOpen = false;
 export let myMapMarker: { x: number, z: number } | null = null;
 export let isRoutingToMarker = false;
 export let activeAttackIndicators: { x: number, z: number, timer: number }[] = [];
-export let mazeTimerInterval: NodeJS.Timeout | null = null;
-export let dungeonTimerInterval: NodeJS.Timeout | null = null; 
+export let mazeTimerInterval: number | null = null;
+export let dungeonTimerInterval: number | null = null; 
 
 // --- GLOBAL EVENT STATE ---
 export let nextEventName = "";
@@ -74,7 +74,7 @@ export function mountMazeUI(durationSeconds: number) {
     
     if (mazeTimerInterval) clearInterval(mazeTimerInterval);
     
-    mazeTimerInterval = setInterval(() => {
+    mazeTimerInterval = window.setInterval(() => {
         timeLeft--;
         const m = Math.floor(timeLeft / 60).toString().padStart(2, "0");
         const s = (timeLeft % 60).toString().padStart(2, "0");

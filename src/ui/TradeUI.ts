@@ -1,4 +1,4 @@
-import { Room } from "colyseus.js";
+import { Client, Room } from "@colyseus/sdk";
 import { ITEM_DB, RANK_COLORS, ItemRank } from "../ItemDatabase";
 
 export let isTradeUIOpen = false;

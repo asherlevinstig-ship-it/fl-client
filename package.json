@@ -7,7 +7,7 @@
     "build": "tsc -p tsconfig.json && vite build"
   },
   "dependencies": {
-    "@colyseus/schema": "^4.0.8",
+    "@colyseus/schema": "^4.0.20",
     "@colyseus/sdk": "^0.17.26",
     "three": "^0.183.2"
   },

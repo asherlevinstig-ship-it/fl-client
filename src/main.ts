@@ -80,7 +80,7 @@ import {
 } from "./game/CollisionSystem";
 
 // ==========================================
-// 🚨 DEBUGGER OVERLAY SYSTEM
+// 🚨 UPGRADED DEBUGGER OVERLAY SYSTEM
 // ==========================================
 let debugFrameCount = 0;
 function updateDebugOverlay(data: any) {
@@ -91,14 +91,22 @@ function updateDebugOverlay(data: any) {
         overlay.style.position = "fixed";
         overlay.style.top = "10px";
         overlay.style.right = "10px";
-        overlay.style.backgroundColor = "rgba(0, 0, 0, 0.8)";
+        overlay.style.backgroundColor = "rgba(0, 0, 0, 0.85)";
         overlay.style.color = "#00ff00";
-        overlay.style.padding = "10px";
+        overlay.style.padding = "15px";
         overlay.style.fontFamily = "monospace";
-        overlay.style.fontSize = "12px";
+        overlay.style.fontSize = "13px";
         overlay.style.zIndex = "99999";
         overlay.style.pointerEvents = "none";
+        overlay.style.border = "1px solid #444";
         document.body.appendChild(overlay);
+    }
+
+    const uiState = getActionContext();
+    
+    let visualExists = false;
+    if (activeScene && activeRoom) {
+        visualExists = (activeScene as any).playerVisuals?.has(activeRoom.sessionId) || false;
     }
 
     overlay.innerHTML = `
@@ -106,12 +114,15 @@ function updateDebugOverlay(data: any) {
         -----------------------<br/>
         <b>FPS Loop:</b> ${debugFrameCount++}<br/>
         <b>Zone:</b> ${currentZone || "None"}<br/>
-        <b>Room Session ID:</b> ${activeRoom?.sessionId || "Disconnected"}<br/>
         <b>Has Active Scene?:</b> ${!!activeScene}<br/>
-        <b>Server Players Count:</b> ${data.serverPlayerCount}<br/>
         <b>Is 'Me' Loaded?:</b> <span style="color:${data.isMeLoaded ? '#0f0' : '#f00'}">${data.isMeLoaded}</span><br/>
-        <b>Local Pos:</b> X:${localPlayerPos.x.toFixed(2)} Y:${localPlayerPos.y.toFixed(2)}<br/>
+        <b>Local Pos:</b> X:${localPlayerPos.x.toFixed(2)} Z:${localPlayerPos.y.toFixed(2)}<br/>
         <b>Input X/Y:</b> ${data.inputX} / ${data.inputY}<br/>
+        <hr style="border-color:#555; margin:6px 0;" />
+        <strong style="color: #ffaa00">🕵️ SUSPECT VARIABLES</strong><br/>
+        <b>UI Open (Blocking Input)?:</b> <span style="color:${uiState.isUIOpen ? '#f00' : '#0f0'}">${uiState.isUIOpen}</span><br/>
+        <b>3D Mesh Created?:</b> <span style="color:${visualExists ? '#0f0' : '#f00'}">${visualExists}</span><br/>
+        <b>Cam Pos:</b> X:${activeScene?.camera?.position.x.toFixed(1) || 0} Y:${activeScene?.camera?.position.y.toFixed(1) || 0} Z:${activeScene?.camera?.position.z.toFixed(1) || 0}<br/>
     `;
 }
 // ==========================================
@@ -194,9 +205,14 @@ function getHeightCached(x: number, z: number): number {
     const key = `${x | 0},${z | 0}`;
     if (!heightCache.has(key)) {
         try {
-            heightCache.set(key, getTerrainHeight(x, z) || 0);
+            const h = getTerrainHeight(x, z);
+            if (h !== undefined && h !== null && !isNaN(h)) {
+                heightCache.set(key, h);
+            } else {
+                return 0; // Return safe default but DO NOT cache early failures
+            }
         } catch (e) {
-            return 0; // Failsafe so the visual sync doesn't crash on zone transitions
+            return 0; 
         }
     }
     return heightCache.get(key)!;
@@ -238,11 +254,13 @@ function showTransientUI(id: string, text: string, color: string, duration: numb
 }
 
 function getActionContext(): ActionContext {
+    // CRITICAL FIX: Explicitly check for .style.display === "block"
+    // Because checking !!document.getElementById("blueprint-modal") is always true if it exists in DOM!
     const isAnyUIOpen = isShopUIOpen || isInventoryUIOpen || 
                         isChestUIOpen || isCasinoUIOpen || isTeleportUIOpen || 
                         isQuestUIOpen || isSkillTreeUIOpen || isWorldMapOpen ||
                         isTradeUIOpen || 
-                        !!document.getElementById("blueprint-modal") ||
+                        (document.getElementById("blueprint-modal")?.style.display === "block") ||
                         (document.getElementById("meditation-ui")?.style.display === "block") ||
                         (document.getElementById("crafting-modal")?.style.display === "block") || 
                         (document.getElementById("store-management-modal")?.style.display === "block");
@@ -381,6 +399,8 @@ function safeBind(collection: any, onAdd: (item: any, id: string) => void, onRem
 
 // --- HELPER TO GUARANTEE PLAYER INITIALIZATION ---
 function initPlayerVisual(player: any, id: string, room: ActiveRoom, sceneObj: ActiveScene) {
+    console.log(`[DEBUG-INIT] initPlayerVisual called for ID: ${id}. Is Local Player?: ${id === room.sessionId}`);
+    
     const safeX = isNaN(player.x) ? 0 : player.x;
     const safeY = isNaN(player.y) ? 0 : player.y;
 
@@ -391,7 +411,10 @@ function initPlayerVisual(player: any, id: string, room: ActiveRoom, sceneObj: A
     }
     
     if (typeof (sceneObj as any).addPlayer === "function") {
+        console.log(`[DEBUG-INIT] Calling sceneObj.addPlayer for ${id}`);
         (sceneObj as any).addPlayer(id, id === room.sessionId, player.name);
+    } else {
+        console.error(`[DEBUG-INIT] ❌ sceneObj.addPlayer is NOT a function on current scene!`);
     } 
 
     if (typeof (sceneObj as any).updatePlayer === "function") {
@@ -402,8 +425,11 @@ function initPlayerVisual(player: any, id: string, room: ActiveRoom, sceneObj: A
         if (typeof (sceneObj as any).playerVisuals !== "undefined") {
             const v = (sceneObj as any).playerVisuals.get(id);
             if (v) {
+                console.log(`[DEBUG-INIT] ✅ Local Player Visual successfully bound to Scene.`);
                 v.mesh.position.set(safeX, th, safeY);
                 v.targetPosition.set(safeX, th, safeY);
+            } else {
+                console.error(`[DEBUG-INIT] ❌ Local Player Visual is missing from sceneObj.playerVisuals map!`);
             }
         }
 
@@ -1098,7 +1124,14 @@ async function switchZone(nextZone: ZoneName): Promise<void> {
 let isHoldingTab = false;
 
 function setupInput(): void {
+  console.log("[DEBUG-INPUT] Keyboard listeners initialized.");
+
   window.addEventListener("keydown", (event) => {
+    // Log keypresses to track if inputs are getting swallowed by UI
+    if (["KeyW", "KeyA", "KeyS", "KeyD", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(event.code)) {
+        console.log(`[DEBUG-INPUT] KeyPressed: ${event.code}. isUIOpen?: ${getActionContext().isUIOpen}`);
+    }
+
     if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(event.code)) {
         event.preventDefault();
     }

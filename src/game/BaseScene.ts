@@ -121,7 +121,7 @@ export abstract class BaseScene {
   protected cameraPitch = 0.8; 
   protected cameraZoom = 30; 
 
-  private lastTime = Date.now();
+  private lastTime = performance.now();
   protected currentDt = 0.016; // Tracks global DT for decoupled lerp functions
 
   // --- PERFORMANCE Caches & Pools ---
@@ -259,7 +259,7 @@ export abstract class BaseScene {
   protected abstract onUpdate(dt: number): void;
 
   public start() {
-    this.lastTime = Date.now();
+    this.lastTime = performance.now();
     this.animate();
   }
 
@@ -272,7 +272,7 @@ export abstract class BaseScene {
   private animate = () => {
     this.animationId = requestAnimationFrame(this.animate);
     
-    const now = Date.now();
+    const now = performance.now();
     const dt = Math.min((now - this.lastTime) / 1000, 0.05);
     this.lastTime = now;
     this.currentDt = dt; // Cache global delta time
@@ -313,9 +313,10 @@ export abstract class BaseScene {
     // This stops the camera from snapping when moving out-of-sync with the monitor framerate
     const actualDt = dt !== undefined ? dt : this.currentDt;
 
-    const px = visual.mesh.position.x; 
-    const py = visual.mesh.position.y; 
-    const pz = visual.mesh.position.z;
+    // Use smoothly interpolated mesh target positions
+    const px = THREE.MathUtils.lerp(visual.mesh.position.x, visual.targetPosition.x, 0.5);
+    const py = THREE.MathUtils.lerp(visual.mesh.position.y, visual.targetPosition.y, 0.5);
+    const pz = THREE.MathUtils.lerp(visual.mesh.position.z, visual.targetPosition.z, 0.5);
 
     const lookAtY = py + 2.0;
 
@@ -1045,7 +1046,7 @@ public updatePlayer(
   }
 
   private updateInterpolatedEntities(dt: number) {
-    const time = Date.now();
+    const time = performance.now();
     const moveLerp = 1.0 - Math.exp(-15.0 * dt);
     const rotLerp = 1.0 - Math.exp(-10.0 * dt);
 

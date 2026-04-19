@@ -116,6 +116,7 @@ function updateDebugOverlay(data: any) {
 }
 // ==========================================
 
+
 type TownRoomType = Awaited<ReturnType<typeof connectToTown>>;
 type FieldRoomType = Awaited<ReturnType<typeof connectToField>>;
 type DungeonRoomType = Awaited<ReturnType<typeof connectToDungeon>>;
@@ -1143,43 +1144,6 @@ async function switchZone(nextZone: ZoneName): Promise<void> {
     if (activeRoom && activeScene) {
       localStorage.setItem("rpg_reconnection_token", activeRoom.reconnectionToken);
       activeRoom.send("set_aura_style", { style: PLAYER_AURA_STYLE });
-
-      // ---- CAMERA JITTER FIX (Monkey-patching Render) ----
-      const sceneRef = activeScene as any;
-      if (sceneRef.renderer && typeof sceneRef.renderer.render === "function") {
-          const originalRender = sceneRef.renderer.render;
-          sceneRef.renderer.render = function(scene: THREE.Scene, camera: THREE.Camera) {
-              if (activeRoom && activeRoom.sessionId) {
-                  const visual = sceneRef.playerVisuals?.get(activeRoom.sessionId);
-                  if (visual && visual.mesh) {
-                      // Bypass BaseScene's updateCameraFollow, which uses the fluctuating Date.now() dt.
-                      // Just hard-lock the camera to the target to eliminate all screen-shaking jitter.
-                      const px = visual.mesh.position.x;
-                      const py = visual.mesh.position.y;
-                      const pz = visual.mesh.position.z;
-                      
-                      const lookAtY = py + 2.0;
-                      
-                      const camAngle = typeof sceneRef.getCameraAngle === "function" ? sceneRef.getCameraAngle() : 0;
-                      // Assume pitch=0.8, zoom=30 based on BaseScene.ts defaults
-                      const pitch = sceneRef.cameraPitch !== undefined ? sceneRef.cameraPitch : 0.8;
-                      const zoom = sceneRef.cameraZoom !== undefined ? sceneRef.cameraZoom : 30;
-
-                      const targetX = px + Math.sin(camAngle) * Math.cos(pitch) * zoom;
-                      const targetZ = pz + Math.cos(camAngle) * Math.cos(pitch) * zoom;
-                      const targetY = lookAtY + Math.sin(pitch) * zoom;
-
-                      // Smoothly lerp using a fixed stable multiplier to ignore Date.now() jitter completely
-                      camera.position.x += (targetX - camera.position.x) * 0.15;
-                      camera.position.y += (targetY - camera.position.y) * 0.15;
-                      camera.position.z += (targetZ - camera.position.z) * 0.15;
-                      
-                      camera.lookAt(px, lookAtY, pz);
-                  }
-              }
-              originalRender.call(this, scene, camera);
-          };
-      }
 
       if (typeof (activeScene as any).start === "function") {
           (activeScene as any).start();
@@ -2448,6 +2412,12 @@ function startHudLoop(): void {
             );
         }
 
+        if (typeof activeScene.updateCameraFollow === "function") {
+            activeScene.updateCameraFollow(activeRoom.sessionId);
+        } else {
+             (activeScene as any).updateCameraFollow(activeRoom.sessionId, undefined);
+        }
+
         if (isShadowMapActive && activeScene) {
             const camera = (activeScene as any).camera as THREE.Camera;
             if (camera) {
@@ -2513,43 +2483,7 @@ async function boot(): Promise<void> {
           if (activeRoom && activeScene) {
               activeRoom.send("set_aura_style", { style: PLAYER_AURA_STYLE });
 
-              // ---- CAMERA JITTER FIX (Monkey-patching Render) ----
-              const sceneRef = activeScene as any;
-              if (sceneRef.renderer && typeof sceneRef.renderer.render === "function") {
-                  const originalRender = sceneRef.renderer.render;
-                  sceneRef.renderer.render = function(scene: THREE.Scene, camera: THREE.Camera) {
-                      if (activeRoom && activeRoom.sessionId) {
-                          const visual = sceneRef.playerVisuals?.get(activeRoom.sessionId);
-                          if (visual && visual.mesh) {
-                              // Bypass BaseScene's updateCameraFollow, which uses the fluctuating Date.now() dt.
-                              // Just hard-lock the camera to the target to eliminate all screen-shaking jitter.
-                              const px = visual.mesh.position.x;
-                              const py = visual.mesh.position.y;
-                              const pz = visual.mesh.position.z;
-                              
-                              const lookAtY = py + 2.0;
-                              
-                              const camAngle = typeof sceneRef.getCameraAngle === "function" ? sceneRef.getCameraAngle() : 0;
-                              // Assume pitch=0.8, zoom=30 based on BaseScene.ts defaults
-                              const pitch = sceneRef.cameraPitch !== undefined ? sceneRef.cameraPitch : 0.8;
-                              const zoom = sceneRef.cameraZoom !== undefined ? sceneRef.cameraZoom : 30;
-
-                              const targetX = px + Math.sin(camAngle) * Math.cos(pitch) * zoom;
-                              const targetZ = pz + Math.cos(camAngle) * Math.cos(pitch) * zoom;
-                              const targetY = lookAtY + Math.sin(pitch) * zoom;
-
-                              // Smoothly lerp using a fixed stable multiplier to ignore Date.now() jitter completely
-                              camera.position.x += (targetX - camera.position.x) * 0.15;
-                              camera.position.y += (targetY - camera.position.y) * 0.15;
-                              camera.position.z += (targetZ - camera.position.z) * 0.15;
-                              
-                              camera.lookAt(px, lookAtY, pz);
-                          }
-                      }
-                      originalRender.call(this, scene, camera);
-                  };
-              }
-
+              // CALL START HERE! (This is what actually starts the 3D loop)
               if (typeof (activeScene as any).start === "function") {
                   (activeScene as any).start();
                   console.log(`[DEBUG] activeScene.start() fired.`);

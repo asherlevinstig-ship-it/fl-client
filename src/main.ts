@@ -196,7 +196,7 @@ function getHeightCached(x: number, z: number): number {
         try {
             heightCache.set(key, getTerrainHeight(x, z) || 0);
         } catch (e) {
-            return 0; // Failsafe so the visual sync doesn't crash on zone transitions
+            return 0; 
         }
     }
     return heightCache.get(key)!;
@@ -371,7 +371,6 @@ function initPlayerVisual(player: any, id: string, room: ActiveRoom, sceneObj: A
         th = getHeightCached(safeX, safeY);
     }
     
-    // Add the player to the 3D Engine
     if (typeof (sceneObj as any).addPlayer === "function") {
         (sceneObj as any).addPlayer(id, id === room.sessionId, player.name);
         console.log(`[DEBUG] Successfully injected player ${id} mesh into Three.js scene.`);
@@ -412,6 +411,9 @@ function initPlayerVisual(player: any, id: string, room: ActiveRoom, sceneObj: A
 function setupRoomBindings(room: ActiveRoom, sceneObj: ActiveScene): () => void {
   console.log(`[DEBUG] Setting up Colyseus network bindings...`);
 
+  // ==========================================
+  // 1. NON-STATE MESSAGES (Safe to bind immediately)
+  // ==========================================
   room.onLeave((code: number) => {
       console.warn(`Connection closed (Code: ${code}).`);
       if (activeRoom === room) activeRoom = null;
@@ -475,7 +477,6 @@ function setupRoomBindings(room: ActiveRoom, sceneObj: ActiveScene): () => void 
       setIsWorldMapOpen(false);
   });
 
-  // --- HUD MESSAGE (Generic System Notifications) ---
   room.onMessage("hud_message", (message: string) => {
       eventQueue.push(() => {
           showTransientUI("general-hud-msg", message, "#ffffff", 3000);
@@ -554,7 +555,6 @@ function setupRoomBindings(room: ActiveRoom, sceneObj: ActiveScene): () => void 
       });
   });
 
-  // --- TRIGGER VOID FALL LOGIC ---
   room.onMessage("trigger_void_fall", () => {
       console.log("[CLIENT-NET] Received 'trigger_void_fall'. Triggering scene dummy.");
       eventQueue.push(() => {
@@ -563,13 +563,10 @@ function setupRoomBindings(room: ActiveRoom, sceneObj: ActiveScene): () => void 
               if (visual && visual.mesh) {
                   (sceneObj as any).triggerPlayerVoidFall(visual.mesh);
               }
-          } else {
-              console.warn("[CLIENT-NET] WARNING: Received trigger_void_fall, but triggerPlayerVoidFall is missing or scene is inactive!");
           }
       });
   });
 
-  // --- AUTHORITATIVE SERVER CORRECTION FIX ---
   room.onMessage("forcePosition", (data: any) => {
       localPlayerPos.x = data.x;
       localPlayerPos.y = data.z !== undefined ? data.z : data.y; 
@@ -588,119 +585,6 @@ function setupRoomBindings(room: ActiveRoom, sceneObj: ActiveScene): () => void 
       }
   });
 
-  if ((room.state as any)?.players) {
-    const playersMap = (room.state as any).players;
-    console.log(`[DEBUG] Initial Server Players Count: ${playersMap.size}`);
-    
-    // Robust Pre-initialization for Colyseus timing quirks
-    playersMap.forEach((p: any, id: string) => {
-        console.log(`[DEBUG] Pre-loading existing player: ${id}`);
-        initPlayerVisual(p, id, room, sceneObj);
-    });
-
-    playersMap.onAdd((player: any, id: string) => {
-        console.log(`[DEBUG] Colyseus Event Triggered: Player onAdd -> ${id}`);
-        initPlayerVisual(player, id, room, sceneObj);
-    });
-
-    playersMap.onRemove((player: any, id: string) => {
-      if (typeof (sceneObj as any).removePlayer === "function") {
-          (sceneObj as any).removePlayer(id);
-      }
-    });
-  } else {
-      console.error("[DEBUG] FATAL: room.state.players does not exist on the server!");
-  }
-
-  if ((room.state as any)?.decorations) {
-      const decosMap = (room.state as any).decorations;
-      
-      const initDeco = (deco: any) => {
-          if (sceneObj instanceof TownScene) {
-              const terrainY = getHeightCached(deco.x, deco.z);
-              (sceneObj as any).addDecoration(deco.id, deco.type, deco.x, terrainY + 0.05, deco.z, deco.rotation);
-          }
-          if (deco.inventory) {
-              deco.inventory.onAdd(() => refreshChestUI(room));
-              deco.inventory.onRemove(() => refreshChestUI(room));
-              deco.inventory.onChange(() => refreshChestUI(room));
-          }
-      };
-
-      decosMap.forEach(initDeco);
-      decosMap.onAdd((deco: any) => initDeco(deco));
-
-      decosMap.onRemove((deco: any, id: string) => {
-          if (sceneObj instanceof TownScene) {
-              (sceneObj as any).removeDecoration(deco.id);
-          }
-      });
-  }
-
-  if ((room.state as any)?.stores) {
-      const storesMap = (room.state as any).stores;
-      
-      const initStore = (store: any) => {
-          if (typeof store.listen === "function") {
-              store.listen("vault", () => refreshShopUI(room));
-              store.listen("ownerId", () => refreshShopUI(room));
-          }
-          if (store.inventory) {
-              store.inventory.onAdd(() => refreshShopUI(room));
-              store.inventory.onRemove(() => refreshShopUI(room));
-              store.inventory.onChange(() => refreshShopUI(room));
-          }
-      };
-
-      storesMap.forEach(initStore);
-      storesMap.onAdd((store: any) => initStore(store));
-  }
-
-  if ((room.state as any)?.familiars) {
-      const famMap = (room.state as any).familiars;
-      
-      const initFam = (fam: any, id: string) => {
-          if (sceneObj && (sceneObj as any).familiarRenderer) {
-              const safeX = isNaN(fam.x) ? 0 : fam.x;
-              const safeY = isNaN(fam.y) ? 0 : fam.y;
-              let th = 0;
-              if (sceneObj instanceof TownScene) {
-                  th = getHeightCached(safeX, safeY);
-              }
-              (sceneObj as any).familiarRenderer.addFamiliar(id, fam.type, safeX, th, safeY);
-          }
-      };
-
-      famMap.forEach(initFam);
-      famMap.onAdd(initFam);
-
-      famMap.onRemove((fam: any, id: string) => {
-          if (sceneObj && (sceneObj as any).familiarRenderer) {
-              (sceneObj as any).familiarRenderer.removeFamiliar(id);
-          }
-      });
-  }
-
-  if ((room.state as any)?.enemies) {
-    const enemyMap = (room.state as any).enemies;
-    
-    const initEnemy = (enemy: any, id: string) => {
-        if (typeof (sceneObj as any).addEnemy === "function") {
-            (sceneObj as any).addEnemy(id, enemy.name);
-        }
-    };
-
-    enemyMap.forEach(initEnemy);
-    enemyMap.onAdd(initEnemy);
-
-    enemyMap.onRemove((enemy: any, id: string) => {
-       if (typeof (sceneObj as any).removeEnemy === "function") {
-           (sceneObj as any).removeEnemy(id);
-       }
-    });
-  }
-
-  // --- QUEUED VISUAL EVENTS ---
   room.onMessage("spawnHazard", (hazard: any) => {
       eventQueue.push(() => {
           if (sceneObj && typeof (sceneObj as any).addHazard === "function") {
@@ -785,7 +669,6 @@ function setupRoomBindings(room: ActiveRoom, sceneObj: ActiveScene): () => void 
           const input = document.getElementById("med-input") as HTMLInputElement;
           if (input) {
               input.focus();
-              
               input.addEventListener("keydown", (e) => {
                   if (e.key === "Enter") {
                       activeRoom?.send("submit_meditation", { answer: input.value, index: data.index });
@@ -864,66 +747,6 @@ function setupRoomBindings(room: ActiveRoom, sceneObj: ActiveScene): () => void 
       });
   });
 
-  if ((room.state as any)?.lootItems) {
-    (room.state as any).lootItems.onAdd((item: any, id: string) => {
-      if (sceneObj instanceof FieldScene || sceneObj instanceof DungeonScene) {
-        (sceneObj as any).addLootItem(id, item.kind, item.x, item.y, item.scale, item.rotation);
-      }
-      if (sceneObj instanceof TownScene) {
-        (sceneObj as any).addLootItem(id, item.kind, item.x, item.y, item.isOpen);
-      }
-    });
-
-    (room.state as any).lootItems.onRemove((item: any, id: string) => {
-      if (sceneObj instanceof FieldScene || sceneObj instanceof DungeonScene) {
-        (sceneObj as any).removeLootItem(id);
-      }
-    });
-  }
-
-  if ((room.state as any)?.scenery) {
-    (room.state as any).scenery.onAdd((item: any, id: string) => {
-      clientSceneryGrid.add(item, item.x, item.y);
-      if (sceneObj instanceof TownScene) {
-        (sceneObj as any).addScenery(item.id, item.kind, item.x, item.y, item.scale, item.rotation);
-      }
-    });
-
-    (room.state as any).scenery.onRemove((item: any, id: string) => {
-      clientSceneryGrid.remove(item, item.x, item.y);
-      if (sceneObj instanceof TownScene) {
-        (sceneObj as any).removeScenery(item.id);
-      }
-    });
-  }
-
-  if ((room.state as any)?.landPlots) {
-    (room.state as any).landPlots.onAdd((plot: any, id: string) => {
-      if (sceneObj instanceof TownScene) {
-        const worldX = plot.gridX * 20 + 10;
-        const worldZ = plot.gridY * 20 + 10;
-        const terrainY = getHeightCached(worldX, worldZ);
-        
-        (sceneObj as any).addLandPlot(plot.id, plot.gridX, plot.gridY, plot.ownerId, plot.ownerName, terrainY);
-      }
-    });
-
-    (room.state as any).landPlots.onRemove((plot: any, id: string) => {
-      if (sceneObj instanceof TownScene) {
-        (sceneObj as any).removeLandPlot(plot.id);
-      }
-    });
-  }
-
-  if ((room.state as any)?.buildings) {
-    (room.state as any).buildings.onAdd((bldg: any, id: string) => {
-      if (sceneObj instanceof TownScene) {
-        const terrainY = getHeightCached(bldg.x, bldg.z);
-        (sceneObj as any).addBuilding(bldg.id, bldg.type, bldg.x, bldg.z, bldg.isConstructed, bldg.progress, bldg.targetProgress, terrainY);
-      }
-    });
-  }
-
   room.onMessage("combatEvent", (data: any) => { 
       eventQueue.push(() => {
           if (sceneObj instanceof FieldScene || sceneObj instanceof DungeonScene) (sceneObj as any).playCombatEvent(data); 
@@ -933,7 +756,6 @@ function setupRoomBindings(room: ActiveRoom, sceneObj: ActiveScene): () => void 
   room.onMessage("playerAttacked", (data: any) => {
       eventQueue.push(() => {
           if (sceneObj && typeof (sceneObj as any).playAttackVisual === "function") {
-              
               if (data.damage === undefined) {
                   if (data.id === room.sessionId) return;
                   (sceneObj as any).playAttackVisual(data.id, data.targetX, data.targetZ);
@@ -964,7 +786,6 @@ function setupRoomBindings(room: ActiveRoom, sceneObj: ActiveScene): () => void 
       if (data.id === room.sessionId) {
           if (data.abilityId === "spirit_animal") isLocallyWolf = true;
           else if (data.abilityId === "spirit_animal_end") isLocallyWolf = false;
-          
           if (data.abilityId === "map_marker_placed") setMyMapMarker({ x: data.targetX, z: data.targetZ });
       }
 
@@ -1051,6 +872,220 @@ function setupRoomBindings(room: ActiveRoom, sceneObj: ActiveScene): () => void 
               showTransientUI("fishing-result-ui", `❌ ${data.message || "The fish got away!"}`, "#ff4444", 3000);
           }
       });
+  });
+
+  // ==========================================
+  // 2. STATE LISTENERS (Must wait for state initialization)
+  // ==========================================
+  room.onStateChange.once((state: any) => {
+      console.log("[DEBUG] Initial state synced from server! Building world entities...");
+
+      // --- PLAYERS ---
+      if (state.players) {
+        const playersMap = state.players;
+        console.log(`[DEBUG] Initial Server Players Count: ${playersMap.size}`);
+        
+        playersMap.forEach((p: any, id: string) => {
+            console.log(`[DEBUG] Pre-loading existing player: ${id}`);
+            initPlayerVisual(p, id, room, sceneObj);
+        });
+
+        playersMap.onAdd((player: any, id: string) => {
+            console.log(`[DEBUG] Player joined: ${id}`);
+            initPlayerVisual(player, id, room, sceneObj);
+        });
+
+        playersMap.onRemove((player: any, id: string) => {
+          if (typeof (sceneObj as any).removePlayer === "function") {
+              (sceneObj as any).removePlayer(id);
+          }
+        });
+      } else {
+          console.error("[DEBUG] FATAL: state.players does not exist in schema!");
+      }
+
+      // --- DECORATIONS ---
+      if (state.decorations) {
+          const decosMap = state.decorations;
+          const initDeco = (deco: any) => {
+              if (sceneObj instanceof TownScene) {
+                  const terrainY = getHeightCached(deco.x, deco.z);
+                  (sceneObj as any).addDecoration(deco.id, deco.type, deco.x, terrainY + 0.05, deco.z, deco.rotation);
+              }
+              if (deco.inventory) {
+                  deco.inventory.onAdd(() => refreshChestUI(room));
+                  deco.inventory.onRemove(() => refreshChestUI(room));
+                  deco.inventory.onChange(() => refreshChestUI(room));
+              }
+          };
+
+          decosMap.forEach(initDeco);
+          decosMap.onAdd((deco: any) => initDeco(deco));
+
+          decosMap.onRemove((deco: any, id: string) => {
+              if (sceneObj instanceof TownScene) {
+                  (sceneObj as any).removeDecoration(deco.id);
+              }
+          });
+      }
+
+      // --- STORES ---
+      if (state.stores) {
+          const storesMap = state.stores;
+          const initStore = (store: any) => {
+              if (typeof store.listen === "function") {
+                  store.listen("vault", () => refreshShopUI(room));
+                  store.listen("ownerId", () => refreshShopUI(room));
+              }
+              if (store.inventory) {
+                  store.inventory.onAdd(() => refreshShopUI(room));
+                  store.inventory.onRemove(() => refreshShopUI(room));
+                  store.inventory.onChange(() => refreshShopUI(room));
+              }
+          };
+
+          storesMap.forEach(initStore);
+          storesMap.onAdd((store: any) => initStore(store));
+      }
+
+      // --- FAMILIARS ---
+      if (state.familiars) {
+          const famMap = state.familiars;
+          const initFam = (fam: any, id: string) => {
+              if (sceneObj && (sceneObj as any).familiarRenderer) {
+                  const safeX = isNaN(fam.x) ? 0 : fam.x;
+                  const safeY = isNaN(fam.y) ? 0 : fam.y;
+                  let th = 0;
+                  if (sceneObj instanceof TownScene) {
+                      th = getHeightCached(safeX, safeY);
+                  }
+                  (sceneObj as any).familiarRenderer.addFamiliar(id, fam.type, safeX, th, safeY);
+              }
+          };
+
+          famMap.forEach(initFam);
+          famMap.onAdd(initFam);
+
+          famMap.onRemove((fam: any, id: string) => {
+              if (sceneObj && (sceneObj as any).familiarRenderer) {
+                  (sceneObj as any).familiarRenderer.removeFamiliar(id);
+              }
+          });
+      }
+
+      // --- ENEMIES ---
+      if (state.enemies) {
+        const enemyMap = state.enemies;
+        const initEnemy = (enemy: any, id: string) => {
+            if (typeof (sceneObj as any).addEnemy === "function") {
+                (sceneObj as any).addEnemy(id, enemy.name);
+            }
+        };
+
+        enemyMap.forEach(initEnemy);
+        enemyMap.onAdd(initEnemy);
+
+        enemyMap.onRemove((enemy: any, id: string) => {
+           if (typeof (sceneObj as any).removeEnemy === "function") {
+               (sceneObj as any).removeEnemy(id);
+           }
+        });
+      }
+
+      // --- LOOT ITEMS ---
+      if (state.lootItems) {
+        state.lootItems.forEach((item: any, id: string) => {
+          if (sceneObj instanceof FieldScene || sceneObj instanceof DungeonScene) {
+            (sceneObj as any).addLootItem(id, item.kind, item.x, item.y, item.scale, item.rotation);
+          }
+          if (sceneObj instanceof TownScene) {
+            (sceneObj as any).addLootItem(id, item.kind, item.x, item.y, item.isOpen);
+          }
+        });
+
+        state.lootItems.onAdd((item: any, id: string) => {
+          if (sceneObj instanceof FieldScene || sceneObj instanceof DungeonScene) {
+            (sceneObj as any).addLootItem(id, item.kind, item.x, item.y, item.scale, item.rotation);
+          }
+          if (sceneObj instanceof TownScene) {
+            (sceneObj as any).addLootItem(id, item.kind, item.x, item.y, item.isOpen);
+          }
+        });
+
+        state.lootItems.onRemove((item: any, id: string) => {
+          if (sceneObj instanceof FieldScene || sceneObj instanceof DungeonScene) {
+            (sceneObj as any).removeLootItem(id);
+          }
+        });
+      }
+
+      // --- SCENERY ---
+      if (state.scenery) {
+        state.scenery.forEach((item: any, id: string) => {
+          clientSceneryGrid.add(item, item.x, item.y);
+          if (sceneObj instanceof TownScene) {
+            (sceneObj as any).addScenery(item.id, item.kind, item.x, item.y, item.scale, item.rotation);
+          }
+        });
+
+        state.scenery.onAdd((item: any, id: string) => {
+          clientSceneryGrid.add(item, item.x, item.y);
+          if (sceneObj instanceof TownScene) {
+            (sceneObj as any).addScenery(item.id, item.kind, item.x, item.y, item.scale, item.rotation);
+          }
+        });
+
+        state.scenery.onRemove((item: any, id: string) => {
+          clientSceneryGrid.remove(item, item.x, item.y);
+          if (sceneObj instanceof TownScene) {
+            (sceneObj as any).removeScenery(item.id);
+          }
+        });
+      }
+
+      // --- LAND PLOTS ---
+      if (state.landPlots) {
+        state.landPlots.forEach((plot: any, id: string) => {
+          if (sceneObj instanceof TownScene) {
+            const worldX = plot.gridX * 20 + 10;
+            const worldZ = plot.gridY * 20 + 10;
+            const terrainY = getHeightCached(worldX, worldZ);
+            (sceneObj as any).addLandPlot(plot.id, plot.gridX, plot.gridY, plot.ownerId, plot.ownerName, terrainY);
+          }
+        });
+
+        state.landPlots.onAdd((plot: any, id: string) => {
+          if (sceneObj instanceof TownScene) {
+            const worldX = plot.gridX * 20 + 10;
+            const worldZ = plot.gridY * 20 + 10;
+            const terrainY = getHeightCached(worldX, worldZ);
+            (sceneObj as any).addLandPlot(plot.id, plot.gridX, plot.gridY, plot.ownerId, plot.ownerName, terrainY);
+          }
+        });
+
+        state.landPlots.onRemove((plot: any, id: string) => {
+          if (sceneObj instanceof TownScene) {
+            (sceneObj as any).removeLandPlot(plot.id);
+          }
+        });
+      }
+
+      // --- BUILDINGS ---
+      if (state.buildings) {
+        state.buildings.forEach((bldg: any, id: string) => {
+          if (sceneObj instanceof TownScene) {
+            const terrainY = getHeightCached(bldg.x, bldg.z);
+            (sceneObj as any).addBuilding(bldg.id, bldg.type, bldg.x, bldg.z, bldg.isConstructed, bldg.progress, bldg.targetProgress, terrainY);
+          }
+        });
+
+        state.buildings.onAdd((bldg: any, id: string) => {
+          if (sceneObj instanceof TownScene) {
+            const terrainY = getHeightCached(bldg.x, bldg.z);
+            (sceneObj as any).addBuilding(bldg.id, bldg.type, bldg.x, bldg.z, bldg.isConstructed, bldg.progress, bldg.targetProgress, terrainY);
+          }
+        });
+      }
   });
 
   // Initialize Trade Receivers

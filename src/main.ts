@@ -374,21 +374,21 @@ function initAdminPanel() {
     document.body.appendChild(panel);
 }
 
-// --- COLYSEUS HYDRATION HELPER (BULLETPROOF FIX) ---
-// This aggressively polls the server schema until it exists.
-function safeBind(parent: any, key: string, onAdd: (item: any, id: string) => void, onRemove?: (item: any, id: string) => void) {
-    if (!parent) return;
-    const collection = parent[key];
+// --- COLYSEUS HYDRATION HELPER (BULLETPROOF FIX 2.0) ---
+// Uses a getter function to prevent freezing on a stale/empty state object
+function safeBind(getCollection: () => any, onAdd: (item: any, id: string) => void, onRemove?: (item: any, id: string) => void) {
+    const collection = getCollection();
     
     if (!collection) {
         // The server hasn't sent the schema data yet. Keep trying!
-        setTimeout(() => safeBind(parent, key, onAdd, onRemove), 50);
+        setTimeout(() => safeBind(getCollection, onAdd, onRemove), 50);
         return;
     }
     
-    if (typeof collection.onAdd === "function") {
+    if (typeof collection.onAdd === "function" && !(collection as any)._isBound) {
         collection.onAdd(onAdd);
         if (onRemove) collection.onRemove(onRemove);
+        (collection as any)._isBound = true; // Prevent double binding
         
         // Catch any items that were loaded before the binding happened
         if (typeof collection.forEach === "function") {
@@ -396,16 +396,14 @@ function safeBind(parent: any, key: string, onAdd: (item: any, id: string) => vo
                 onAdd(item, id);
             });
         }
-    } else {
+    } else if (!(collection as any)._isBound) {
         // Fallback: Check again in 50ms (allows Colyseus time to attach the MapSchema prototypes)
-        setTimeout(() => safeBind(parent, key, onAdd, onRemove), 50);
+        setTimeout(() => safeBind(getCollection, onAdd, onRemove), 50);
     }
 }
 
 // --- HELPER TO GUARANTEE PLAYER INITIALIZATION ---
 function initPlayerVisual(player: any, id: string, room: ActiveRoom, sceneObj: ActiveScene) {
-    console.log(`[DEBUG-INIT] initPlayerVisual called for ID: ${id}. Is Local Player?: ${id === room.sessionId}`);
-    
     const safeX = isNaN(player.x) ? 0 : player.x;
     const safeY = isNaN(player.y) ? 0 : player.y;
 
@@ -417,9 +415,7 @@ function initPlayerVisual(player: any, id: string, room: ActiveRoom, sceneObj: A
     
     if (typeof (sceneObj as any).addPlayer === "function") {
         (sceneObj as any).addPlayer(id, id === room.sessionId, player.name);
-    } else {
-        console.error(`[DEBUG-INIT] ❌ sceneObj.addPlayer is NOT a function on current scene!`);
-    } 
+    }
 
     if (typeof (sceneObj as any).updatePlayer === "function") {
         (sceneObj as any).updatePlayer(id, safeX, safeY, player.name, player.equippedItem, player.equipBack, player.isSleeping, player.sleepRot, isSwim, th, player.equipHead, player.equipChest, player.equipLegs, player.equipFeet, player.equipOffHand, player.isSpiritAnimal, player.isSprinting, player.isMeditating, player.teamId, player.mountedFamiliarId);
@@ -429,16 +425,13 @@ function initPlayerVisual(player: any, id: string, room: ActiveRoom, sceneObj: A
         if (typeof (sceneObj as any).playerVisuals !== "undefined") {
             const v = (sceneObj as any).playerVisuals.get(id);
             if (v) {
-                console.log(`[DEBUG-INIT] ✅ Local Player Visual successfully bound to Scene.`);
                 v.mesh.position.set(safeX, th, safeY);
                 v.targetPosition.set(safeX, th, safeY);
-            } else {
-                console.error(`[DEBUG-INIT] ❌ Local Player Visual is missing from sceneObj.playerVisuals map!`);
-            }
+            } 
         }
 
-        // Safe bind for nested inventory
-        safeBind(player, "inventory", () => refreshInventoryUI(room, PLAYER_CLASS), () => refreshInventoryUI(room, PLAYER_CLASS));
+        // Safe bind for nested inventory using Getter syntax
+        safeBind(() => player.inventory, () => refreshInventoryUI(room, PLAYER_CLASS), () => refreshInventoryUI(room, PLAYER_CLASS));
         
         if (typeof player.listen === "function") {
             player.listen("coins", () => {
@@ -918,13 +911,11 @@ function setupRoomBindings(room: ActiveRoom, sceneObj: ActiveScene): () => void 
   });
 
   // ==========================================
-  // 2. STATE LISTENERS (With Safebind to Prevent Crashes)
+  // 2. STATE LISTENERS (With Bulletproof Getters)
   // ==========================================
-  
-  const state = room.state as any;
 
   // PLAYERS
-  safeBind(state, "players", (p: any, id: string) => {
+  safeBind(() => room.state?.players, (p: any, id: string) => {
       initPlayerVisual(p, id, room, sceneObj);
   }, (p: any, id: string) => {
       if (typeof (sceneObj as any).removePlayer === "function") {
@@ -933,12 +924,12 @@ function setupRoomBindings(room: ActiveRoom, sceneObj: ActiveScene): () => void 
   });
 
   // DECORATIONS
-  safeBind(state, "decorations", (deco: any, id: string) => {
+  safeBind(() => room.state?.decorations, (deco: any, id: string) => {
       if (sceneObj instanceof TownScene) {
           const terrainY = getHeightCached(deco.x, deco.z);
           (sceneObj as any).addDecoration(deco.id, deco.type, deco.x, terrainY + 0.05, deco.z, deco.rotation);
       }
-      safeBind(deco, "inventory", () => refreshChestUI(room), () => refreshChestUI(room));
+      safeBind(() => deco.inventory, () => refreshChestUI(room), () => refreshChestUI(room));
       if (deco.inventory && typeof deco.inventory.onChange === "function") {
           deco.inventory.onChange(() => refreshChestUI(room));
       }
@@ -947,19 +938,19 @@ function setupRoomBindings(room: ActiveRoom, sceneObj: ActiveScene): () => void 
   });
 
   // STORES
-  safeBind(state, "stores", (store: any, id: string) => {
+  safeBind(() => room.state?.stores, (store: any, id: string) => {
       if (typeof store.listen === "function") {
           store.listen("vault", () => refreshShopUI(room));
           store.listen("ownerId", () => refreshShopUI(room));
       }
-      safeBind(store, "inventory", () => refreshShopUI(room), () => refreshShopUI(room));
+      safeBind(() => store.inventory, () => refreshShopUI(room), () => refreshShopUI(room));
       if (store.inventory && typeof store.inventory.onChange === "function") {
           store.inventory.onChange(() => refreshShopUI(room));
       }
   });
 
   // FAMILIARS
-  safeBind(state, "familiars", (fam: any, id: string) => {
+  safeBind(() => room.state?.familiars, (fam: any, id: string) => {
       if (sceneObj && (sceneObj as any).familiarRenderer) {
           const safeX = isNaN(fam.x) ? 0 : fam.x;
           const safeY = isNaN(fam.y) ? 0 : fam.y;
@@ -979,7 +970,7 @@ function setupRoomBindings(room: ActiveRoom, sceneObj: ActiveScene): () => void 
   });
 
   // ENEMIES
-  safeBind(state, "enemies", (enemy: any, id: string) => {
+  safeBind(() => room.state?.enemies, (enemy: any, id: string) => {
       if (typeof (sceneObj as any).addEnemy === "function") {
           (sceneObj as any).addEnemy(id, enemy.name);
       }
@@ -990,7 +981,7 @@ function setupRoomBindings(room: ActiveRoom, sceneObj: ActiveScene): () => void 
   });
 
   // LOOT ITEMS
-  safeBind(state, "lootItems", (item: any, id: string) => {
+  safeBind(() => room.state?.lootItems, (item: any, id: string) => {
       if (sceneObj instanceof FieldScene || sceneObj instanceof DungeonScene) {
           if (typeof (sceneObj as any).addLootItem === "function") {
               (sceneObj as any).addLootItem(id, item.kind, item.x, item.y, item.scale, item.rotation);
@@ -1010,7 +1001,7 @@ function setupRoomBindings(room: ActiveRoom, sceneObj: ActiveScene): () => void 
   });
 
   // SCENERY
-  safeBind(state, "scenery", (item: any, id: string) => {
+  safeBind(() => room.state?.scenery, (item: any, id: string) => {
       clientSceneryGrid.add(item, item.x, item.y);
       if (sceneObj instanceof TownScene) {
           if (typeof (sceneObj as any).addScenery === "function") {
@@ -1027,7 +1018,7 @@ function setupRoomBindings(room: ActiveRoom, sceneObj: ActiveScene): () => void 
   });
 
   // LAND PLOTS
-  safeBind(state, "landPlots", (plot: any, id: string) => {
+  safeBind(() => room.state?.landPlots, (plot: any, id: string) => {
       if (sceneObj instanceof TownScene) {
           const worldX = plot.gridX * 20 + 10;
           const worldZ = plot.gridY * 20 + 10;
@@ -1045,7 +1036,7 @@ function setupRoomBindings(room: ActiveRoom, sceneObj: ActiveScene): () => void 
   });
 
   // BUILDINGS
-  safeBind(state, "buildings", (bldg: any, id: string) => {
+  safeBind(() => room.state?.buildings, (bldg: any, id: string) => {
       if (sceneObj instanceof TownScene) {
           const terrainY = getHeightCached(bldg.x, bldg.z);
           if (typeof (sceneObj as any).addBuilding === "function") {
@@ -1128,13 +1119,7 @@ async function switchZone(nextZone: ZoneName): Promise<void> {
 let isHoldingTab = false;
 
 function setupInput(): void {
-  console.log("[DEBUG-INPUT] Keyboard listeners initialized.");
-
   window.addEventListener("keydown", (event) => {
-    if (["KeyW", "KeyA", "KeyS", "KeyD", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(event.code)) {
-        console.log(`[DEBUG-INPUT] KeyPressed: ${event.code}. isUIOpen?: ${getActionContext().isUIOpen}`);
-    }
-
     if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(event.code)) {
         event.preventDefault();
     }
@@ -1972,6 +1957,12 @@ function syncStateToScene(room: ActiveRoom, sceneObj: ActiveScene) {
     try {
         if (state.players && typeof state.players.forEach === "function") {
             state.players.forEach((player: any, id: string) => {
+                // SAFEGUARD: If the server knows this player exists, but they aren't in the 3D scene, FORCE CREATE THEM
+                if (!(sceneObj as any).playerVisuals?.has(id)) {
+                    console.warn(`⚠️ [RECOVERY] Player mesh missing for ${id}! Forcing creation...`);
+                    initPlayerVisual(player, id, room, sceneObj);
+                }
+
                 if (id !== room.sessionId) {
                     const safeX = isNaN(player.x) ? 0 : player.x;
                     const safeY = isNaN(player.y) ? 0 : player.y;
@@ -2091,12 +2082,6 @@ function startHudLoop(): void {
 
       const state = activeRoom.state as any;
       const me = state.players?.get(activeRoom.sessionId) as any;
-
-      // SAFEGUARD: If the server knows we exist, but our local 3D mesh wasn't created, force create it!
-      if (me && !(activeScene as any).playerVisuals?.has(activeRoom.sessionId)) {
-          console.warn("⚠️ [RECOVERY] Local player mesh missing! Forcing creation...");
-          initPlayerVisual(me, activeRoom.sessionId, activeRoom, activeScene);
-      }
 
       let inputX = 0; let inputY = 0;
       if (keys.KeyW) inputY -= 1; 

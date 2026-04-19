@@ -116,7 +116,6 @@ function updateDebugOverlay(data: any) {
 }
 // ==========================================
 
-
 type TownRoomType = Awaited<ReturnType<typeof connectToTown>>;
 type FieldRoomType = Awaited<ReturnType<typeof connectToField>>;
 type DungeonRoomType = Awaited<ReturnType<typeof connectToDungeon>>;
@@ -392,11 +391,13 @@ function initPlayerVisual(player: any, id: string, room: ActiveRoom, sceneObj: A
             }
         }
 
-        if (player.inventory) {
+        // Apply safety check for inventory onAdd
+        if (player.inventory && typeof player.inventory.onAdd === "function") {
             player.inventory.onAdd(() => refreshInventoryUI(room, PLAYER_CLASS));
             player.inventory.onRemove(() => refreshInventoryUI(room, PLAYER_CLASS));
             player.inventory.onChange(() => refreshInventoryUI(room, PLAYER_CLASS));
         }
+        
         if (typeof player.listen === "function") {
             player.listen("coins", () => {
                 refreshInventoryUI(room, PLAYER_CLASS);
@@ -912,7 +913,8 @@ function setupRoomBindings(room: ActiveRoom, sceneObj: ActiveScene): () => void 
                   const terrainY = getHeightCached(deco.x, deco.z);
                   (sceneObj as any).addDecoration(deco.id, deco.type, deco.x, terrainY + 0.05, deco.z, deco.rotation);
               }
-              if (deco.inventory) {
+              
+              if (deco.inventory && typeof deco.inventory.onAdd === "function") {
                   deco.inventory.onAdd(() => refreshChestUI(room));
                   deco.inventory.onRemove(() => refreshChestUI(room));
                   deco.inventory.onChange(() => refreshChestUI(room));
@@ -937,7 +939,8 @@ function setupRoomBindings(room: ActiveRoom, sceneObj: ActiveScene): () => void 
                   store.listen("vault", () => refreshShopUI(room));
                   store.listen("ownerId", () => refreshShopUI(room));
               }
-              if (store.inventory) {
+              
+              if (store.inventory && typeof store.inventory.onAdd === "function") {
                   store.inventory.onAdd(() => refreshShopUI(room));
                   store.inventory.onRemove(() => refreshShopUI(room));
                   store.inventory.onChange(() => refreshShopUI(room));
@@ -1166,6 +1169,7 @@ let isHoldingTab = false;
 
 function setupInput(): void {
   window.addEventListener("keydown", (event) => {
+    // Prevent browser scrolling for camera pan
     if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(event.code)) {
         event.preventDefault();
     }

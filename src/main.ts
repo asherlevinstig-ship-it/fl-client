@@ -155,7 +155,11 @@ const heightCache = new Map<string, number>();
 function getHeightCached(x: number, z: number): number {
     const key = `${x | 0},${z | 0}`;
     if (!heightCache.has(key)) {
-        heightCache.set(key, getTerrainHeight(x, z));
+        try {
+            heightCache.set(key, getTerrainHeight(x, z) || 0);
+        } catch (e) {
+            return 0; // Failsafe so the visual sync doesn't crash on zone transitions
+        }
     }
     return heightCache.get(key)!;
 }
@@ -314,6 +318,45 @@ function initAdminPanel() {
     panel.appendChild(closeText);
 
     document.body.appendChild(panel);
+}
+
+// --- HELPER TO GUARANTEE PLAYER INITIALIZATION ---
+function initPlayerVisual(player: any, id: string, room: ActiveRoom, sceneObj: ActiveScene) {
+    const safeX = isNaN(player.x) ? 0 : player.x;
+    const safeY = isNaN(player.y) ? 0 : player.y;
+
+    const isSwim = distanceSq(safeX, safeY, 1200, 0) <= 1600;
+    let th = 0;
+    if (sceneObj instanceof TownScene) {
+        th = getHeightCached(safeX, safeY);
+    }
+    
+    (sceneObj as any).addPlayer(id, id === room.sessionId, player.name);
+    (sceneObj as any).updatePlayer(id, safeX, safeY, player.name, player.equippedItem, player.equipBack, player.isSleeping, player.sleepRot, isSwim, th, player.equipHead, player.equipChest, player.equipLegs, player.equipFeet, player.equipOffHand, player.isSpiritAnimal, player.isSprinting, player.isMeditating, player.teamId, player.mountedFamiliarId);
+    
+    if (id === room.sessionId) {
+        if (typeof (sceneObj as any).playerVisuals !== "undefined") {
+            const v = (sceneObj as any).playerVisuals.get(id);
+            if (v) {
+                v.mesh.position.set(safeX, th, safeY);
+                v.targetPosition.set(safeX, th, safeY);
+            }
+        }
+
+        if (player.inventory) {
+            player.inventory.onAdd(() => refreshInventoryUI(room, PLAYER_CLASS));
+            player.inventory.onRemove(() => refreshInventoryUI(room, PLAYER_CLASS));
+            player.inventory.onChange(() => refreshInventoryUI(room, PLAYER_CLASS));
+        }
+        if (typeof player.listen === "function") {
+            player.listen("coins", () => {
+                refreshInventoryUI(room, PLAYER_CLASS);
+                refreshShopUI(room);
+            });
+            player.listen("level", () => refreshInventoryUI(room, PLAYER_CLASS));
+            player.listen("rank", () => refreshInventoryUI(room, PLAYER_CLASS));
+        }
+    }
 }
 
 function setupRoomBindings(room: ActiveRoom, sceneObj: ActiveScene): () => void {
@@ -495,46 +538,18 @@ function setupRoomBindings(room: ActiveRoom, sceneObj: ActiveScene): () => void 
   });
 
   if ((room.state as any)?.players) {
-    (room.state as any).players.onAdd((player: any, id: string) => {
-      const safeX = isNaN(player.x) ? 0 : player.x;
-      const safeY = isNaN(player.y) ? 0 : player.y;
-
-      const isSwim = distanceSq(safeX, safeY, 1200, 0) <= 1600;
-      let th = 0;
-      if (sceneObj instanceof TownScene && typeof getHeightCached === "function") {
-          const h = getHeightCached(safeX, safeY);
-          th = isNaN(h) ? 0 : h;
-      }
-      
-      (sceneObj as any).addPlayer(id, id === room.sessionId, player.name);
-      (sceneObj as any).updatePlayer(id, safeX, safeY, player.name, player.equippedItem, player.equipBack, player.isSleeping, player.sleepRot, isSwim, th, player.equipHead, player.equipChest, player.equipLegs, player.equipFeet, player.equipOffHand, player.isSpiritAnimal, player.isSprinting, player.isMeditating, player.teamId, player.mountedFamiliarId);
-      
-      if (id === room.sessionId) {
-          if (typeof (sceneObj as any).playerVisuals !== "undefined") {
-              const v = (sceneObj as any).playerVisuals.get(id);
-              if (v) {
-                  v.mesh.position.set(safeX, th, safeY);
-                  v.targetPosition.set(safeX, th, safeY);
-              }
-          }
-
-          if (player.inventory) {
-              player.inventory.onAdd(() => refreshInventoryUI(room, PLAYER_CLASS));
-              player.inventory.onRemove(() => refreshInventoryUI(room, PLAYER_CLASS));
-              player.inventory.onChange(() => refreshInventoryUI(room, PLAYER_CLASS));
-          }
-          if (typeof player.listen === "function") {
-              player.listen("coins", () => {
-                  refreshInventoryUI(room, PLAYER_CLASS);
-                  refreshShopUI(room);
-              });
-              player.listen("level", () => refreshInventoryUI(room, PLAYER_CLASS));
-              player.listen("rank", () => refreshInventoryUI(room, PLAYER_CLASS));
-          }
-      }
+    const playersMap = (room.state as any).players;
+    
+    // FIX 1: Robust Pre-initialization for Colyseus timing quirks
+    playersMap.forEach((p: any, id: string) => {
+        initPlayerVisual(p, id, room, sceneObj);
     });
 
-    (room.state as any).players.onRemove((player: any, id: string) => {
+    playersMap.onAdd((player: any, id: string) => {
+        initPlayerVisual(player, id, room, sceneObj);
+    });
+
+    playersMap.onRemove((player: any, id: string) => {
       if (typeof (sceneObj as any).removePlayer === "function") {
           (sceneObj as any).removePlayer(id);
       }
@@ -542,20 +557,24 @@ function setupRoomBindings(room: ActiveRoom, sceneObj: ActiveScene): () => void 
   }
 
   if ((room.state as any)?.decorations) {
-      (room.state as any).decorations.onAdd((deco: any, id: string) => {
+      const decosMap = (room.state as any).decorations;
+      
+      const initDeco = (deco: any) => {
           if (sceneObj instanceof TownScene) {
               const terrainY = getHeightCached(deco.x, deco.z);
               (sceneObj as any).addDecoration(deco.id, deco.type, deco.x, terrainY + 0.05, deco.z, deco.rotation);
           }
-          
           if (deco.inventory) {
               deco.inventory.onAdd(() => refreshChestUI(room));
               deco.inventory.onRemove(() => refreshChestUI(room));
               deco.inventory.onChange(() => refreshChestUI(room));
           }
-      });
+      };
 
-      (room.state as any).decorations.onRemove((deco: any, id: string) => {
+      decosMap.forEach(initDeco);
+      decosMap.onAdd((deco: any) => initDeco(deco));
+
+      decosMap.onRemove((deco: any, id: string) => {
           if (sceneObj instanceof TownScene) {
               (sceneObj as any).removeDecoration(deco.id);
           }
@@ -563,7 +582,9 @@ function setupRoomBindings(room: ActiveRoom, sceneObj: ActiveScene): () => void 
   }
 
   if ((room.state as any)?.stores) {
-      (room.state as any).stores.onAdd((store: any, id: string) => {
+      const storesMap = (room.state as any).stores;
+      
+      const initStore = (store: any) => {
           if (typeof store.listen === "function") {
               store.listen("vault", () => refreshShopUI(room));
               store.listen("ownerId", () => refreshShopUI(room));
@@ -573,24 +594,31 @@ function setupRoomBindings(room: ActiveRoom, sceneObj: ActiveScene): () => void 
               store.inventory.onRemove(() => refreshShopUI(room));
               store.inventory.onChange(() => refreshShopUI(room));
           }
-      });
+      };
+
+      storesMap.forEach(initStore);
+      storesMap.onAdd((store: any) => initStore(store));
   }
 
   if ((room.state as any)?.familiars) {
-      (room.state as any).familiars.onAdd((fam: any, id: string) => {
+      const famMap = (room.state as any).familiars;
+      
+      const initFam = (fam: any, id: string) => {
           if (sceneObj && (sceneObj as any).familiarRenderer) {
               const safeX = isNaN(fam.x) ? 0 : fam.x;
               const safeY = isNaN(fam.y) ? 0 : fam.y;
               let th = 0;
-              if (sceneObj instanceof TownScene && typeof getHeightCached === "function") {
-                  const h = getHeightCached(safeX, safeY);
-                  th = isNaN(h) ? 0 : h;
+              if (sceneObj instanceof TownScene) {
+                  th = getHeightCached(safeX, safeY);
               }
               (sceneObj as any).familiarRenderer.addFamiliar(id, fam.type, safeX, th, safeY);
           }
-      });
+      };
 
-      (room.state as any).familiars.onRemove((fam: any, id: string) => {
+      famMap.forEach(initFam);
+      famMap.onAdd(initFam);
+
+      famMap.onRemove((fam: any, id: string) => {
           if (sceneObj && (sceneObj as any).familiarRenderer) {
               (sceneObj as any).familiarRenderer.removeFamiliar(id);
           }
@@ -598,13 +626,18 @@ function setupRoomBindings(room: ActiveRoom, sceneObj: ActiveScene): () => void 
   }
 
   if ((room.state as any)?.enemies) {
-    (room.state as any).enemies.onAdd((enemy: any, id: string) => {
+    const enemyMap = (room.state as any).enemies;
+    
+    const initEnemy = (enemy: any, id: string) => {
         if (typeof (sceneObj as any).addEnemy === "function") {
             (sceneObj as any).addEnemy(id, enemy.name);
         }
-    });
+    };
 
-    (room.state as any).enemies.onRemove((enemy: any, id: string) => {
+    enemyMap.forEach(initEnemy);
+    enemyMap.onAdd(initEnemy);
+
+    enemyMap.onRemove((enemy: any, id: string) => {
        if (typeof (sceneObj as any).removeEnemy === "function") {
            (sceneObj as any).removeEnemy(id);
        }
@@ -1877,9 +1910,8 @@ function syncStateToScene(room: ActiveRoom, sceneObj: ActiveScene) {
                     const isSwim = distanceSq(safeX, safeY, 1200, 0) <= 1600;
                     
                     let th = 0;
-                    if (sceneObj instanceof TownScene && typeof getHeightCached === "function") {
-                        const h = getHeightCached(safeX, safeY);
-                        th = isNaN(h) ? 0 : h;
+                    if (sceneObj instanceof TownScene) {
+                        th = getHeightCached(safeX, safeY);
                     }
 
                     if (typeof (sceneObj as any).updatePlayer === "function") {
@@ -1918,9 +1950,8 @@ function syncStateToScene(room: ActiveRoom, sceneObj: ActiveScene) {
                 const label = `${enemy.name} (${Math.ceil(enemy.hp)}/${enemy.maxHp})${statusText}`;
                 
                 let th = 0;
-                if (sceneObj instanceof TownScene && typeof getHeightCached === "function") {
-                    const h = getHeightCached(safeX, safeY);
-                    th = isNaN(h) ? 0 : h;
+                if (sceneObj instanceof TownScene) {
+                    th = getHeightCached(safeX, safeY);
                 }
 
                 (sceneObj as any).updateEnemy(id, safeX, safeY, label, enemy.action, enemy.attackRadius || 2.5, enemy.targetX, enemy.targetY, th, Array.from(enemy.afflictions.keys()));
@@ -1949,9 +1980,8 @@ function syncStateToScene(room: ActiveRoom, sceneObj: ActiveScene) {
                 const safeY = isNaN(fam.y) ? 0 : fam.y;
                 
                 let th = 0;
-                if (sceneObj instanceof TownScene && typeof getHeightCached === "function") {
-                    const h = getHeightCached(safeX, safeY);
-                    th = isNaN(h) ? 0 : h;
+                if (sceneObj instanceof TownScene) {
+                    th = getHeightCached(safeX, safeY);
                 }
                 
                 if (typeof (sceneObj as any).familiarRenderer.updateFamiliar === "function") {
@@ -2247,9 +2277,8 @@ function startHudLoop(): void {
 
         const isSwimmingLocally = distanceSq(localPlayerPos.x, localPlayerPos.y, 1200, 0) <= 1600;
         let th = 0;
-        if (activeScene instanceof TownScene && typeof getHeightCached === "function") {
-            const h = getHeightCached(localPlayerPos.x, localPlayerPos.y);
-            th = isNaN(h) ? 0 : h;
+        if (activeScene instanceof TownScene) {
+            th = getHeightCached(localPlayerPos.x, localPlayerPos.y);
         }
         
         const isWolfVisual = me.isSpiritAnimal || isLocallyWolf;
@@ -2325,7 +2354,7 @@ async function boot(): Promise<void> {
           
           localStorage.setItem("rpg_reconnection_token", activeRoom.reconnectionToken);
           
-          // --- FIX 1: Trust the Server's Room Name, not Local Storage ---
+          // --- FIX 2: Trust the Server's Room Name, not Local Storage ---
           const actualZone = activeRoom.name as ZoneName;
           currentZone = actualZone;
           localStorage.setItem("rpg_last_zone", actualZone);

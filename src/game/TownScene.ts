@@ -307,10 +307,9 @@ export class TownScene extends BaseScene {
     this.createHoverPlot();
     this.createBlueprints();
     this.createDecoGhosts();
-
-    this.start();
+    // this.start() removed to prevent double-loop camera jitter
   }
-//chicken
+
  public override updatePlayer(
       id: string,
       x: number,
@@ -333,7 +332,7 @@ export class TownScene extends BaseScene {
       teamId: number = 0,
       mountedFamiliarId: string = "", 
       isAuraActive: boolean = false,  
-      auraStyle: string = "tyrant"    
+      auraStyle: string = "tyrant"   
   ) {
       super.updatePlayer(
           id,
@@ -747,7 +746,7 @@ export class TownScene extends BaseScene {
 
   protected onUpdate(dt: number): void {
     this.frameCount++;
-    const time = Date.now();
+    const time = performance.now();
     const timeSec = time * 0.001;
 
     const camX = this.camera.position.x;
@@ -1030,8 +1029,8 @@ export class TownScene extends BaseScene {
       }
   }
 
-  public updateCameraFollow(myId: string) {
-    super.updateCameraFollow(myId);
+  public updateCameraFollow(myId: string, dt?: number) {
+    super.updateCameraFollow(myId, dt);
 
     const camX = this.camera.position.x;
     const camZ = this.camera.position.z;
@@ -1739,7 +1738,7 @@ export class TownScene extends BaseScene {
       if (this.casinoAnims.bjTimer > 0) {
           this.casinoAnims.bjTimer -= dt;
           this.casinoAnims.bjCards.forEach((c, i) => {
-              c.position.y = 1.42 + Math.abs(Math.sin((Date.now() / 80) + i)) * 0.3;
+              c.position.y = 1.42 + Math.abs(Math.sin((performance.now() / 80) + i)) * 0.3;
               c.rotation.y += dt * 5;
           });
       } else {

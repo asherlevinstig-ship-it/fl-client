@@ -1,4 +1,7 @@
-const API_URL = "http://localhost:2567/api"; 
+const isLocal = window.location.hostname === "localhost";
+const API_URL = isLocal 
+  ? "http://localhost:2567/api" 
+  : "https://us-mia-ea26ba04.colyseus.cloud/api"; // Make sure it's https://
 
 export async function runAuthenticationFlow(): Promise<any> {
     return new Promise((resolve) => {

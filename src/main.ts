@@ -79,6 +79,44 @@ import {
   distance 
 } from "./game/CollisionSystem";
 
+// ==========================================
+// 🚨 DEBUGGER OVERLAY SYSTEM
+// ==========================================
+let debugFrameCount = 0;
+function updateDebugOverlay(data: any) {
+    let overlay = document.getElementById("dev-debug-overlay");
+    if (!overlay) {
+        overlay = document.createElement("div");
+        overlay.id = "dev-debug-overlay";
+        overlay.style.position = "fixed";
+        overlay.style.top = "10px";
+        overlay.style.right = "10px";
+        overlay.style.backgroundColor = "rgba(0, 0, 0, 0.8)";
+        overlay.style.color = "#00ff00";
+        overlay.style.padding = "10px";
+        overlay.style.fontFamily = "monospace";
+        overlay.style.fontSize = "12px";
+        overlay.style.zIndex = "99999";
+        overlay.style.pointerEvents = "none";
+        document.body.appendChild(overlay);
+    }
+
+    overlay.innerHTML = `
+        <strong style="color: #fff">🔧 CLIENT DEBUGGER</strong><br/>
+        -----------------------<br/>
+        <b>FPS Loop:</b> ${debugFrameCount++}<br/>
+        <b>Zone:</b> ${currentZone || "None"}<br/>
+        <b>Room Session ID:</b> ${activeRoom?.sessionId || "Disconnected"}<br/>
+        <b>Has Active Scene?:</b> ${!!activeScene}<br/>
+        <b>Server Players Count:</b> ${data.serverPlayerCount}<br/>
+        <b>Is 'Me' Loaded?:</b> <span style="color:${data.isMeLoaded ? '#0f0' : '#f00'}">${data.isMeLoaded}</span><br/>
+        <b>Local Pos:</b> X:${localPlayerPos.x.toFixed(2)} Y:${localPlayerPos.y.toFixed(2)}<br/>
+        <b>Input X/Y:</b> ${data.inputX} / ${data.inputY}<br/>
+    `;
+}
+// ==========================================
+
+
 type TownRoomType = Awaited<ReturnType<typeof connectToTown>>;
 type FieldRoomType = Awaited<ReturnType<typeof connectToField>>;
 type DungeonRoomType = Awaited<ReturnType<typeof connectToDungeon>>;
@@ -155,7 +193,11 @@ const heightCache = new Map<string, number>();
 function getHeightCached(x: number, z: number): number {
     const key = `${x | 0},${z | 0}`;
     if (!heightCache.has(key)) {
-        heightCache.set(key, getTerrainHeight(x, z));
+        try {
+            heightCache.set(key, getTerrainHeight(x, z) || 0);
+        } catch (e) {
+            return 0; // Failsafe so the visual sync doesn't crash on zone transitions
+        }
     }
     return heightCache.get(key)!;
 }
@@ -316,8 +358,75 @@ function initAdminPanel() {
     document.body.appendChild(panel);
 }
 
-function setupRoomBindings(room: ActiveRoom, sceneObj: ActiveScene): () => void {
+// --- COLYSEUS HYDRATION HELPER ---
+// Safely binds collection listeners, handling the initial connection delay
+function safeBind(collection: any, onAdd: (item: any, id: string) => void, onRemove?: (item: any, id: string) => void) {
+    if (!collection) return;
+    
+    if (typeof collection.onAdd === "function") {
+        collection.onAdd(onAdd);
+        if (onRemove) collection.onRemove(onRemove);
+        
+        // Catch any items that were loaded before the binding happened
+        if (typeof collection.forEach === "function") {
+            collection.forEach((item: any, id: string) => {
+                onAdd(item, id);
+            });
+        }
+    } else {
+        // Fallback: Check again in 50ms (allows Colyseus time to attach the MapSchema prototypes)
+        setTimeout(() => safeBind(collection, onAdd, onRemove), 50);
+    }
+}
 
+// --- HELPER TO GUARANTEE PLAYER INITIALIZATION ---
+function initPlayerVisual(player: any, id: string, room: ActiveRoom, sceneObj: ActiveScene) {
+    const safeX = isNaN(player.x) ? 0 : player.x;
+    const safeY = isNaN(player.y) ? 0 : player.y;
+
+    const isSwim = distanceSq(safeX, safeY, 1200, 0) <= 1600;
+    let th = 0;
+    if (sceneObj instanceof TownScene) {
+        th = getHeightCached(safeX, safeY);
+    }
+    
+    if (typeof (sceneObj as any).addPlayer === "function") {
+        (sceneObj as any).addPlayer(id, id === room.sessionId, player.name);
+    } 
+
+    if (typeof (sceneObj as any).updatePlayer === "function") {
+        (sceneObj as any).updatePlayer(id, safeX, safeY, player.name, player.equippedItem, player.equipBack, player.isSleeping, player.sleepRot, isSwim, th, player.equipHead, player.equipChest, player.equipLegs, player.equipFeet, player.equipOffHand, player.isSpiritAnimal, player.isSprinting, player.isMeditating, player.teamId, player.mountedFamiliarId);
+    }
+    
+    if (id === room.sessionId) {
+        if (typeof (sceneObj as any).playerVisuals !== "undefined") {
+            const v = (sceneObj as any).playerVisuals.get(id);
+            if (v) {
+                v.mesh.position.set(safeX, th, safeY);
+                v.targetPosition.set(safeX, th, safeY);
+            }
+        }
+
+        // Safe bind for nested inventory
+        safeBind(player.inventory, () => refreshInventoryUI(room, PLAYER_CLASS), () => refreshInventoryUI(room, PLAYER_CLASS));
+        
+        if (typeof player.listen === "function") {
+            player.listen("coins", () => {
+                refreshInventoryUI(room, PLAYER_CLASS);
+                refreshShopUI(room);
+            });
+            player.listen("level", () => refreshInventoryUI(room, PLAYER_CLASS));
+            player.listen("rank", () => refreshInventoryUI(room, PLAYER_CLASS));
+        }
+    }
+}
+
+function setupRoomBindings(room: ActiveRoom, sceneObj: ActiveScene): () => void {
+  console.log(`[DEBUG] Setting up Colyseus network bindings...`);
+
+  // ==========================================
+  // 1. NON-STATE MESSAGES (Safe to bind immediately)
+  // ==========================================
   room.onLeave((code: number) => {
       console.warn(`Connection closed (Code: ${code}).`);
       if (activeRoom === room) activeRoom = null;
@@ -381,7 +490,6 @@ function setupRoomBindings(room: ActiveRoom, sceneObj: ActiveScene): () => void 
       setIsWorldMapOpen(false);
   });
 
-  // --- HUD MESSAGE (Generic System Notifications) ---
   room.onMessage("hud_message", (message: string) => {
       eventQueue.push(() => {
           showTransientUI("general-hud-msg", message, "#ffffff", 3000);
@@ -460,7 +568,6 @@ function setupRoomBindings(room: ActiveRoom, sceneObj: ActiveScene): () => void 
       });
   });
 
-  // --- TRIGGER VOID FALL LOGIC ---
   room.onMessage("trigger_void_fall", () => {
       console.log("[CLIENT-NET] Received 'trigger_void_fall'. Triggering scene dummy.");
       eventQueue.push(() => {
@@ -469,13 +576,10 @@ function setupRoomBindings(room: ActiveRoom, sceneObj: ActiveScene): () => void 
               if (visual && visual.mesh) {
                   (sceneObj as any).triggerPlayerVoidFall(visual.mesh);
               }
-          } else {
-              console.warn("[CLIENT-NET] WARNING: Received trigger_void_fall, but triggerPlayerVoidFall is missing or scene is inactive!");
           }
       });
   });
 
-  // --- AUTHORITATIVE SERVER CORRECTION FIX ---
   room.onMessage("forcePosition", (data: any) => {
       localPlayerPos.x = data.x;
       localPlayerPos.y = data.z !== undefined ? data.z : data.y; 
@@ -494,124 +598,6 @@ function setupRoomBindings(room: ActiveRoom, sceneObj: ActiveScene): () => void 
       }
   });
 
-  if ((room.state as any)?.players) {
-    (room.state as any).players.onAdd((player: any, id: string) => {
-      const safeX = isNaN(player.x) ? 0 : player.x;
-      const safeY = isNaN(player.y) ? 0 : player.y;
-
-      const isSwim = distanceSq(safeX, safeY, 1200, 0) <= 1600;
-      let th = 0;
-      if (sceneObj instanceof TownScene && typeof getHeightCached === "function") {
-          const h = getHeightCached(safeX, safeY);
-          th = isNaN(h) ? 0 : h;
-      }
-      
-      (sceneObj as any).addPlayer(id, id === room.sessionId, player.name);
-      (sceneObj as any).updatePlayer(id, safeX, safeY, player.name, player.equippedItem, player.equipBack, player.isSleeping, player.sleepRot, isSwim, th, player.equipHead, player.equipChest, player.equipLegs, player.equipFeet, player.equipOffHand, player.isSpiritAnimal, player.isSprinting, player.isMeditating, player.teamId, player.mountedFamiliarId);
-      
-      if (id === room.sessionId) {
-          if (typeof (sceneObj as any).playerVisuals !== "undefined") {
-              const v = (sceneObj as any).playerVisuals.get(id);
-              if (v) {
-                  v.mesh.position.set(safeX, th, safeY);
-                  v.targetPosition.set(safeX, th, safeY);
-              }
-          }
-
-          if (player.inventory && typeof player.inventory.onAdd === "function") {
-              player.inventory.onAdd(() => refreshInventoryUI(room, PLAYER_CLASS));
-              player.inventory.onRemove(() => refreshInventoryUI(room, PLAYER_CLASS));
-              player.inventory.onChange(() => refreshInventoryUI(room, PLAYER_CLASS));
-          }
-          if (typeof player.listen === "function") {
-              player.listen("coins", () => {
-                  refreshInventoryUI(room, PLAYER_CLASS);
-                  refreshShopUI(room);
-              });
-              player.listen("level", () => refreshInventoryUI(room, PLAYER_CLASS));
-              player.listen("rank", () => refreshInventoryUI(room, PLAYER_CLASS));
-          }
-      }
-    });
-
-    (room.state as any).players.onRemove((player: any, id: string) => {
-      if (typeof (sceneObj as any).removePlayer === "function") {
-          (sceneObj as any).removePlayer(id);
-      }
-    });
-  }
-
-  if ((room.state as any)?.decorations) {
-      (room.state as any).decorations.onAdd((deco: any, id: string) => {
-          if (sceneObj instanceof TownScene) {
-              const terrainY = getHeightCached(deco.x, deco.z);
-              (sceneObj as any).addDecoration(deco.id, deco.type, deco.x, terrainY + 0.05, deco.z, deco.rotation);
-          }
-          
-          if (deco.inventory && typeof deco.inventory.onAdd === "function") {
-              deco.inventory.onAdd(() => refreshChestUI(room));
-              deco.inventory.onRemove(() => refreshChestUI(room));
-              deco.inventory.onChange(() => refreshChestUI(room));
-          }
-      });
-
-      (room.state as any).decorations.onRemove((deco: any, id: string) => {
-          if (sceneObj instanceof TownScene) {
-              (sceneObj as any).removeDecoration(deco.id);
-          }
-      });
-  }
-
-  if ((room.state as any)?.stores) {
-      (room.state as any).stores.onAdd((store: any, id: string) => {
-          if (typeof store.listen === "function") {
-              store.listen("vault", () => refreshShopUI(room));
-              store.listen("ownerId", () => refreshShopUI(room));
-          }
-          if (store.inventory && typeof store.inventory.onAdd === "function") {
-              store.inventory.onAdd(() => refreshShopUI(room));
-              store.inventory.onRemove(() => refreshShopUI(room));
-              store.inventory.onChange(() => refreshShopUI(room));
-          }
-      });
-  }
-
-  if ((room.state as any)?.familiars) {
-      (room.state as any).familiars.onAdd((fam: any, id: string) => {
-          if (sceneObj && (sceneObj as any).familiarRenderer) {
-              const safeX = isNaN(fam.x) ? 0 : fam.x;
-              const safeY = isNaN(fam.y) ? 0 : fam.y;
-              let th = 0;
-              if (sceneObj instanceof TownScene && typeof getHeightCached === "function") {
-                  const h = getHeightCached(safeX, safeY);
-                  th = isNaN(h) ? 0 : h;
-              }
-              (sceneObj as any).familiarRenderer.addFamiliar(id, fam.type, safeX, th, safeY);
-          }
-      });
-
-      (room.state as any).familiars.onRemove((fam: any, id: string) => {
-          if (sceneObj && (sceneObj as any).familiarRenderer) {
-              (sceneObj as any).familiarRenderer.removeFamiliar(id);
-          }
-      });
-  }
-
-  if ((room.state as any)?.enemies) {
-    (room.state as any).enemies.onAdd((enemy: any, id: string) => {
-        if (typeof (sceneObj as any).addEnemy === "function") {
-            (sceneObj as any).addEnemy(id, enemy.name);
-        }
-    });
-
-    (room.state as any).enemies.onRemove((enemy: any, id: string) => {
-       if (typeof (sceneObj as any).removeEnemy === "function") {
-           (sceneObj as any).removeEnemy(id);
-       }
-    });
-  }
-
-  // --- QUEUED VISUAL EVENTS ---
   room.onMessage("spawnHazard", (hazard: any) => {
       eventQueue.push(() => {
           if (sceneObj && typeof (sceneObj as any).addHazard === "function") {
@@ -696,7 +682,6 @@ function setupRoomBindings(room: ActiveRoom, sceneObj: ActiveScene): () => void 
           const input = document.getElementById("med-input") as HTMLInputElement;
           if (input) {
               input.focus();
-              
               input.addEventListener("keydown", (e) => {
                   if (e.key === "Enter") {
                       activeRoom?.send("submit_meditation", { answer: input.value, index: data.index });
@@ -775,66 +760,6 @@ function setupRoomBindings(room: ActiveRoom, sceneObj: ActiveScene): () => void 
       });
   });
 
-  if ((room.state as any)?.lootItems) {
-    (room.state as any).lootItems.onAdd((item: any, id: string) => {
-      if (sceneObj instanceof FieldScene || sceneObj instanceof DungeonScene) {
-        (sceneObj as any).addLootItem(id, item.kind, item.x, item.y, item.scale, item.rotation);
-      }
-      if (sceneObj instanceof TownScene) {
-        (sceneObj as any).addLootItem(id, item.kind, item.x, item.y, item.isOpen);
-      }
-    });
-
-    (room.state as any).lootItems.onRemove((item: any, id: string) => {
-      if (sceneObj instanceof FieldScene || sceneObj instanceof DungeonScene) {
-        (sceneObj as any).removeLootItem(id);
-      }
-    });
-  }
-
-  if ((room.state as any)?.scenery) {
-    (room.state as any).scenery.onAdd((item: any, id: string) => {
-      clientSceneryGrid.add(item, item.x, item.y);
-      if (sceneObj instanceof TownScene) {
-        (sceneObj as any).addScenery(item.id, item.kind, item.x, item.y, item.scale, item.rotation);
-      }
-    });
-
-    (room.state as any).scenery.onRemove((item: any, id: string) => {
-      clientSceneryGrid.remove(item, item.x, item.y);
-      if (sceneObj instanceof TownScene) {
-        (sceneObj as any).removeScenery(item.id);
-      }
-    });
-  }
-
-  if ((room.state as any)?.landPlots) {
-    (room.state as any).landPlots.onAdd((plot: any, id: string) => {
-      if (sceneObj instanceof TownScene) {
-        const worldX = plot.gridX * 20 + 10;
-        const worldZ = plot.gridY * 20 + 10;
-        const terrainY = getHeightCached(worldX, worldZ);
-        
-        (sceneObj as any).addLandPlot(plot.id, plot.gridX, plot.gridY, plot.ownerId, plot.ownerName, terrainY);
-      }
-    });
-
-    (room.state as any).landPlots.onRemove((plot: any, id: string) => {
-      if (sceneObj instanceof TownScene) {
-        (sceneObj as any).removeLandPlot(plot.id);
-      }
-    });
-  }
-
-  if ((room.state as any)?.buildings) {
-    (room.state as any).buildings.onAdd((bldg: any, id: string) => {
-      if (sceneObj instanceof TownScene) {
-        const terrainY = getHeightCached(bldg.x, bldg.z);
-        (sceneObj as any).addBuilding(bldg.id, bldg.type, bldg.x, bldg.z, bldg.isConstructed, bldg.progress, bldg.targetProgress, terrainY);
-      }
-    });
-  }
-
   room.onMessage("combatEvent", (data: any) => { 
       eventQueue.push(() => {
           if (sceneObj instanceof FieldScene || sceneObj instanceof DungeonScene) (sceneObj as any).playCombatEvent(data); 
@@ -844,7 +769,6 @@ function setupRoomBindings(room: ActiveRoom, sceneObj: ActiveScene): () => void 
   room.onMessage("playerAttacked", (data: any) => {
       eventQueue.push(() => {
           if (sceneObj && typeof (sceneObj as any).playAttackVisual === "function") {
-              
               if (data.damage === undefined) {
                   if (data.id === room.sessionId) return;
                   (sceneObj as any).playAttackVisual(data.id, data.targetX, data.targetZ);
@@ -875,7 +799,6 @@ function setupRoomBindings(room: ActiveRoom, sceneObj: ActiveScene): () => void 
       if (data.id === room.sessionId) {
           if (data.abilityId === "spirit_animal") isLocallyWolf = true;
           else if (data.abilityId === "spirit_animal_end") isLocallyWolf = false;
-          
           if (data.abilityId === "map_marker_placed") setMyMapMarker({ x: data.targetX, z: data.targetZ });
       }
 
@@ -964,6 +887,143 @@ function setupRoomBindings(room: ActiveRoom, sceneObj: ActiveScene): () => void 
       });
   });
 
+  // ==========================================
+  // 2. STATE LISTENERS (With Safebind to Prevent Crashes)
+  // ==========================================
+  
+  const state = room.state as any;
+
+  // PLAYERS
+  safeBind(state.players, (p: any, id: string) => {
+      initPlayerVisual(p, id, room, sceneObj);
+  }, (p: any, id: string) => {
+      if (typeof (sceneObj as any).removePlayer === "function") {
+          (sceneObj as any).removePlayer(id);
+      }
+  });
+
+  // DECORATIONS
+  safeBind(state.decorations, (deco: any, id: string) => {
+      if (sceneObj instanceof TownScene) {
+          const terrainY = getHeightCached(deco.x, deco.z);
+          (sceneObj as any).addDecoration(deco.id, deco.type, deco.x, terrainY + 0.05, deco.z, deco.rotation);
+      }
+      safeBind(deco.inventory, () => refreshChestUI(room), () => refreshChestUI(room));
+      if (deco.inventory && typeof deco.inventory.onChange === "function") {
+          deco.inventory.onChange(() => refreshChestUI(room));
+      }
+  }, (deco: any, id: string) => {
+      if (sceneObj instanceof TownScene) (sceneObj as any).removeDecoration(deco.id);
+  });
+
+  // STORES
+  safeBind(state.stores, (store: any, id: string) => {
+      if (typeof store.listen === "function") {
+          store.listen("vault", () => refreshShopUI(room));
+          store.listen("ownerId", () => refreshShopUI(room));
+      }
+      safeBind(store.inventory, () => refreshShopUI(room), () => refreshShopUI(room));
+      if (store.inventory && typeof store.inventory.onChange === "function") {
+          store.inventory.onChange(() => refreshShopUI(room));
+      }
+  });
+
+  // FAMILIARS
+  safeBind(state.familiars, (fam: any, id: string) => {
+      if (sceneObj && (sceneObj as any).familiarRenderer) {
+          const safeX = isNaN(fam.x) ? 0 : fam.x;
+          const safeY = isNaN(fam.y) ? 0 : fam.y;
+          let th = 0;
+          if (sceneObj instanceof TownScene) th = getHeightCached(safeX, safeY);
+          
+          if (typeof (sceneObj as any).familiarRenderer.addFamiliar === "function") {
+              (sceneObj as any).familiarRenderer.addFamiliar(id, fam.type, safeX, th, safeY);
+          }
+      }
+  }, (fam: any, id: string) => {
+      if (sceneObj && (sceneObj as any).familiarRenderer) {
+          if (typeof (sceneObj as any).familiarRenderer.removeFamiliar === "function") {
+              (sceneObj as any).familiarRenderer.removeFamiliar(id);
+          }
+      }
+  });
+
+  // ENEMIES
+  safeBind(state.enemies, (enemy: any, id: string) => {
+      if (typeof (sceneObj as any).addEnemy === "function") {
+          (sceneObj as any).addEnemy(id, enemy.name);
+      }
+  }, (enemy: any, id: string) => {
+      if (typeof (sceneObj as any).removeEnemy === "function") {
+          (sceneObj as any).removeEnemy(id);
+      }
+  });
+
+  // LOOT ITEMS
+  safeBind(state.lootItems, (item: any, id: string) => {
+      if (sceneObj instanceof FieldScene || sceneObj instanceof DungeonScene) {
+          if (typeof (sceneObj as any).addLootItem === "function") {
+              (sceneObj as any).addLootItem(id, item.kind, item.x, item.y, item.scale, item.rotation);
+          }
+      }
+      if (sceneObj instanceof TownScene) {
+          if (typeof (sceneObj as any).addLootItem === "function") {
+              (sceneObj as any).addLootItem(id, item.kind, item.x, item.y, item.isOpen);
+          }
+      }
+  }, (item: any, id: string) => {
+      if (sceneObj instanceof FieldScene || sceneObj instanceof DungeonScene) {
+          if (typeof (sceneObj as any).removeLootItem === "function") {
+              (sceneObj as any).removeLootItem(id);
+          }
+      }
+  });
+
+  // SCENERY
+  safeBind(state.scenery, (item: any, id: string) => {
+      clientSceneryGrid.add(item, item.x, item.y);
+      if (sceneObj instanceof TownScene) {
+          if (typeof (sceneObj as any).addScenery === "function") {
+              (sceneObj as any).addScenery(item.id, item.kind, item.x, item.y, item.scale, item.rotation);
+          }
+      }
+  }, (item: any, id: string) => {
+      clientSceneryGrid.remove(item, item.x, item.y);
+      if (sceneObj instanceof TownScene) {
+          if (typeof (sceneObj as any).removeScenery === "function") {
+              (sceneObj as any).removeScenery(item.id);
+          }
+      }
+  });
+
+  // LAND PLOTS
+  safeBind(state.landPlots, (plot: any, id: string) => {
+      if (sceneObj instanceof TownScene) {
+          const worldX = plot.gridX * 20 + 10;
+          const worldZ = plot.gridY * 20 + 10;
+          const terrainY = getHeightCached(worldX, worldZ);
+          if (typeof (sceneObj as any).addLandPlot === "function") {
+              (sceneObj as any).addLandPlot(plot.id, plot.gridX, plot.gridY, plot.ownerId, plot.ownerName, terrainY);
+          }
+      }
+  }, (plot: any, id: string) => {
+      if (sceneObj instanceof TownScene) {
+          if (typeof (sceneObj as any).removeLandPlot === "function") {
+              (sceneObj as any).removeLandPlot(plot.id);
+          }
+      }
+  });
+
+  // BUILDINGS
+  safeBind(state.buildings, (bldg: any, id: string) => {
+      if (sceneObj instanceof TownScene) {
+          const terrainY = getHeightCached(bldg.x, bldg.z);
+          if (typeof (sceneObj as any).addBuilding === "function") {
+              (sceneObj as any).addBuilding(bldg.id, bldg.type, bldg.x, bldg.z, bldg.isConstructed, bldg.progress, bldg.targetProgress, terrainY);
+          }
+      }
+  });
+
   // Initialize Trade Receivers
   setupTradeClient(room);
 
@@ -980,6 +1040,7 @@ function setupRoomBindings(room: ActiveRoom, sceneObj: ActiveScene): () => void 
 
 async function switchZone(nextZone: ZoneName): Promise<void> {
   if (isTransitioning || currentZone === nextZone) return;
+  console.log(`[DEBUG] Attempting to switch zone to: ${nextZone}`);
   isTransitioning = true; localPlayerPos.initialized = false; hoverX = 0; hoverY = 0;
   for (const key in keys) keys[key as keyof typeof keys] = false; 
 
@@ -1012,13 +1073,14 @@ async function switchZone(nextZone: ZoneName): Promise<void> {
     }
     currentZone = nextZone; 
     
+    console.log(`[DEBUG] Room connection successful. Starting scene...`);
+    
     localStorage.setItem("rpg_last_zone", nextZone);
 
     if (activeRoom && activeScene) {
       localStorage.setItem("rpg_reconnection_token", activeRoom.reconnectionToken);
       activeRoom.send("set_aura_style", { style: PLAYER_AURA_STYLE });
 
-      // CALL START HERE! (This is what actually starts the 3D loop)
       if (typeof (activeScene as any).start === "function") {
           (activeScene as any).start();
       }
@@ -1037,7 +1099,6 @@ let isHoldingTab = false;
 
 function setupInput(): void {
   window.addEventListener("keydown", (event) => {
-    // Prevent browser scrolling for camera pan
     if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(event.code)) {
         event.preventDefault();
     }
@@ -1873,7 +1934,7 @@ function syncStateToScene(room: ActiveRoom, sceneObj: ActiveScene) {
     const state = room.state as any;
 
     try {
-        if (state.players) {
+        if (state.players && typeof state.players.forEach === "function") {
             state.players.forEach((player: any, id: string) => {
                 if (id !== room.sessionId) {
                     const safeX = isNaN(player.x) ? 0 : player.x;
@@ -1897,7 +1958,7 @@ function syncStateToScene(room: ActiveRoom, sceneObj: ActiveScene) {
             });
         }
 
-        if (state.enemies && typeof (sceneObj as any).updateEnemy === "function") {
+        if (state.enemies && typeof state.enemies.forEach === "function" && typeof (sceneObj as any).updateEnemy === "function") {
             state.enemies.forEach((enemy: any, id: string) => {
                 const safeX = isNaN(enemy.x) ? 0 : enemy.x;
                 const safeY = isNaN(enemy.y) ? 0 : enemy.y;
@@ -1907,7 +1968,7 @@ function syncStateToScene(room: ActiveRoom, sceneObj: ActiveScene) {
                 else if (enemy.rootedTimer > 0) statusText += " 🧊";
                 else if (enemy.action === "recovering") statusText += " 😴";
 
-                if (enemy.afflictions && enemy.afflictions.size > 0) {
+                if (enemy.afflictions && enemy.afflictions.size > 0 && typeof enemy.afflictions.forEach === "function") {
                     enemy.afflictions.forEach((aff: any, key: string) => {
                         if (key === "Bleed") statusText += " 🩸";
                         if (key === "Necrosis") statusText += " 💀";
@@ -1926,11 +1987,16 @@ function syncStateToScene(room: ActiveRoom, sceneObj: ActiveScene) {
                     th = getHeightCached(safeX, safeY);
                 }
 
-                (sceneObj as any).updateEnemy(id, safeX, safeY, label, enemy.action, enemy.attackRadius || 2.5, enemy.targetX, enemy.targetY, th, Array.from(enemy.afflictions.keys()));
+                let keysArray: string[] = [];
+                if (enemy.afflictions && typeof enemy.afflictions.keys === "function") {
+                    keysArray = Array.from(enemy.afflictions.keys());
+                }
+
+                (sceneObj as any).updateEnemy(id, safeX, safeY, label, enemy.action, enemy.attackRadius || 2.5, enemy.targetX, enemy.targetY, th, keysArray);
             });
         }
 
-        if (state.buildings && sceneObj instanceof TownScene) {
+        if (state.buildings && typeof state.buildings.forEach === "function" && sceneObj instanceof TownScene) {
             state.buildings.forEach((bldg: any, id: string) => {
                 if (typeof (sceneObj as any).updateBuilding === "function") {
                     (sceneObj as any).updateBuilding(bldg.id, bldg.type, bldg.isConstructed, bldg.progress, bldg.targetProgress);
@@ -1938,7 +2004,7 @@ function syncStateToScene(room: ActiveRoom, sceneObj: ActiveScene) {
             });
         }
 
-        if (state.scenery && sceneObj instanceof TownScene) {
+        if (state.scenery && typeof state.scenery.forEach === "function" && sceneObj instanceof TownScene) {
             state.scenery.forEach((item: any, id: string) => {
                 if (typeof (sceneObj as any).updateSceneryProgress === "function") {
                     (sceneObj as any).updateSceneryProgress(item.id, item.hp, item.maxHp);
@@ -1946,7 +2012,7 @@ function syncStateToScene(room: ActiveRoom, sceneObj: ActiveScene) {
             });
         }
 
-        if (state.familiars && (sceneObj as any).familiarRenderer) {
+        if (state.familiars && typeof state.familiars.forEach === "function" && (sceneObj as any).familiarRenderer) {
             state.familiars.forEach((fam: any, id: string) => {
                 const safeX = isNaN(fam.x) ? 0 : fam.x;
                 const safeY = isNaN(fam.y) ? 0 : fam.y;
@@ -1996,9 +2062,23 @@ function startHudLoop(): void {
       if (keys.KeyA) inputX -= 1; 
       if (keys.KeyD) inputX += 1;
 
+      updateDebugOverlay({
+          serverPlayerCount: state.players?.size || 0,
+          isMeLoaded: !!me,
+          inputX: inputX,
+          inputY: inputY
+      });
+
       if (!me) {
           requestAnimationFrame(tick);
           return;
+      }
+
+      // --- UI Polling System (Decoupled from Colyseus .onAdd/.onChange events) ---
+      if (debugFrameCount % 30 === 0) {
+          refreshInventoryUI(activeRoom, PLAYER_CLASS);
+          if (isShopUIOpen) refreshShopUI(activeRoom);
+          if (isChestUIOpen) refreshChestUI(activeRoom);
       }
 
       const ctx = getActionContext();
@@ -2278,9 +2358,9 @@ function startHudLoop(): void {
         }
 
         if (typeof activeScene.updateCameraFollow === "function") {
-            activeScene.updateCameraFollow(activeRoom.sessionId);
+            activeScene.updateCameraFollow(activeRoom.sessionId, dt);
         } else {
-             (activeScene as any).updateCameraFollow(activeRoom.sessionId, undefined);
+             (activeScene as any).updateCameraFollow(activeRoom.sessionId, dt);
         }
 
         if (isShadowMapActive && activeScene) {
@@ -2348,9 +2428,9 @@ async function boot(): Promise<void> {
           if (activeRoom && activeScene) {
               activeRoom.send("set_aura_style", { style: PLAYER_AURA_STYLE });
 
-              // CALL START HERE! (This is what actually starts the 3D loop)
               if (typeof (activeScene as any).start === "function") {
                   (activeScene as any).start();
+                  console.log(`[DEBUG] activeScene.start() fired.`);
               }
 
               cleanupRoomBindings = setupRoomBindings(activeRoom, activeScene);

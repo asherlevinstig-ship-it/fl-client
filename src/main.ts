@@ -1032,6 +1032,11 @@ let isHoldingTab = false;
 
 function setupInput(): void {
   window.addEventListener("keydown", (event) => {
+    // --- FIX 3: Prevent browser scrolling for camera pan ---
+    if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(event.code)) {
+        event.preventDefault();
+    }
+
     if (event.code === "ShiftLeft" || event.key === "Shift") keys.ShiftLeft = true;
     if (Object.prototype.hasOwnProperty.call(keys, event.code)) {
       keys[event.code as keyof typeof keys] = true;
@@ -1982,6 +1987,13 @@ function startHudLoop(): void {
 
       const state = activeRoom.state as any;
       const me = state.players?.get(activeRoom.sessionId) as any;
+
+      // --- FIX 2: Wait for Colyseus state sync to prevent crash ---
+      if (!me) {
+          requestAnimationFrame(tick);
+          return;
+      }
+
       const ctx = getActionContext();
 
       // Synchronize all Colyseus variables to Three.js models in batch
@@ -2313,13 +2325,17 @@ async function boot(): Promise<void> {
           
           localStorage.setItem("rpg_reconnection_token", activeRoom.reconnectionToken);
           
-          currentZone = lastZone;
+          // --- FIX 1: Trust the Server's Room Name, not Local Storage ---
+          const actualZone = activeRoom.name as ZoneName;
+          currentZone = actualZone;
+          localStorage.setItem("rpg_last_zone", actualZone);
+
           clearContainer(container);
           
-          if (lastZone === "town") activeScene = new TownScene(container);
-          else if (lastZone === "maze") activeScene = new MazeScene(container);
-          else if (lastZone === "underworld") activeScene = new UnderworldScene(container);
-          else if (lastZone === "dungeon") activeScene = new DungeonScene(container);
+          if (actualZone === "town") activeScene = new TownScene(container);
+          else if (actualZone === "maze") activeScene = new MazeScene(container);
+          else if (actualZone === "underworld") activeScene = new UnderworldScene(container);
+          else if (actualZone === "dungeon") activeScene = new DungeonScene(container);
           else activeScene = new FieldScene(container);
           
           if (activeRoom && activeScene) {

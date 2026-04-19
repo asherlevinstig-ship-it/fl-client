@@ -540,7 +540,7 @@ function setupRoomBindings(room: ActiveRoom, sceneObj: ActiveScene): () => void 
   if ((room.state as any)?.players) {
     const playersMap = (room.state as any).players;
     
-    // FIX 1: Robust Pre-initialization for Colyseus timing quirks
+    // Robust Pre-initialization for Colyseus timing quirks
     playersMap.forEach((p: any, id: string) => {
         initPlayerVisual(p, id, room, sceneObj);
     });
@@ -1047,9 +1047,14 @@ async function switchZone(nextZone: ZoneName): Promise<void> {
     
     localStorage.setItem("rpg_last_zone", nextZone);
 
-    if (activeRoom) {
+    if (activeRoom && activeScene) {
       localStorage.setItem("rpg_reconnection_token", activeRoom.reconnectionToken);
       activeRoom.send("set_aura_style", { style: PLAYER_AURA_STYLE });
+
+      // CALL START HERE! (This is what actually starts the 3D loop)
+      if (typeof (activeScene as any).start === "function") {
+          (activeScene as any).start();
+      }
     }
     
     cleanupRoomBindings = setupRoomBindings(activeRoom, activeScene);
@@ -2018,7 +2023,7 @@ function startHudLoop(): void {
       const state = activeRoom.state as any;
       const me = state.players?.get(activeRoom.sessionId) as any;
 
-      // --- FIX 2: Wait for Colyseus state sync to prevent crash ---
+      // Wait for Colyseus state sync to prevent crash
       if (!me) {
           requestAnimationFrame(tick);
           return;
@@ -2354,7 +2359,7 @@ async function boot(): Promise<void> {
           
           localStorage.setItem("rpg_reconnection_token", activeRoom.reconnectionToken);
           
-          // --- FIX 2: Trust the Server's Room Name, not Local Storage ---
+          // Trust the Server's Room Name, not Local Storage
           const actualZone = activeRoom.name as ZoneName;
           currentZone = actualZone;
           localStorage.setItem("rpg_last_zone", actualZone);
@@ -2369,6 +2374,12 @@ async function boot(): Promise<void> {
           
           if (activeRoom && activeScene) {
               activeRoom.send("set_aura_style", { style: PLAYER_AURA_STYLE });
+
+              // CALL START HERE! (This is what actually starts the 3D loop)
+              if (typeof (activeScene as any).start === "function") {
+                  (activeScene as any).start();
+              }
+
               cleanupRoomBindings = setupRoomBindings(activeRoom, activeScene);
               reconnected = true;
           }

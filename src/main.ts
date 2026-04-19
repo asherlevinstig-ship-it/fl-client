@@ -79,6 +79,44 @@ import {
   distance 
 } from "./game/CollisionSystem";
 
+// ==========================================
+// 🚨 DEBUGGER OVERLAY SYSTEM
+// ==========================================
+let debugFrameCount = 0;
+function updateDebugOverlay(data: any) {
+    let overlay = document.getElementById("dev-debug-overlay");
+    if (!overlay) {
+        overlay = document.createElement("div");
+        overlay.id = "dev-debug-overlay";
+        overlay.style.position = "fixed";
+        overlay.style.top = "10px";
+        overlay.style.right = "10px";
+        overlay.style.backgroundColor = "rgba(0, 0, 0, 0.8)";
+        overlay.style.color = "#00ff00";
+        overlay.style.padding = "10px";
+        overlay.style.fontFamily = "monospace";
+        overlay.style.fontSize = "12px";
+        overlay.style.zIndex = "99999";
+        overlay.style.pointerEvents = "none";
+        document.body.appendChild(overlay);
+    }
+
+    overlay.innerHTML = `
+        <strong style="color: #fff">🔧 CLIENT DEBUGGER</strong><br/>
+        -----------------------<br/>
+        <b>FPS Loop:</b> ${debugFrameCount++}<br/>
+        <b>Zone:</b> ${currentZone || "None"}<br/>
+        <b>Room Session ID:</b> ${activeRoom?.sessionId || "Disconnected"}<br/>
+        <b>Has Active Scene?:</b> ${!!activeScene}<br/>
+        <b>Server Players Count:</b> ${data.serverPlayerCount}<br/>
+        <b>Is 'Me' Loaded?:</b> <span style="color:${data.isMeLoaded ? '#0f0' : '#f00'}">${data.isMeLoaded}</span><br/>
+        <b>Local Pos:</b> X:${localPlayerPos.x.toFixed(2)} Y:${localPlayerPos.y.toFixed(2)}<br/>
+        <b>Input X/Y:</b> ${data.inputX} / ${data.inputY}<br/>
+    `;
+}
+// ==========================================
+
+
 type TownRoomType = Awaited<ReturnType<typeof connectToTown>>;
 type FieldRoomType = Awaited<ReturnType<typeof connectToField>>;
 type DungeonRoomType = Awaited<ReturnType<typeof connectToDungeon>>;
@@ -322,6 +360,8 @@ function initAdminPanel() {
 
 // --- HELPER TO GUARANTEE PLAYER INITIALIZATION ---
 function initPlayerVisual(player: any, id: string, room: ActiveRoom, sceneObj: ActiveScene) {
+    console.log(`[DEBUG] Executing initPlayerVisual for ${id}. Scene Active?: ${!!sceneObj}`);
+    
     const safeX = isNaN(player.x) ? 0 : player.x;
     const safeY = isNaN(player.y) ? 0 : player.y;
 
@@ -331,15 +371,25 @@ function initPlayerVisual(player: any, id: string, room: ActiveRoom, sceneObj: A
         th = getHeightCached(safeX, safeY);
     }
     
-    (sceneObj as any).addPlayer(id, id === room.sessionId, player.name);
+    // Add the player to the 3D Engine
+    if (typeof (sceneObj as any).addPlayer === "function") {
+        (sceneObj as any).addPlayer(id, id === room.sessionId, player.name);
+        console.log(`[DEBUG] Successfully injected player ${id} mesh into Three.js scene.`);
+    } else {
+        console.error(`[DEBUG] FATAL: sceneObj.addPlayer is missing!`);
+    }
+
     (sceneObj as any).updatePlayer(id, safeX, safeY, player.name, player.equippedItem, player.equipBack, player.isSleeping, player.sleepRot, isSwim, th, player.equipHead, player.equipChest, player.equipLegs, player.equipFeet, player.equipOffHand, player.isSpiritAnimal, player.isSprinting, player.isMeditating, player.teamId, player.mountedFamiliarId);
     
     if (id === room.sessionId) {
         if (typeof (sceneObj as any).playerVisuals !== "undefined") {
             const v = (sceneObj as any).playerVisuals.get(id);
             if (v) {
+                console.log(`[DEBUG] Force-snapping camera to me: X:${safeX} Z:${safeY}`);
                 v.mesh.position.set(safeX, th, safeY);
                 v.targetPosition.set(safeX, th, safeY);
+            } else {
+                console.warn(`[DEBUG] Visual for ME not found in scene map!`);
             }
         }
 
@@ -360,6 +410,7 @@ function initPlayerVisual(player: any, id: string, room: ActiveRoom, sceneObj: A
 }
 
 function setupRoomBindings(room: ActiveRoom, sceneObj: ActiveScene): () => void {
+  console.log(`[DEBUG] Setting up Colyseus network bindings...`);
 
   room.onLeave((code: number) => {
       console.warn(`Connection closed (Code: ${code}).`);
@@ -539,13 +590,16 @@ function setupRoomBindings(room: ActiveRoom, sceneObj: ActiveScene): () => void 
 
   if ((room.state as any)?.players) {
     const playersMap = (room.state as any).players;
+    console.log(`[DEBUG] Initial Server Players Count: ${playersMap.size}`);
     
     // Robust Pre-initialization for Colyseus timing quirks
     playersMap.forEach((p: any, id: string) => {
+        console.log(`[DEBUG] Pre-loading existing player: ${id}`);
         initPlayerVisual(p, id, room, sceneObj);
     });
 
     playersMap.onAdd((player: any, id: string) => {
+        console.log(`[DEBUG] Colyseus Event Triggered: Player onAdd -> ${id}`);
         initPlayerVisual(player, id, room, sceneObj);
     });
 
@@ -554,6 +608,8 @@ function setupRoomBindings(room: ActiveRoom, sceneObj: ActiveScene): () => void 
           (sceneObj as any).removePlayer(id);
       }
     });
+  } else {
+      console.error("[DEBUG] FATAL: room.state.players does not exist on the server!");
   }
 
   if ((room.state as any)?.decorations) {
@@ -1013,6 +1069,7 @@ function setupRoomBindings(room: ActiveRoom, sceneObj: ActiveScene): () => void 
 
 async function switchZone(nextZone: ZoneName): Promise<void> {
   if (isTransitioning || currentZone === nextZone) return;
+  console.log(`[DEBUG] Attempting to switch zone to: ${nextZone}`);
   isTransitioning = true; localPlayerPos.initialized = false; hoverX = 0; hoverY = 0;
   for (const key in keys) keys[key as keyof typeof keys] = false; 
 
@@ -1045,19 +1102,23 @@ async function switchZone(nextZone: ZoneName): Promise<void> {
     }
     currentZone = nextZone; 
     
+    console.log(`[DEBUG] Room connection successful. Starting scene...`);
+    
     localStorage.setItem("rpg_last_zone", nextZone);
 
     if (activeRoom && activeScene) {
       localStorage.setItem("rpg_reconnection_token", activeRoom.reconnectionToken);
       activeRoom.send("set_aura_style", { style: PLAYER_AURA_STYLE });
 
-      // CALL START HERE! (This is what actually starts the 3D loop)
       if (typeof (activeScene as any).start === "function") {
           (activeScene as any).start();
+          console.log(`[DEBUG] activeScene.start() fired.`);
+      } else {
+          console.error(`[DEBUG] FATAL: activeScene.start() IS MISSING.`);
       }
     }
     
-    cleanupRoomBindings = setupRoomBindings(activeRoom, activeScene);
+    cleanupRoomBindings = setupRoomBindings(activeRoom!, activeScene!);
   } catch (error) {
     console.error(`Failed to connect to ${nextZone}.`, error);
   } finally { 
@@ -1070,7 +1131,6 @@ let isHoldingTab = false;
 
 function setupInput(): void {
   window.addEventListener("keydown", (event) => {
-    // --- FIX 3: Prevent browser scrolling for camera pan ---
     if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(event.code)) {
         event.preventDefault();
     }
@@ -2023,7 +2083,19 @@ function startHudLoop(): void {
       const state = activeRoom.state as any;
       const me = state.players?.get(activeRoom.sessionId) as any;
 
-      // Wait for Colyseus state sync to prevent crash
+      let inputX = 0; let inputY = 0;
+      if (keys.KeyW) inputY -= 1; 
+      if (keys.KeyS) inputY += 1;
+      if (keys.KeyA) inputX -= 1; 
+      if (keys.KeyD) inputX += 1;
+
+      updateDebugOverlay({
+          serverPlayerCount: state.players?.size || 0,
+          isMeLoaded: !!me,
+          inputX: inputX,
+          inputY: inputY
+      });
+
       if (!me) {
           requestAnimationFrame(tick);
           return;
@@ -2125,7 +2197,8 @@ function startHudLoop(): void {
             pendingInputs.length = 0;
         } 
 
-        let inputX = 0; let inputY = 0;
+        // Reset input processing for movement step
+        inputX = 0; inputY = 0;
         let camDx = 0; let camDy = 0;
 
         const isMounted = me.mountedFamiliarId && me.mountedFamiliarId !== "";
@@ -2353,9 +2426,9 @@ async function boot(): Promise<void> {
   // --- ATTEMPT RAPID RECONNECTION ---
   if (reconnectionToken) {
       try {
-          console.log("Attempting to restore frozen session...");
+          console.log("[DEBUG] Attempting to restore frozen session...");
           activeRoom = await reconnectToRoom(reconnectionToken);
-          console.log("Reconnected successfully! Bypassing fresh join.");
+          console.log("[DEBUG] Reconnected successfully! Bypassing fresh join.");
           
           localStorage.setItem("rpg_reconnection_token", activeRoom.reconnectionToken);
           
@@ -2378,13 +2451,14 @@ async function boot(): Promise<void> {
               // CALL START HERE! (This is what actually starts the 3D loop)
               if (typeof (activeScene as any).start === "function") {
                   (activeScene as any).start();
+                  console.log(`[DEBUG] activeScene.start() fired.`);
               }
 
               cleanupRoomBindings = setupRoomBindings(activeRoom, activeScene);
               reconnected = true;
           }
       } catch (e) {
-          console.log("Session expired or room closed. Falling back to fresh join.", e);
+          console.log("[DEBUG] Session expired or room closed. Falling back to fresh join.", e);
       }
   }
 

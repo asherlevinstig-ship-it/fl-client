@@ -239,6 +239,7 @@ function showTransientUI(id: string, text: string, color: string, duration: numb
         ui.style.fontWeight = "bold";
         ui.style.zIndex = "3000";
         ui.style.textAlign = "center";
+        ui.style.pointerEvents = "none";
         document.body.appendChild(ui);
     }
     ui.style.color = color;
@@ -254,6 +255,8 @@ function showTransientUI(id: string, text: string, color: string, duration: numb
 }
 
 function getActionContext(): ActionContext {
+    // CRITICAL FIX: Explicitly check for .style.display === "block"
+    // Because checking !!document.getElementById("blueprint-modal") is always true if it exists in DOM!
     const isAnyUIOpen = isShopUIOpen || isInventoryUIOpen || 
                         isChestUIOpen || isCasinoUIOpen || isTeleportUIOpen || 
                         isQuestUIOpen || isSkillTreeUIOpen || isWorldMapOpen ||
@@ -404,6 +407,8 @@ function safeBind(getCollection: () => any, onAdd: (item: any, id: string) => vo
 
 // --- HELPER TO GUARANTEE PLAYER INITIALIZATION ---
 function initPlayerVisual(player: any, id: string, room: ActiveRoom, sceneObj: ActiveScene) {
+    console.log(`[DEBUG-INIT] initPlayerVisual called for ID: ${id}. Is Local Player?: ${id === room.sessionId}`);
+    
     const safeX = isNaN(player.x) ? 0 : player.x;
     const safeY = isNaN(player.y) ? 0 : player.y;
 
@@ -425,6 +430,7 @@ function initPlayerVisual(player: any, id: string, room: ActiveRoom, sceneObj: A
         if (typeof (sceneObj as any).playerVisuals !== "undefined") {
             const v = (sceneObj as any).playerVisuals.get(id);
             if (v) {
+                console.log(`[DEBUG-INIT] ✅ Local Player Visual successfully bound to Scene.`);
                 v.mesh.position.set(safeX, th, safeY);
                 v.targetPosition.set(safeX, th, safeY);
             } 
@@ -1108,6 +1114,39 @@ async function switchZone(nextZone: ZoneName): Promise<void> {
     }
     
     cleanupRoomBindings = setupRoomBindings(activeRoom!, activeScene!);
+
+    // ----------------------------------------------------
+    // 🔥 NEW: ZONE-SPECIFIC INTRO INSTRUCTIONS 🔥
+    // ----------------------------------------------------
+    if (nextZone === "underworld") {
+        setTimeout(() => {
+            showTransientUI(
+                "underworld-intro-ui", 
+                `<div style="font-size: 42px; color: #ff0055; text-shadow: 0 0 20px #ff0055, 0 0 40px #aa0000; font-weight: 900; letter-spacing: 4px; text-transform: uppercase;">
+                    THE UNDERWORLD
+                 </div>
+                 <div style="font-size: 20px; color: #ffffff; margin-top: 15px; text-shadow: 1px 1px 5px #000; font-family: monospace;">
+                    PvP is <span style="color:#ff4444">ENABLED</span>. <br/>
+                    Defeat a player to escape with 5,000 Coins.<br/>
+                    <span style="color:#aaaaaa">Do not fall off the edge...</span>
+                 </div>`, 
+                "#ffffff", 
+                6000       
+            );
+        }, 1000);
+    }
+    else if (nextZone === "maze") {
+        setTimeout(() => {
+            showTransientUI(
+                "maze-intro-ui",
+                `<div style="font-size: 36px; color: #00ffaa; text-shadow: 0 0 20px #00ffaa;">THE LABYRINTH</div>
+                 <div style="font-size: 18px; color: #fff; margin-top: 10px;">Find the exit before time runs out!</div>`,
+                "#ffffff",
+                4000
+            );
+        }, 1000);
+    }
+
   } catch (error) {
     console.error(`Failed to connect to ${nextZone}.`, error);
   } finally { 
@@ -1119,7 +1158,13 @@ async function switchZone(nextZone: ZoneName): Promise<void> {
 let isHoldingTab = false;
 
 function setupInput(): void {
+  console.log("[DEBUG-INPUT] Keyboard listeners initialized.");
+
   window.addEventListener("keydown", (event) => {
+    if (["KeyW", "KeyA", "KeyS", "KeyD", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(event.code)) {
+        console.log(`[DEBUG-INPUT] KeyPressed: ${event.code}. isUIOpen?: ${getActionContext().isUIOpen}`);
+    }
+
     if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(event.code)) {
         event.preventDefault();
     }
@@ -2082,6 +2127,12 @@ function startHudLoop(): void {
 
       const state = activeRoom.state as any;
       const me = state.players?.get(activeRoom.sessionId) as any;
+
+      // SAFEGUARD: If the server knows we exist, but our local 3D mesh wasn't created, force create it!
+      if (me && !(activeScene as any).playerVisuals?.has(activeRoom.sessionId)) {
+          console.warn("⚠️ [RECOVERY] Local player mesh missing! Forcing creation...");
+          initPlayerVisual(me, activeRoom.sessionId, activeRoom, activeScene);
+      }
 
       let inputX = 0; let inputY = 0;
       if (keys.KeyW) inputY -= 1; 

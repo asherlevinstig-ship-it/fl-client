@@ -95,6 +95,11 @@ export type ActiveEffect = {
   update: (dt: number, mesh: THREE.Object3D, progress: number) => void;
 };
 
+export type LocalCommunionPillar = {
+  group: THREE.Group;
+  optionText: string;
+};
+
 export abstract class BaseScene {
   public scene: THREE.Scene;
   public camera: THREE.PerspectiveCamera;
@@ -113,6 +118,10 @@ export abstract class BaseScene {
 
   protected activeSlashes: AttackSlash[] = [];
   protected activeEffects: ActiveEffect[] = [];
+  protected localCommunionPillars: LocalCommunionPillar[] = [];
+  
+  // --- NEW: DIABLO STYLE COINS ---
+  public activeCoins = new Map<string, { group: THREE.Group, mesh: THREE.Mesh }>();
 
   protected container: HTMLElement;
   private animationId = 0;
@@ -284,6 +293,13 @@ export abstract class BaseScene {
     this.updateFishingLines(dt, now);
     
     this.familiarRenderer.animate(dt, now / 1000);
+    
+    // --- ANIMATE DIABLO COINS ---
+    const spinTime = now * 0.003;
+    for (const coin of this.activeCoins.values()) {
+        coin.mesh.rotation.y = spinTime;
+        coin.group.position.y = 0.5 + Math.sin(spinTime * 2) * 0.2;
+    }
     
     this.onUpdate(dt);
     this.renderer.render(this.scene, this.camera);
@@ -1045,6 +1061,131 @@ public updatePlayer(
       });
   }
 
+  // --- NEW: ASTRAL COMMUNION LOCAL RENDER ---
+  public spawnLocalCommunionPillars(options: string[]) {
+      this.clearLocalCommunionPillars();
+      if (!this.localPlayerId) return;
+      const visual = this.playerVisuals.get(this.localPlayerId);
+      if (!visual) return;
+
+      const px = visual.targetPosition.x;
+      const pz = visual.targetPosition.z;
+      const py = visual.targetPosition.y;
+
+      const angles = [0, Math.PI / 2, Math.PI, (3 * Math.PI) / 2];
+
+      options.forEach((opt, i) => {
+          const group = new THREE.Group();
+          group.position.set(px + Math.cos(angles[i]) * 10.0, py, pz + Math.sin(angles[i]) * 10.0);
+
+          const geo = new THREE.CylinderGeometry(1.5, 1.5, 0.2, 16);
+          const mat = new THREE.MeshBasicMaterial({ color: 0x00aaff, transparent: true, opacity: 0.6, blending: THREE.AdditiveBlending });
+          const mesh = new THREE.Mesh(geo, mat);
+          mesh.position.y = 0.1;
+          group.add(mesh);
+
+          const shaftGeo = new THREE.CylinderGeometry(1.4, 1.4, 10, 16);
+          const shaftMat = new THREE.MeshBasicMaterial({ color: 0x00aaff, transparent: true, opacity: 0.2, blending: THREE.AdditiveBlending, depthWrite: false });
+          const shaft = new THREE.Mesh(shaftGeo, shaftMat);
+          shaft.position.y = 5;
+          group.add(shaft);
+
+          const sprite = this.createNameLabel(opt);
+          sprite.position.y = 3;
+          group.add(sprite);
+
+          this.scene.add(group);
+          this.localCommunionPillars.push({ group, optionText: opt });
+      });
+  }
+
+  public clearLocalCommunionPillars() {
+      for (const p of this.localCommunionPillars) {
+          this.scene.remove(p.group);
+          p.group.traverse((child) => {
+              if (child instanceof THREE.Mesh) {
+                  if (child.geometry) child.geometry.dispose();
+                  if (child.material) child.material.dispose();
+              } else if (child instanceof THREE.Sprite) {
+                  if (child.material.map) child.material.map.dispose();
+                  if (child.material) child.material.dispose();
+              }
+          });
+      }
+      this.localCommunionPillars = [];
+  }
+
+  public checkCommunionSelection(): string | null {
+      if (this.localCommunionPillars.length === 0 || !this.localPlayerId) return null;
+      
+      const visual = this.playerVisuals.get(this.localPlayerId);
+      if (!visual) return null;
+
+      const px = visual.mesh.position.x;
+      const pz = visual.mesh.position.z;
+
+      for (const p of this.localCommunionPillars) {
+          const dx = p.group.position.x - px;
+          const dz = p.group.position.z - pz;
+          if (dx * dx + dz * dz <= 2.25) { 
+              return p.optionText;
+          }
+      }
+      return null;
+  }
+
+  // --- NEW: DIABLO-STYLE COIN SPAWNING ---
+  public spawnCoinMesh(id: string, x: number, z: number) {
+      const group = new THREE.Group();
+      group.position.set(x, 0, z); 
+
+      const geo = new THREE.CylinderGeometry(0.3, 0.3, 0.05, 16);
+      geo.rotateX(Math.PI / 2); 
+      const mat = new THREE.MeshStandardMaterial({ color: 0xffd700, metalness: 0.9, roughness: 0.2 });
+      const mesh = new THREE.Mesh(geo, mat);
+      mesh.castShadow = true;
+      group.add(mesh);
+
+      // Glowing base
+      const glowGeo = new THREE.PlaneGeometry(1.5, 1.5);
+      const canvas = document.createElement("canvas");
+      canvas.width = 64; canvas.height = 64;
+      const ctx = canvas.getContext("2d")!;
+      const grad = ctx.createRadialGradient(32, 32, 0, 32, 32, 32);
+      grad.addColorStop(0, "rgba(255, 255, 255, 0.8)");
+      grad.addColorStop(0.2, "rgba(255, 200, 0, 0.5)");
+      grad.addColorStop(1, "rgba(255, 100, 0, 0)");
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, 64, 64);
+      
+      const glowMat = new THREE.MeshBasicMaterial({ 
+          map: new THREE.CanvasTexture(canvas), transparent: true, 
+          blending: THREE.AdditiveBlending, depthWrite: false 
+      });
+      const glow = new THREE.Mesh(glowGeo, glowMat);
+      glow.rotation.x = -Math.PI / 2;
+      glow.position.y = 0.05;
+      group.add(glow);
+
+      this.scene.add(group);
+      this.activeCoins.set(id, { group, mesh });
+  }
+
+  public removeCoinMesh(id: string) {
+      const coin = this.activeCoins.get(id);
+      if (coin) {
+          this.scene.remove(coin.group);
+          coin.group.traverse((c: any) => {
+              if (c.geometry) c.geometry.dispose();
+              if (c.material) {
+                  if (c.material.map) c.material.map.dispose();
+                  c.material.dispose();
+              }
+          });
+          this.activeCoins.delete(id);
+      }
+  }
+
   private updateInterpolatedEntities(dt: number) {
     const time = performance.now();
     const moveLerp = 1.0 - Math.exp(-15.0 * dt);
@@ -1493,6 +1634,7 @@ public updatePlayer(
     
     this.familiarRenderer.dispose();
     this.equipmentBuilder.dispose(); 
+    this.clearLocalCommunionPillars();
 
     for (const visual of this.playerVisuals.values()) {
       if (visual.labelSprite.material instanceof THREE.SpriteMaterial) { 
@@ -1571,6 +1713,19 @@ public updatePlayer(
         }
     }
     this.enemyVisuals.clear();
+
+    // --- CLEANUP COINS ---
+    for (const coin of this.activeCoins.values()) {
+        this.scene.remove(coin.group);
+        coin.group.traverse((c: any) => {
+            if (c.geometry) c.geometry.dispose();
+            if (c.material) {
+                if (c.material.map) c.material.map.dispose();
+                c.material.dispose();
+            }
+        });
+    }
+    this.activeCoins.clear();
 
     // Cleanup Caches
     for (const tex of this.labelTextureCache.values()) tex.dispose();

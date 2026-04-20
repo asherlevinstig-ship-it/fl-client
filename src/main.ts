@@ -824,6 +824,17 @@ function setupRoomBindings(room: ActiveRoom, sceneObj: ActiveScene): () => void 
       });
   });
 
+  room.onMessage("coin_pickup", (data: { amount: number }) => {
+    eventQueue.push(() => {
+        if (sceneObj && typeof (sceneObj as any).showDamageNumber === "function") {
+            const p = (sceneObj as any).playerVisuals.get(room.sessionId);
+            if (p) {
+                (sceneObj as any).showDamageNumber(p.mesh.position.x, p.mesh.position.y + 1.5, p.mesh.position.z, `+${data.amount}`, "#ffd700");
+            }
+        }
+    });
+});
+
   room.onMessage("abilityUsed", (data: any) => {
       if (data.id === room.sessionId) {
           if (data.abilityId === "spirit_animal") isLocallyWolf = true;

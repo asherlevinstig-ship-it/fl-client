@@ -79,55 +79,6 @@ import {
   distance 
 } from "./game/CollisionSystem";
 
-// ==========================================
-// 🚨 UPGRADED DEBUGGER OVERLAY SYSTEM
-// ==========================================
-let debugFrameCount = 0;
-function updateDebugOverlay(data: any) {
-    let overlay = document.getElementById("dev-debug-overlay");
-    if (!overlay) {
-        overlay = document.createElement("div");
-        overlay.id = "dev-debug-overlay";
-        overlay.style.position = "fixed";
-        overlay.style.top = "10px";
-        overlay.style.right = "10px";
-        overlay.style.backgroundColor = "rgba(0, 0, 0, 0.85)";
-        overlay.style.color = "#00ff00";
-        overlay.style.padding = "15px";
-        overlay.style.fontFamily = "monospace";
-        overlay.style.fontSize = "13px";
-        overlay.style.zIndex = "99999";
-        overlay.style.pointerEvents = "none";
-        overlay.style.border = "1px solid #444";
-        document.body.appendChild(overlay);
-    }
-
-    const uiState = getActionContext();
-    
-    let visualExists = false;
-    if (activeScene && activeRoom) {
-        visualExists = (activeScene as any).playerVisuals?.has(activeRoom.sessionId) || false;
-    }
-
-    overlay.innerHTML = `
-        <strong style="color: #fff">🔧 CLIENT DEBUGGER</strong><br/>
-        -----------------------<br/>
-        <b>FPS Loop:</b> ${debugFrameCount++}<br/>
-        <b>Zone:</b> ${currentZone || "None"}<br/>
-        <b>Has Active Scene?:</b> ${!!activeScene}<br/>
-        <b>Is 'Me' Loaded?:</b> <span style="color:${data.isMeLoaded ? '#0f0' : '#f00'}">${data.isMeLoaded}</span><br/>
-        <b>Local Pos:</b> X:${localPlayerPos.x.toFixed(2)} Z:${localPlayerPos.y.toFixed(2)}<br/>
-        <b>Input X/Y:</b> ${data.inputX} / ${data.inputY}<br/>
-        <hr style="border-color:#555; margin:6px 0;" />
-        <strong style="color: #ffaa00">🕵️ SUSPECT VARIABLES</strong><br/>
-        <b>UI Open (Blocking Input)?:</b> <span style="color:${uiState.isUIOpen ? '#f00' : '#0f0'}">${uiState.isUIOpen}</span><br/>
-        <b>3D Mesh Created?:</b> <span style="color:${visualExists ? '#0f0' : '#f00'}">${visualExists}</span><br/>
-        <b>Cam Pos:</b> X:${activeScene?.camera?.position.x.toFixed(1) || 0} Y:${activeScene?.camera?.position.y.toFixed(1) || 0} Z:${activeScene?.camera?.position.z.toFixed(1) || 0}<br/>
-    `;
-}
-// ==========================================
-
-
 type TownRoomType = Awaited<ReturnType<typeof connectToTown>>;
 type FieldRoomType = Awaited<ReturnType<typeof connectToField>>;
 type DungeonRoomType = Awaited<ReturnType<typeof connectToDungeon>>;
@@ -255,8 +206,6 @@ function showTransientUI(id: string, text: string, color: string, duration: numb
 }
 
 function getActionContext(): ActionContext {
-    // CRITICAL FIX: Explicitly check for .style.display === "block"
-    // Because checking !!document.getElementById("blueprint-modal") is always true if it exists in DOM!
     const isAnyUIOpen = isShopUIOpen || isInventoryUIOpen || 
                         isChestUIOpen || isCasinoUIOpen || isTeleportUIOpen || 
                         isQuestUIOpen || isSkillTreeUIOpen || isWorldMapOpen ||
@@ -342,7 +291,6 @@ function initAdminPanel() {
         btn.onmouseleave = () => btn.style.background = "linear-gradient(to right, #440011, #880022)";
         
         btn.onclick = () => {
-            console.log(`[Admin] Forcing teleport to ${zone}...`);
             switchZone(zone).catch(console.error);
             panel!.style.display = "none"; 
         };
@@ -377,13 +325,11 @@ function initAdminPanel() {
     document.body.appendChild(panel);
 }
 
-// --- COLYSEUS HYDRATION HELPER (BULLETPROOF FIX 2.0) ---
-// Uses a getter function to prevent freezing on a stale/empty state object
+// --- COLYSEUS HYDRATION HELPER ---
 function safeBind(getCollection: () => any, onAdd: (item: any, id: string) => void, onRemove?: (item: any, id: string) => void) {
     const collection = getCollection();
     
     if (!collection) {
-        // The server hasn't sent the schema data yet. Keep trying!
         setTimeout(() => safeBind(getCollection, onAdd, onRemove), 50);
         return;
     }
@@ -391,24 +337,19 @@ function safeBind(getCollection: () => any, onAdd: (item: any, id: string) => vo
     if (typeof collection.onAdd === "function" && !(collection as any)._isBound) {
         collection.onAdd(onAdd);
         if (onRemove) collection.onRemove(onRemove);
-        (collection as any)._isBound = true; // Prevent double binding
+        (collection as any)._isBound = true; 
         
-        // Catch any items that were loaded before the binding happened
         if (typeof collection.forEach === "function") {
             collection.forEach((item: any, id: string) => {
                 onAdd(item, id);
             });
         }
     } else if (!(collection as any)._isBound) {
-        // Fallback: Check again in 50ms (allows Colyseus time to attach the MapSchema prototypes)
         setTimeout(() => safeBind(getCollection, onAdd, onRemove), 50);
     }
 }
 
-// --- HELPER TO GUARANTEE PLAYER INITIALIZATION ---
 function initPlayerVisual(player: any, id: string, room: ActiveRoom, sceneObj: ActiveScene) {
-    console.log(`[DEBUG-INIT] initPlayerVisual called for ID: ${id}. Is Local Player?: ${id === room.sessionId}`);
-    
     const safeX = isNaN(player.x) ? 0 : player.x;
     const safeY = isNaN(player.y) ? 0 : player.y;
 
@@ -430,13 +371,11 @@ function initPlayerVisual(player: any, id: string, room: ActiveRoom, sceneObj: A
         if (typeof (sceneObj as any).playerVisuals !== "undefined") {
             const v = (sceneObj as any).playerVisuals.get(id);
             if (v) {
-                console.log(`[DEBUG-INIT] ✅ Local Player Visual successfully bound to Scene.`);
                 v.mesh.position.set(safeX, th, safeY);
                 v.targetPosition.set(safeX, th, safeY);
             } 
         }
 
-        // Safe bind for nested inventory using Getter syntax
         safeBind(() => player.inventory, () => refreshInventoryUI(room, PLAYER_CLASS), () => refreshInventoryUI(room, PLAYER_CLASS));
         
         if (typeof player.listen === "function") {
@@ -451,11 +390,6 @@ function initPlayerVisual(player: any, id: string, room: ActiveRoom, sceneObj: A
 }
 
 function setupRoomBindings(room: ActiveRoom, sceneObj: ActiveScene): () => void {
-  console.log(`[DEBUG] Setting up Colyseus network bindings...`);
-
-  // ==========================================
-  // 1. NON-STATE MESSAGES (Safe to bind immediately)
-  // ==========================================
   room.onLeave((code: number) => {
       console.warn(`Connection closed (Code: ${code}).`);
       if (activeRoom === room) activeRoom = null;
@@ -598,7 +532,6 @@ function setupRoomBindings(room: ActiveRoom, sceneObj: ActiveScene): () => void 
   });
 
   room.onMessage("trigger_void_fall", () => {
-      console.log("[CLIENT-NET] Received 'trigger_void_fall'. Triggering scene dummy.");
       eventQueue.push(() => {
           if (sceneObj && typeof (sceneObj as any).triggerPlayerVoidFall === "function") {
               const visual = (sceneObj as any).playerVisuals?.get(room.sessionId);
@@ -824,17 +757,6 @@ function setupRoomBindings(room: ActiveRoom, sceneObj: ActiveScene): () => void 
       });
   });
 
-  room.onMessage("coin_pickup", (data: { amount: number }) => {
-    eventQueue.push(() => {
-        if (sceneObj && typeof (sceneObj as any).showDamageNumber === "function") {
-            const p = (sceneObj as any).playerVisuals.get(room.sessionId);
-            if (p) {
-                (sceneObj as any).showDamageNumber(p.mesh.position.x, p.mesh.position.y + 1.5, p.mesh.position.z, `+${data.amount}`, "#ffd700");
-            }
-        }
-    });
-});
-
   room.onMessage("abilityUsed", (data: any) => {
       if (data.id === room.sessionId) {
           if (data.abilityId === "spirit_animal") isLocallyWolf = true;
@@ -999,6 +921,14 @@ function setupRoomBindings(room: ActiveRoom, sceneObj: ActiveScene): () => void 
 
   // LOOT ITEMS
   safeBind(() => room.state?.lootItems, (item: any, id: string) => {
+      // Intercept Coins and send them to our custom 3D renderer
+      if (item.kind.startsWith("Coin_")) {
+          if (sceneObj && typeof (sceneObj as any).spawnCoinMesh === "function") {
+              (sceneObj as any).spawnCoinMesh(id, item.x, item.y);
+          }
+          return; 
+      }
+
       if (sceneObj instanceof FieldScene || sceneObj instanceof DungeonScene) {
           if (typeof (sceneObj as any).addLootItem === "function") {
               (sceneObj as any).addLootItem(id, item.kind, item.x, item.y, item.scale, item.rotation);
@@ -1010,6 +940,13 @@ function setupRoomBindings(room: ActiveRoom, sceneObj: ActiveScene): () => void 
           }
       }
   }, (item: any, id: string) => {
+      if (item.kind && item.kind.startsWith("Coin_")) {
+          if (sceneObj && typeof (sceneObj as any).removeCoinMesh === "function") {
+              (sceneObj as any).removeCoinMesh(id);
+          }
+          return;
+      }
+
       if (sceneObj instanceof FieldScene || sceneObj instanceof DungeonScene) {
           if (typeof (sceneObj as any).removeLootItem === "function") {
               (sceneObj as any).removeLootItem(id);
@@ -1078,7 +1015,6 @@ function setupRoomBindings(room: ActiveRoom, sceneObj: ActiveScene): () => void 
 
 async function switchZone(nextZone: ZoneName): Promise<void> {
   if (isTransitioning || currentZone === nextZone) return;
-  console.log(`[DEBUG] Attempting to switch zone to: ${nextZone}`);
   isTransitioning = true; localPlayerPos.initialized = false; hoverX = 0; hoverY = 0;
   for (const key in keys) keys[key as keyof typeof keys] = false; 
 
@@ -1111,8 +1047,6 @@ async function switchZone(nextZone: ZoneName): Promise<void> {
     }
     currentZone = nextZone; 
     
-    console.log(`[DEBUG] Room connection successful. Starting scene...`);
-    
     localStorage.setItem("rpg_last_zone", nextZone);
 
     if (activeRoom && activeScene) {
@@ -1127,7 +1061,7 @@ async function switchZone(nextZone: ZoneName): Promise<void> {
     cleanupRoomBindings = setupRoomBindings(activeRoom!, activeScene!);
 
     // ----------------------------------------------------
-    // 🔥 NEW: ZONE-SPECIFIC INTRO INSTRUCTIONS 🔥
+    // 🔥 ZONE-SPECIFIC INTRO INSTRUCTIONS 🔥
     // ----------------------------------------------------
     if (nextZone === "underworld") {
         setTimeout(() => {
@@ -1169,13 +1103,7 @@ async function switchZone(nextZone: ZoneName): Promise<void> {
 let isHoldingTab = false;
 
 function setupInput(): void {
-  console.log("[DEBUG-INPUT] Keyboard listeners initialized.");
-
   window.addEventListener("keydown", (event) => {
-    if (["KeyW", "KeyA", "KeyS", "KeyD", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(event.code)) {
-        console.log(`[DEBUG-INPUT] KeyPressed: ${event.code}. isUIOpen?: ${getActionContext().isUIOpen}`);
-    }
-
     if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(event.code)) {
         event.preventDefault();
     }
@@ -2015,7 +1943,6 @@ function syncStateToScene(room: ActiveRoom, sceneObj: ActiveScene) {
             state.players.forEach((player: any, id: string) => {
                 // SAFEGUARD: If the server knows this player exists, but they aren't in the 3D scene, FORCE CREATE THEM
                 if (!(sceneObj as any).playerVisuals?.has(id)) {
-                    console.warn(`⚠️ [RECOVERY] Player mesh missing for ${id}! Forcing creation...`);
                     initPlayerVisual(player, id, room, sceneObj);
                 }
 
@@ -2122,7 +2049,7 @@ function startHudLoop(): void {
   let lastTime = performance.now();
   let timeSinceLastInput = 0; 
   let wasInputting = false; 
-
+let frameCount = 0; // 1️⃣ ADD THIS LINE HERE
   const tick = () => {
     const now = performance.now(); 
     const dt = Math.min((now - lastTime) / 1000, 0.1); 
@@ -2141,22 +2068,8 @@ function startHudLoop(): void {
 
       // SAFEGUARD: If the server knows we exist, but our local 3D mesh wasn't created, force create it!
       if (me && !(activeScene as any).playerVisuals?.has(activeRoom.sessionId)) {
-          console.warn("⚠️ [RECOVERY] Local player mesh missing! Forcing creation...");
           initPlayerVisual(me, activeRoom.sessionId, activeRoom, activeScene);
       }
-
-      let inputX = 0; let inputY = 0;
-      if (keys.KeyW) inputY -= 1; 
-      if (keys.KeyS) inputY += 1;
-      if (keys.KeyA) inputX -= 1; 
-      if (keys.KeyD) inputX += 1;
-
-      updateDebugOverlay({
-          serverPlayerCount: state.players?.size || 0,
-          isMeLoaded: !!me,
-          inputX: inputX,
-          inputY: inputY
-      });
 
       if (!me) {
           requestAnimationFrame(tick);
@@ -2164,7 +2077,7 @@ function startHudLoop(): void {
       }
 
       // --- UI Polling System (Decoupled from Colyseus .onAdd/.onChange events) ---
-      if (debugFrameCount % 30 === 0) {
+      if (frameCount % 30 === 0) {
           refreshInventoryUI(activeRoom, PLAYER_CLASS);
           if (isShopUIOpen) refreshShopUI(activeRoom);
           if (isChestUIOpen) refreshChestUI(activeRoom);
@@ -2267,7 +2180,7 @@ function startHudLoop(): void {
         } 
 
         // Reset input processing for movement step
-        inputX = 0; inputY = 0;
+        let inputX = 0; let inputY = 0;
         let camDx = 0; let camDy = 0;
 
         const isMounted = me.mountedFamiliarId && me.mountedFamiliarId !== "";
@@ -2495,10 +2408,7 @@ async function boot(): Promise<void> {
   // --- ATTEMPT RAPID RECONNECTION ---
   if (reconnectionToken) {
       try {
-          console.log("[DEBUG] Attempting to restore frozen session...");
           activeRoom = await reconnectToRoom(reconnectionToken);
-          console.log("[DEBUG] Reconnected successfully! Bypassing fresh join.");
-          
           localStorage.setItem("rpg_reconnection_token", activeRoom.reconnectionToken);
           
           // Trust the Server's Room Name, not Local Storage
@@ -2519,14 +2429,13 @@ async function boot(): Promise<void> {
 
               if (typeof (activeScene as any).start === "function") {
                   (activeScene as any).start();
-                  console.log(`[DEBUG] activeScene.start() fired.`);
               }
 
               cleanupRoomBindings = setupRoomBindings(activeRoom, activeScene);
               reconnected = true;
           }
       } catch (e) {
-          console.log("[DEBUG] Session expired or room closed. Falling back to fresh join.", e);
+          console.warn("Session expired or room closed. Falling back to fresh join.");
       }
   }
 

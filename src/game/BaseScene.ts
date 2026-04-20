@@ -19,6 +19,13 @@ export class ObjectPool<T> {
   public release(item: T): void {
     this.pool.push(item);
   }
+
+  public disposeAll(disposeFn: (item: T) => void) {
+      for (const item of this.pool) {
+          disposeFn(item);
+      }
+      this.pool = [];
+  }
 }
 
 export type BoneData = {
@@ -326,7 +333,6 @@ export abstract class BaseScene {
     if (!visual) return;
 
     // Use explicit DT if passed, otherwise fallback to the render loop's actual global DT
-    // This stops the camera from snapping when moving out-of-sync with the monitor framerate
     const actualDt = dt !== undefined ? dt : this.currentDt;
 
     // Use smoothly interpolated mesh target positions
@@ -661,7 +667,6 @@ public updatePlayer(
 
     if (!itemName || itemName === "") return;
 
-    // --- DELEGATED ITEM MODEL CREATION ---
     const itemModel = this.equipmentBuilder.buildItemModel(itemName);
     itemModel.scale.set(2.8, 2.8, 2.8);
     
@@ -675,7 +680,6 @@ public updatePlayer(
         if (visual.limbs.rightArm) {
             visual.limbs.rightArm.bone.add(itemModel);
             
-            // Correctly offset the long fishing rod so it extends from the hand
             if (itemName === "Fishing Rod") {
                 itemModel.position.set(0, -1.0, 0.5); 
                 itemModel.rotation.set(Math.PI / 2, 0, 0);
@@ -689,7 +693,6 @@ public updatePlayer(
     (visual as any)[meshKey] = itemModel;
   }
 
-  // --- NEW: ABILITY ROUTER ---
   public playAbilityVisual(playerId: string, abilityId: string, targetX?: number, targetZ?: number) {
       const FAMILIAR_VFX = [
           "swarm_devour_cast", "swarm_return", "gordon_laser", "gordon_annihilation", 
@@ -698,7 +701,6 @@ public updatePlayer(
           "beast_kill_command", "gryphon_liftoff", "behemoth_battering_ram", "gemini_swap"
       ];
 
-      // 1. Check if this is a familiar ability and route it to the FamiliarRenderer
       if (FAMILIAR_VFX.includes(abilityId)) {
           if (this.familiarRenderer) {
               this.familiarRenderer.playAbilityVisual(playerId, abilityId, targetX, targetZ);
@@ -706,21 +708,18 @@ public updatePlayer(
           return;
       }
 
-      // 2. Route player abilities to the main VFX spawner
       const visual = this.playerVisuals.get(playerId);
       const th = visual ? visual.targetPosition.y : 0; 
       
       spawnAbilityVFX(this.scene, abilityId, targetX || 0, targetZ || 0, th, visual);
   }
 
-  // --- FISHING ANIMATION LOGIC (ZERO GC OVERHAUL) ---
   public updatePlayerFishing(id: string, state: string, bobberX: number, bobberZ: number) {
       const visual = this.playerVisuals.get(id);
       if (!visual || !visual.modelMesh || !visual.limbs) return;
 
       let lineData = this.fishingLines.get(id);
       
-      // Stop Fishing
       if (state === "none") {
           if (lineData) {
               this.scene.remove(lineData.curveLine);
@@ -734,15 +733,12 @@ public updatePlayer(
           return;
       }
 
-      // Equip a fishing rod if they don't have one visually
       if (visual.current_mainhand !== "Fishing Rod") {
           this.updatePlayerEquipment(id, "Fishing Rod", "mainhand");
-          visual.current_mainhand = "Fishing Rod"; // Force the local override
+          visual.current_mainhand = "Fishing Rod"; 
       }
 
-      // Start or update fishing state
       if (!lineData) {
-          // Pre-allocate buffer geometry to completely stop GC memory leaks
           const numSegments = 10;
           const posArray = new Float32Array((numSegments + 1) * 3);
           const geo = new THREE.BufferGeometry();
@@ -765,7 +761,6 @@ public updatePlayer(
       lineData.targetX = bobberX;
       lineData.targetZ = bobberZ;
       
-      // Reset cast progress when state transitions
       if (state === "casting" && lineData.castProgress > 0) lineData.castProgress = 0;
       if (state === "reeling" && lineData.castProgress < 1.0) lineData.castProgress = 1.0; 
   }
@@ -778,20 +773,17 @@ public updatePlayer(
               continue;
           }
 
-          // 1. Find the tip of the fishing rod
           const rodMesh = visual.equipped_mainhand_Mesh;
-          const tipPos = new THREE.Vector3(0, 1.5, 0); // Assuming the rod is ~1.5 units long on Y
+          const tipPos = new THREE.Vector3(0, 1.5, 0); 
           rodMesh.localToWorld(tipPos);
 
           const pY = visual.mesh.position.y;
-          const waterLevel = pY - 1.0; // Estimate water surface relative to player
+          const waterLevel = pY - 1.0; 
           
-          // 2. Animate the bobber position based on state
           if (lineData.state === "casting") {
-              lineData.castProgress += dt * 1.5; // 0.66 seconds to cast
+              lineData.castProgress += dt * 1.5; 
               if (lineData.castProgress > 1.0) lineData.castProgress = 1.0;
               
-              // Parabolic arc for the cast
               const startX = tipPos.x;
               const startZ = tipPos.z;
               const curX = THREE.MathUtils.lerp(startX, lineData.targetX, lineData.castProgress);
@@ -803,14 +795,13 @@ public updatePlayer(
               lineData.bobber.position.set(curX, curY, curZ);
 
           } else if (lineData.state === "waiting") {
-              // Bob gently on the water
               lineData.bobber.position.set(
                   lineData.targetX, 
                   waterLevel + Math.sin(now * 0.003) * 0.05, 
                   lineData.targetZ
               );
           } else if (lineData.state === "reeling") {
-              lineData.castProgress -= dt * 2.0; // 0.5s to reel in
+              lineData.castProgress -= dt * 2.0; 
               if (lineData.castProgress < 0) lineData.castProgress = 0;
               
               const curX = THREE.MathUtils.lerp(tipPos.x, lineData.targetX, lineData.castProgress);
@@ -820,22 +811,20 @@ public updatePlayer(
               lineData.bobber.position.set(curX, curY, curZ);
           }
 
-          // 3. Draw Quadratic Bezier Curve (Zero GC Allocation approach)
           const posAttribute = lineData.curveLine.geometry.attributes.position as THREE.BufferAttribute;
           const array = posAttribute.array as Float32Array;
 
           const p0x = tipPos.x; const p0y = tipPos.y; const p0z = tipPos.z;
           const p2x = lineData.bobber.position.x; const p2y = lineData.bobber.position.y; const p2z = lineData.bobber.position.z;
 
-          // Midpoint with physics sag
           const p1x = (p0x + p2x) / 2;
           const p1z = (p0z + p2z) / 2;
           let p1y = (p0y + p2y) / 2;
 
           if (lineData.state === "waiting") {
-              p1y -= 1.5; // Deep sag when idle
+              p1y -= 1.5; 
           } else if (lineData.state === "casting") {
-              p1y -= 0.5 * (1.0 - lineData.castProgress); // Trailing sag in air
+              p1y -= 0.5 * (1.0 - lineData.castProgress); 
           }
 
           const segments = 10;
@@ -852,17 +841,13 @@ public updatePlayer(
           }
           posAttribute.needsUpdate = true;
           
-          // 4. Animate the Player's Arm
           if (visual.limbs.rightArm) {
               if (lineData.state === "casting") {
-                  // Swing arm forward
                   const armAng = THREE.MathUtils.lerp(Math.PI * 0.6, -Math.PI * 0.2, lineData.castProgress);
                   visual.limbs.rightArm.bone.rotation.x = armAng;
               } else if (lineData.state === "waiting") {
-                  // Hold rod steady
                   visual.limbs.rightArm.bone.rotation.x = -Math.PI * 0.2;
               } else if (lineData.state === "reeling") {
-                  // Crank motion
                   visual.limbs.rightArm.bone.rotation.x = -Math.PI * 0.2 + Math.sin(now * 0.02) * 0.2;
               }
           }
@@ -887,7 +872,6 @@ public updatePlayer(
   }
 
   public playEnemyTelegraph(enemyId: string, type: string, x: number, z: number, radius: number, time: number, height: number = 0) {
-      // Use Pool to prevent GC Stutter
       const group = this.telegraphPool.get();
       group.position.set(x, height + 0.1, z);
       
@@ -913,7 +897,6 @@ public updatePlayer(
   }
 
   public playEnemyAttackVisual(enemyId: string, type: string, x: number, z: number, radius: number, height: number = 0) {
-      // Use Pool to prevent GC Stutter
       if (type === "melee" || type === "dash") {
           const slash = this.enemyMeleePool.get();
           slash.position.set(x, height + 1.0, z);
@@ -964,6 +947,7 @@ public updatePlayer(
         
         const texture = new THREE.CanvasTexture(canvas);
         texture.minFilter = THREE.LinearFilter;
+        texture.generateMipmaps = false; // --- CRITICAL WEBGL CRASH FIX ---
         const material = new THREE.SpriteMaterial({ map: texture, transparent: true, depthWrite: false });
         const sprite = new THREE.Sprite(material);
         sprite.scale.set(1.5, 0.75, 1);
@@ -1036,6 +1020,7 @@ public updatePlayer(
 
           texture = new THREE.CanvasTexture(canvas);
           texture.minFilter = THREE.LinearFilter;
+          texture.generateMipmaps = false; // --- CRITICAL WEBGL CRASH FIX ---
           this.chatTextureCache.set(cacheKey, texture);
       }
       
@@ -1158,8 +1143,11 @@ public updatePlayer(
       ctx.fillStyle = grad;
       ctx.fillRect(0, 0, 64, 64);
       
+      const glowTex = new THREE.CanvasTexture(canvas);
+      glowTex.generateMipmaps = false; // --- CRITICAL WEBGL CRASH FIX ---
+
       const glowMat = new THREE.MeshBasicMaterial({ 
-          map: new THREE.CanvasTexture(canvas), transparent: true, 
+          map: glowTex, transparent: true, 
           blending: THREE.AdditiveBlending, depthWrite: false 
       });
       const glow = new THREE.Mesh(glowGeo, glowMat);
@@ -1601,8 +1589,8 @@ public updatePlayer(
 
         texture = new THREE.CanvasTexture(canvas);
         texture.minFilter = THREE.LinearFilter;
-        texture.generateMipmaps = false;
-        texture.name = text + (subText ? `\n${subText}` : ""); // Store raw text here for fast checking
+        texture.generateMipmaps = false; // --- CRITICAL WEBGL CRASH FIX ---
+        texture.name = text + (subText ? `\n${subText}` : "");
         
         this.labelTextureCache.set(cacheKey, texture);
     }
@@ -1668,6 +1656,15 @@ public updatePlayer(
       }
     }
     
+    this.slashPool.disposeAll(m => { m.geometry.dispose(); (m.material as THREE.Material).dispose(); });
+    this.aoeBlastPool.disposeAll(m => { m.geometry.dispose(); (m.material as THREE.Material).dispose(); });
+    this.enemyMeleePool.disposeAll(m => { m.geometry.dispose(); (m.material as THREE.Material).dispose(); });
+    this.telegraphPool.disposeAll(g => {
+        g.traverse(c => {
+            if (c instanceof THREE.Mesh) { c.geometry.dispose(); (c.material as THREE.Material).dispose(); }
+        })
+    });
+
     for (const slash of this.activeSlashes) {
         if (slash.mesh.material instanceof THREE.Material) slash.mesh.material.dispose();
         slash.mesh.geometry.dispose();
@@ -1737,7 +1734,10 @@ public updatePlayer(
     this.playerMeshes.clear(); 
     this.playerVisuals.clear(); 
     
+    // --- CRITICAL WEBGL CRASH FIX ---
+    this.renderer.forceContextLoss();
     this.renderer.dispose();
+
     if (this.renderer.domElement.parentElement === this.container) {
         this.container.removeChild(this.renderer.domElement);
     }

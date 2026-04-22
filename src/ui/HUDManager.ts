@@ -835,26 +835,26 @@ export function ensureOverlay(getActiveRoom: () => any, getActionContext: () => 
             bottomRightContainer.style.pointerEvents = "auto"; 
             
             bottomRightContainer.innerHTML = `
-                <button id="btn-harness-mana" class="btn-hack" style="width: auto; font-size: 14px; padding: 10px 20px; border-radius: 6px;">
+                <button id="btn-harness-mana" class="btn-hack" style="display: none; width: auto; font-size: 14px; padding: 10px 20px; border-radius: 6px;">
                     <i class="fa-solid fa-om"></i> Harness Mana <span class="hud-key">H</span>
                 </button>
                 <div id="controls-combat" class="controls-group" style="text-align: right;">
                     <div class="controls-row"><span class="text-muted text-sm">Attack / Mine</span> <span class="hud-key">1</span></div>
                     <div class="controls-row"><span class="text-muted text-sm">Combat Skills</span> <span class="hud-key">2-5</span></div>
                     <div class="controls-row"><span class="text-muted text-sm">Utility Skills</span> <span class="hud-key">6-7</span></div>
-                    <div class="controls-row"><span class="text-muted text-sm">Familiar Spells</span> <span class="hud-key">9</span></div>
+                    <div class="controls-row" id="ctrl-familiar" style="display: none;"><span class="text-muted text-sm">Familiar Spells</span> <span class="hud-key">9</span></div>
                     <div class="controls-row"><span class="text-muted text-sm">Dodge</span> <span class="hud-key">SPACE</span></div>
                     <div class="controls-row"><span class="text-muted text-sm">Class Menu</span> <span class="hud-key">P</span></div>
-                    <div class="controls-row"><span class="text-muted text-sm">Skill Tree</span> <span class="hud-key">K</span></div>
+                    <div class="controls-row" id="ctrl-skilltree" style="display: none;"><span class="text-muted text-sm">Skill Tree</span> <span class="hud-key">K</span></div>
                 </div>
                 <div id="controls-other" class="controls-group" style="display: none; text-align: right;">
                     <div class="controls-row"><span class="text-muted text-sm">Interact</span> <span class="hud-key">F</span></div>
-                    <div class="controls-row"><span class="text-muted text-sm" style="color: var(--neon-green);">Buy Land</span> <span class="hud-key">B</span></div>
-                    <div class="controls-row"><span class="text-muted text-sm" style="color: var(--neon-green);">Build / Deco Mode</span> <span class="hud-key">V</span></div>
+                    <div class="controls-row" id="ctrl-buy-land" style="display: none;"><span class="text-muted text-sm" style="color: var(--neon-green);">Buy Land</span> <span class="hud-key">B</span></div>
+                    <div class="controls-row" id="ctrl-build-mode" style="display: none;"><span class="text-muted text-sm" style="color: var(--neon-green);">Build / Deco Mode</span> <span class="hud-key">V</span></div>
                     <div class="controls-row"><span class="text-muted text-sm">Inventory</span> <span class="hud-key">I</span></div>
                     <div class="controls-row"><span class="text-muted text-sm">Map</span> <span class="hud-key">M</span></div>
                     <div class="controls-row"><span class="text-muted text-sm">Fast Travel</span> <span class="hud-key">T</span></div>
-                    <div class="controls-row"><span class="text-muted text-sm">Meditate</span> <span class="hud-key">Z</span></div>
+                    <div class="controls-row" id="ctrl-meditate" style="display: none;"><span class="text-muted text-sm">Meditate</span> <span class="hud-key">Z</span></div>
                     <div class="controls-row"><span class="text-muted text-sm">Team Manager</span> <span class="hud-key">ESC</span></div>
                 </div>
                 <button id="btn-toggle-controls" class="hud-btn" style="margin-top: 5px; font-size: 10px; padding: 4px 8px; width: 100%;">
@@ -1544,6 +1544,12 @@ export function updateHUD(
 
         const topHeader = `<div class="hud-header text-muted text-sm" style="margin-bottom: 2px;"><i class="fa-solid fa-server"></i> SAO Tower</div>`;
 
+        // Before injecting the string into the UI, suppress if not unlocked yet
+        if (!me.hasUnlockedBuilding) {
+            landText = "";
+            buildText = "";
+        }
+
         textDiv.innerHTML = `
             ${topHeader}
             ${stealthText}
@@ -1552,6 +1558,44 @@ export function updateHUD(
             ${buildText}
             ${interactText}
         `.trim();
+    }
+
+    // --- PROGRESSIVE DISCLOSURE LOGIC ---
+    const ctrlSkillTree = document.getElementById("ctrl-skilltree");
+    const ctrlMeditate = document.getElementById("ctrl-meditate");
+    const ctrlBuyLand = document.getElementById("ctrl-buy-land");
+    const ctrlBuildMode = document.getElementById("ctrl-build-mode");
+    const btnHarnessMana = document.getElementById("btn-harness-mana");
+    const auraHUDDiv = document.getElementById("hud-aura");
+    const ctrlFamiliar = document.getElementById("ctrl-familiar");
+
+    if (me) {
+        // Skill Tree & Aura/Meditation Unlocks
+        if (me.hasUnlockedSkillTree) {
+            if (ctrlSkillTree) ctrlSkillTree.style.display = "flex";
+            if (ctrlMeditate) ctrlMeditate.style.display = "flex";
+            if (auraHUDDiv) auraHUDDiv.style.display = "flex"; 
+            if (btnHarnessMana) btnHarnessMana.style.display = "block";
+        } else {
+            if (ctrlSkillTree) ctrlSkillTree.style.display = "none";
+            if (ctrlMeditate) ctrlMeditate.style.display = "none";
+            if (auraHUDDiv) auraHUDDiv.style.display = "none"; // Completely hides the Mana/Aura bar
+            if (btnHarnessMana) btnHarnessMana.style.display = "none";
+        }
+
+        // Base Building Unlocks
+        if (me.hasUnlockedBuilding) {
+            if (ctrlBuyLand) ctrlBuyLand.style.display = "flex";
+            if (ctrlBuildMode) ctrlBuildMode.style.display = "flex";
+        } else {
+            if (ctrlBuyLand) ctrlBuyLand.style.display = "none";
+            if (ctrlBuildMode) ctrlBuildMode.style.display = "none";
+        }
+
+        // Familiar Spells only show if they actually have a familiar equipped
+        if (ctrlFamiliar) {
+            ctrlFamiliar.style.display = me.mountedFamiliarId ? "flex" : "none";
+        }
     }
 }
 

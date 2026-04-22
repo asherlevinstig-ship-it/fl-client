@@ -10,6 +10,16 @@ export let activeAttackIndicators: { x: number, z: number, timer: number }[] = [
 export let mazeTimerInterval: number | null = null;
 export let dungeonTimerInterval: number | null = null; 
 
+// --- EXPORTED UI STATE ---
+export let isQuestUIOpen = false;
+export let isTeleportUIOpen = false;
+export let isCasinoUIOpen = false;
+export let isInventoryUIOpen = false;
+export let isChestUIOpen = false;
+export let isShopUIOpen = false;
+export let activeChestId: string | null = null;
+export let activeStallType: string | null = null;
+
 // --- GLOBAL EVENT STATE ---
 export let nextEventName = "";
 export let nextEventTargetTime = 0;
@@ -490,6 +500,79 @@ export function ensureOverlay(getActiveRoom: () => any, getActionContext: () => 
         topRightDiv.style.pointerEvents = "none";
         document.body.appendChild(topRightDiv);
 
+        // --- WAYFINDER MINIMAP CANVAS ---
+        const minimapContainer = document.createElement("div");
+        minimapContainer.id = "minimap-container";
+        minimapContainer.style.position = "fixed";
+        minimapContainer.style.top = "70px"; // Shifted down to accommodate Stats Top Right
+        minimapContainer.style.right = "15px";
+        minimapContainer.style.width = "180px";
+        minimapContainer.style.height = "180px";
+        minimapContainer.style.borderRadius = "50%"; 
+        minimapContainer.style.border = "2px solid var(--neon-blue)";
+        minimapContainer.style.overflow = "hidden";
+        minimapContainer.style.boxShadow = "0 5px 15px rgba(0,0,0,0.8), inset 0 0 20px rgba(0, 170, 255, 0.2)";
+        minimapContainer.style.backgroundColor = "var(--bg-panel)";
+        minimapContainer.style.display = "none"; 
+        minimapContainer.style.zIndex = "15";
+
+        const minimapCanvas = document.createElement("canvas");
+        minimapCanvas.id = "minimap-canvas";
+        minimapCanvas.width = 180;
+        minimapCanvas.height = 180;
+        minimapContainer.appendChild(minimapCanvas);
+        
+        const compassN = document.createElement("div");
+        compassN.className = "hud-header text-amber";
+        compassN.innerText = "N";
+        compassN.style.position = "absolute";
+        compassN.style.top = "4px";
+        compassN.style.left = "50%";
+        compassN.style.transform = "translateX(-50%)";
+        compassN.style.fontSize = "14px";
+        minimapContainer.appendChild(compassN);
+
+        document.body.appendChild(minimapContainer);
+
+        // --- COORDS ---
+        let coordDiv = document.getElementById("hud-coords");
+        if (!coordDiv) {
+            coordDiv = document.createElement("div");
+            coordDiv.id = "hud-coords";
+            coordDiv.className = "hud-header text-muted";
+            coordDiv.style.position = "fixed";
+            coordDiv.style.top = "270px"; // Shifted down for minimap
+            coordDiv.style.right = "15px";
+            coordDiv.style.fontSize = "12px";
+            coordDiv.style.textAlign = "right";
+            coordDiv.style.zIndex = "20";
+            coordDiv.style.pointerEvents = "none";
+            document.body.appendChild(coordDiv);
+        }
+
+        // --- QUEST TRACKER (ONBOARDING) ---
+        let questTracker = document.getElementById("quest-tracker");
+        if (!questTracker) {
+            questTracker = document.createElement("div");
+            questTracker.id = "quest-tracker";
+            questTracker.className = "hud-panel";
+            questTracker.style.position = "fixed";
+            questTracker.style.top = "310px"; // Below coords
+            questTracker.style.right = "15px";
+            questTracker.style.width = "220px";
+            questTracker.style.display = "none";
+            questTracker.style.zIndex = "20";
+            questTracker.style.pointerEvents = "none";
+            
+            questTracker.innerHTML = `
+                <div class="hud-header text-amber" style="font-size: 14px; border-bottom: 1px solid #444; padding-bottom: 5px; margin-bottom: 8px;">
+                    <i class="fa-solid fa-scroll"></i> Active Quest
+                </div>
+                <div id="quest-text" class="text-sm" style="color: #fff; line-height: 1.4;"></div>
+            `;
+            document.body.appendChild(questTracker);
+        }
+
         // --- ZONE POPUP CONTAINER ---
         let zonePopup = document.createElement("div");
         zonePopup.id = "zone-popup";
@@ -590,40 +673,6 @@ export function ensureOverlay(getActiveRoom: () => any, getActionContext: () => 
             });
         }
 
-        // --- WAYFINDER MINIMAP CANVAS ---
-        const minimapContainer = document.createElement("div");
-        minimapContainer.id = "minimap-container";
-        minimapContainer.style.position = "fixed";
-        minimapContainer.style.top = "70px"; // Shifted down to accommodate Stats Top Right
-        minimapContainer.style.right = "15px";
-        minimapContainer.style.width = "180px";
-        minimapContainer.style.height = "180px";
-        minimapContainer.style.borderRadius = "50%"; 
-        minimapContainer.style.border = "2px solid var(--neon-blue)";
-        minimapContainer.style.overflow = "hidden";
-        minimapContainer.style.boxShadow = "0 5px 15px rgba(0,0,0,0.8), inset 0 0 20px rgba(0, 170, 255, 0.2)";
-        minimapContainer.style.backgroundColor = "var(--bg-panel)";
-        minimapContainer.style.display = "none"; 
-        minimapContainer.style.zIndex = "15";
-
-        const minimapCanvas = document.createElement("canvas");
-        minimapCanvas.id = "minimap-canvas";
-        minimapCanvas.width = 180;
-        minimapCanvas.height = 180;
-        minimapContainer.appendChild(minimapCanvas);
-        
-        const compassN = document.createElement("div");
-        compassN.className = "hud-header text-amber";
-        compassN.innerText = "N";
-        compassN.style.position = "absolute";
-        compassN.style.top = "4px";
-        compassN.style.left = "50%";
-        compassN.style.transform = "translateX(-50%)";
-        compassN.style.fontSize = "14px";
-        minimapContainer.appendChild(compassN);
-
-        document.body.appendChild(minimapContainer);
-
         // --- WORLD MAP MODAL ---
         const worldMapContainer = document.createElement("div");
         worldMapContainer.id = "world-map-modal";
@@ -719,35 +768,6 @@ export function ensureOverlay(getActiveRoom: () => any, getActionContext: () => 
             storePopup.style.boxShadow = "0 0 20px rgba(255, 170, 0, 0.2)";
             storePopup.style.display = "none";
             document.body.appendChild(storePopup);
-        }
-        
-        // --- COORDS ---
-        let coordDiv = document.getElementById("hud-coords");
-        if (!coordDiv) {
-            coordDiv = document.createElement("div");
-            coordDiv.id = "hud-coords";
-            coordDiv.className = "hud-header text-muted";
-            coordDiv.style.position = "fixed";
-            coordDiv.style.top = "260px"; // Shifted down for Map
-            coordDiv.style.right = "15px";
-            coordDiv.style.fontSize = "12px";
-            coordDiv.style.textAlign = "right";
-            coordDiv.style.zIndex = "20";
-            coordDiv.style.pointerEvents = "none";
-            document.body.appendChild(coordDiv);
-        }
-
-        // --- GLOBAL EVENT UI ---
-        let eventDiv = document.getElementById("hud-global-event");
-        if (!eventDiv) {
-            eventDiv = document.createElement("div");
-            eventDiv.id = "hud-global-event";
-            eventDiv.className = "hud-panel hud-absolute-center";
-            eventDiv.style.top = "15px";
-            eventDiv.style.padding = "8px 16px";
-            eventDiv.style.border = "1px solid var(--neon-amber)";
-            eventDiv.style.boxShadow = "0 0 10px rgba(255, 170, 0, 0.2)";
-            document.body.appendChild(eventDiv);
         }
 
         // --- AURA & RESOURCES BOTTOM CENTER ---
@@ -1569,6 +1589,9 @@ export function updateHUD(
     const auraHUDDiv = document.getElementById("hud-aura");
     const ctrlFamiliar = document.getElementById("ctrl-familiar");
 
+    const questTracker = document.getElementById("quest-tracker");
+    const questText = document.getElementById("quest-text");
+
     if (me) {
         // Skill Tree & Aura/Meditation Unlocks
         if (me.hasUnlockedSkillTree) {
@@ -1595,6 +1618,29 @@ export function updateHUD(
         // Familiar Spells only show if they actually have a familiar equipped
         if (ctrlFamiliar) {
             ctrlFamiliar.style.display = me.mountedFamiliarId ? "flex" : "none";
+        }
+
+        // --- DYNAMIC ONBOARDING QUEST INJECTION ---
+        if (questTracker && questText) {
+            let currentQuest = "";
+
+            if (me.activeQuests.has("tutorial_1_fish")) {
+                currentQuest = `<b>Survival 101:</b> The town needs food. Head to the lake to the North-West (X: -180, Z: 180) and press <span class="hud-key">F</span> to cast your line.`;
+            } else if (me.activeQuests.has("tutorial_2_tree")) {
+                const prog = me.activeQuests.get("tutorial_2_tree").currentAmount;
+                currentQuest = `<b>Survival 102:</b> Excellent catch. Now we need materials. Find a tree and attack it to gather Wood. (${prog}/3)`;
+            } else if (!me.hasUnlockedSkillTree) {
+                currentQuest = `<b>Growing Stronger:</b> Defeat monsters or gather resources to reach Level 2.`;
+            } else if (!me.hasUnlockedBuilding) {
+                currentQuest = `<b>Settling Down:</b> Earn 100 Coins by defeating enemies, selling items, or finding chests to buy your first plot of land.`;
+            }
+
+            if (currentQuest !== "") {
+                questTracker.style.display = "block";
+                questText.innerHTML = currentQuest;
+            } else {
+                questTracker.style.display = "none";
+            }
         }
     }
 }

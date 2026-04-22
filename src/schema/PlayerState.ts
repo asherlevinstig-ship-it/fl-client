@@ -1,6 +1,12 @@
-import { Schema, MapSchema, type } from "@colyseus/schema";
+import { Schema, MapSchema, ArraySchema, type } from "@colyseus/schema";
 import { InventoryItemState } from "./InventoryItemState";
 import { PlayerSkillTree } from "./SkillState";
+
+export class QuestProgressState extends Schema {
+    @type("string") questId: string = "";
+    @type("number") currentAmount: number = 0;
+    @type("boolean") isCompleted: boolean = false;
+}
 
 export class PlayerState extends Schema {
     // --- Core Identity ---
@@ -8,6 +14,11 @@ export class PlayerState extends Schema {
     @type("string") name: string = "";
     @type("string") classId: string = "";
     @type("string") pathwayId: string = "";
+
+    // --- Progressive Unlocks (Onboarding) ---
+    @type("boolean") hasUnlockedAura: boolean = false;
+    @type("boolean") hasUnlockedBuilding: boolean = false;
+    @type("boolean") hasUnlockedSkillTree: boolean = false;
 
     // --- HWFWM Progression ---
     @type("string") rank: string = "Iron";
@@ -20,14 +31,13 @@ export class PlayerState extends Schema {
     @type("number") auraControl: number = 1.0;
 
     // --- Active Aura Styles ---
-    @type("string") auraStyle: string = "tyrant"; // e.g., "tyrant", "sanctuary", "void", "storm"
+    @type("string") auraStyle: string = "tyrant";
     @type("boolean") isAuraActive: boolean = false;
 
     // --- Position & Vitals ---
     @type("number") x: number = 0;
-    @type("number") y: number = 0; // Represents the Z-axis in the 3D scene
+    @type("number") y: number = 0;
     
-    // NEW: Used to acknowledge client movement packets for smooth reconciliation
     @type("uint32") lastProcessedInput: number = 0; 
     
     @type("number") hp: number = 100;
@@ -54,30 +64,33 @@ export class PlayerState extends Schema {
     @type("string") equipOffHand: string = "";
 
     // --- Team System ---
-    @type("number") teamId: number = 0; // 0 means no team
+    @type("number") teamId: number = 0;
     @type("boolean") isTeamLeader: boolean = false;
 
     // --- Animation & Action States ---
     @type("boolean") isSleeping: boolean = false;
     @type("number") sleepRot: number = 0;
     @type("boolean") isMeditating: boolean = false;
-    @type("number") meditationCount: number = 0; // Tracks questions answered for Aura upgrades
+    @type("number") meditationCount: number = 0;
     @type("boolean") isSprinting: boolean = false;
     @type("boolean") isSpiritAnimal: boolean = false;
 
     // --- Mount System ---
-    @type("string") mountedFamiliarId: string = ""; // Empty string means not mounted
-    @type("boolean") isFlying: boolean = false; // For Z-axis/Y-axis lifting
+    @type("string") mountedFamiliarId: string = "";
+    @type("boolean") isFlying: boolean = false; 
     
     // --- Fishing Mechanics ---
-    @type("string") fishingState: string = "none"; // "none", "casting", "waiting", "reeling"
+    @type("string") fishingState: string = "none"; 
     @type("number") bobberX: number = 0;
     @type("number") bobberZ: number = 0;
 
-    // --- NEW: Status Effects ---
-    @type("number") rootedUntil: number = 0; // Locks movement if they hit the wrong crystal
+    @type("number") rootedUntil: number = 0;
 
     // --- Collections & Nested States ---
     @type({ map: InventoryItemState }) inventory = new MapSchema<InventoryItemState>();
     @type(PlayerSkillTree) skillTree = new PlayerSkillTree();
+    
+    // --- NEW: Quests ---
+    @type({ map: QuestProgressState }) activeQuests = new MapSchema<QuestProgressState>();
+    @type(["string"]) completedQuests = new ArraySchema<string>();
 }

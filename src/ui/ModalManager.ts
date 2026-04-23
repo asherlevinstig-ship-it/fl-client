@@ -145,6 +145,7 @@ function injectGlobalChunkyStyles() {
 }
 
 // --- EXPORTED HUD RENDERING ---
+// --- EXPORTED HUD RENDERING ---
 export function renderChunkyHUD(player: any) {
     if (!player) return;
     injectGlobalChunkyStyles();
@@ -208,10 +209,10 @@ export function renderChunkyHUD(player: any) {
     if (stamFill && hungerFill && stamText) {
         stamFill.style.width = `${staminaPct}%`;
         hungerFill.style.width = `${hungerDeficitPct}%`;
-        stamText.innerText = `${Math.ceil(player.stamina)} / ${Math.ceil(player.hunger)}`;
+        // FIXED: Display Stamina / Max Stamina instead of Hunger!
+        stamText.innerText = `${Math.ceil(player.stamina)} / ${player.maxStamina}`;
     }
 }
-
 // --- EXPORTED MODAL FUNCTIONS ---
 
 export function openQuestUI(activeRoom: any, keys: any, playerName: string) {

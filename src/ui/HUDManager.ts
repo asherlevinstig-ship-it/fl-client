@@ -1388,21 +1388,26 @@ export function updateHUD(
             }
         }
 
-        const topHeader = `<div class="hud-header text-muted text-sm" style="margin-bottom: 5px;"><i class="fa-solid fa-server"></i> SAO Tower</div>`;
-
         if (!me.hasUnlockedBuilding) {
             landText = "";
             buildText = "";
         }
 
-        textDiv.innerHTML = `
-            ${topHeader}
+        const finalHTML = `
             ${stealthText}
             ${overlayText}
             ${landText}
             ${buildText}
             ${interactText}
         `.trim();
+
+        textDiv.innerHTML = finalHTML;
+        
+        // HIDE THE BOX IF IT IS EMPTY SO IT DOESN'T CLUTTER THE SCREEN
+        const infoPanel = document.getElementById("hud-info-panel");
+        if (infoPanel) {
+            infoPanel.style.display = finalHTML === "" ? "none" : "block";
+        }
     }
 
     const ctrlSkillTree = document.getElementById("ctrl-skilltree");

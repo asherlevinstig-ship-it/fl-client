@@ -10,11 +10,214 @@ export let isShopUIOpen = false;
 export let activeChestId: string | null = null;
 export let activeStallType: string | null = null;
 
+// --- GLOBAL CHUNKY STYLES INJECTION ---
+function injectGlobalChunkyStyles() {
+    if (!document.getElementById("chunky-ui-styles")) {
+        const style = document.createElement("style");
+        style.id = "chunky-ui-styles";
+        style.innerHTML = `
+            @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@700;900&display=swap');
+            
+            .modal-chunky {
+                font-family: 'Nunito', 'Segoe UI Rounded', sans-serif;
+                background: #1e293b;
+                border: 4px solid #38bdf8;
+                border-radius: 24px;
+                box-shadow: 0 15px 40px rgba(0,0,0,0.4);
+                color: white;
+            }
+            .btn-chunky {
+                border: none;
+                border-radius: 16px;
+                font-weight: 900;
+                font-size: 16px;
+                cursor: pointer;
+                transition: transform 0.1s, box-shadow 0.1s;
+                text-transform: uppercase;
+                font-family: 'Nunito', sans-serif;
+                letter-spacing: 1px;
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                gap: 8px;
+            }
+            .btn-chunky:active:not(:disabled) {
+                transform: translateY(6px);
+            }
+            .btn-green { background: #22c55e; color: white; box-shadow: 0 6px 0 #16a34a; }
+            .btn-green:active:not(:disabled) { box-shadow: 0 0px 0 #16a34a; }
+            
+            .btn-red { background: #ef4444; color: white; box-shadow: 0 6px 0 #b91c1c; }
+            .btn-red:active:not(:disabled) { box-shadow: 0 0px 0 #b91c1c; }
+            
+            .btn-blue { background: #3b82f6; color: white; box-shadow: 0 6px 0 #2563eb; }
+            .btn-blue:active:not(:disabled) { box-shadow: 0 0px 0 #2563eb; }
+
+            .btn-gold { background: #f59e0b; color: white; box-shadow: 0 6px 0 #d97706; }
+            .btn-gold:active:not(:disabled) { box-shadow: 0 0px 0 #d97706; }
+
+            .btn-slate { background: #475569; color: white; box-shadow: 0 6px 0 #334155; }
+            .btn-slate:active:not(:disabled) { box-shadow: 0 0px 0 #334155; }
+
+            .btn-close-chunky {
+                background: #ef4444; box-shadow: 0 4px 0 #b91c1c; border-radius: 50%;
+                width: 36px; height: 36px; color: white; border: none; font-weight: 900;
+                cursor: pointer; display: flex; align-items: center; justify-content: center;
+                font-size: 20px; transition: transform 0.1s, box-shadow 0.1s;
+            }
+            .btn-close-chunky:active {
+                transform: translateY(4px); box-shadow: 0 0px 0 #b91c1c;
+            }
+            
+            .chunky-panel {
+                background: #334155; border-radius: 16px; padding: 15px; border: 3px solid #475569;
+            }
+
+            /* --- HUD STYLES --- */
+            #chunky-hud-container {
+                position: fixed;
+                top: 20px;
+                left: 20px;
+                display: flex;
+                flex-direction: column;
+                gap: 12px;
+                z-index: 50;
+                font-family: 'Nunito', 'Segoe UI Rounded', sans-serif;
+                pointer-events: none; 
+            }
+            .hud-bar-bg {
+                width: 250px;
+                height: 32px;
+                background: #1e293b;
+                border: 4px solid #475569;
+                border-radius: 16px;
+                position: relative;
+                overflow: hidden;
+                box-shadow: 0 8px 15px rgba(0,0,0,0.3);
+            }
+            .hud-bar-fill {
+                height: 100%;
+                border-radius: 10px;
+                transition: width 0.2s ease-out;
+                position: relative;
+            }
+            .hud-bar-fill::after {
+                content: '';
+                position: absolute;
+                top: 2px;
+                left: 2px;
+                right: 2px;
+                height: 8px;
+                background: rgba(255, 255, 255, 0.3);
+                border-radius: 6px;
+            }
+            .hud-icon {
+                position: absolute;
+                left: -15px;
+                top: -10px;
+                font-size: 36px;
+                filter: drop-shadow(0 4px 0 rgba(0,0,0,0.4));
+                z-index: 2;
+            }
+            .hud-text {
+                position: absolute;
+                right: 12px;
+                top: 50%;
+                transform: translateY(-50%);
+                color: white;
+                font-weight: 900;
+                font-size: 14px;
+                text-shadow: 0 2px 0 rgba(0,0,0,0.5);
+                z-index: 2;
+            }
+            .fill-hp { background: #ef4444; border-right: 2px solid #b91c1c; }
+            .fill-mp { background: #3b82f6; border-right: 2px solid #2563eb; }
+            .fill-stamina { background: #eab308; border-right: 2px solid #b45309; z-index: 1;}
+            .fill-hunger-cap { 
+                position: absolute; 
+                right: 0; top: 0; height: 100%; 
+                background: repeating-linear-gradient(45deg, #7f1d1d, #7f1d1d 10px, #991b1b 10px, #991b1b 20px); 
+                z-index: 0;
+            }
+        `;
+        document.head.appendChild(style);
+    }
+}
+
+// --- EXPORTED HUD RENDERING ---
+export function renderChunkyHUD(player: any) {
+    if (!player) return;
+    injectGlobalChunkyStyles();
+
+    let hud = document.getElementById("chunky-hud-container");
+    
+    // Create the HUD structure if it doesn't exist yet
+    if (!hud) {
+        hud = document.createElement("div");
+        hud.id = "chunky-hud-container";
+        hud.innerHTML = `
+            <div style="position: relative; margin-left: 15px;">
+                <div class="hud-icon">❤️</div>
+                <div class="hud-bar-bg">
+                    <div id="hud-hp-fill" class="hud-bar-fill fill-hp" style="width: 100%;"></div>
+                    <div id="hud-hp-text" class="hud-text">100 / 100</div>
+                </div>
+            </div>
+            <div style="position: relative; margin-left: 15px;">
+                <div class="hud-icon">⚡</div>
+                <div class="hud-bar-bg">
+                    <div id="hud-mp-fill" class="hud-bar-fill fill-mp" style="width: 100%;"></div>
+                    <div id="hud-mp-text" class="hud-text">100 / 100</div>
+                </div>
+            </div>
+            <div style="position: relative; margin-left: 15px;" title="Eat food to restore your maximum stamina!">
+                <div class="hud-icon">🍗</div>
+                <div class="hud-bar-bg" style="border-color: #b45309;">
+                    <div id="hud-hunger-fill" class="fill-hunger-cap" style="width: 0%;"></div>
+                    <div id="hud-stamina-fill" class="hud-bar-fill fill-stamina" style="width: 100%;"></div>
+                    <div id="hud-stamina-text" class="hud-text">100 / 100</div>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(hud);
+    }
+
+    // Update existing HUD elements without recreating the DOM
+    const hpPct = Math.max(0, Math.min(100, (player.hp / player.maxHp) * 100));
+    const mpPct = Math.max(0, Math.min(100, (player.mp / player.maxMp) * 100));
+    const staminaPct = Math.max(0, Math.min(100, (player.stamina / player.maxStamina) * 100));
+    const hungerDeficitPct = 100 - Math.max(0, Math.min(100, (player.hunger / player.maxHunger) * 100));
+
+    const hpFill = document.getElementById("hud-hp-fill");
+    const hpText = document.getElementById("hud-hp-text");
+    if (hpFill && hpText) {
+        hpFill.style.width = `${hpPct}%`;
+        hpText.innerText = `${Math.ceil(player.hp)} / ${player.maxHp}`;
+    }
+
+    const mpFill = document.getElementById("hud-mp-fill");
+    const mpText = document.getElementById("hud-mp-text");
+    if (mpFill && mpText) {
+        mpFill.style.width = `${mpPct}%`;
+        mpText.innerText = `${Math.ceil(player.mp)} / ${player.maxMp}`;
+    }
+
+    const stamFill = document.getElementById("hud-stamina-fill");
+    const hungerFill = document.getElementById("hud-hunger-fill");
+    const stamText = document.getElementById("hud-stamina-text");
+    if (stamFill && hungerFill && stamText) {
+        stamFill.style.width = `${staminaPct}%`;
+        hungerFill.style.width = `${hungerDeficitPct}%`;
+        stamText.innerText = `${Math.ceil(player.stamina)} / ${Math.ceil(player.hunger)}`;
+    }
+}
+
 // --- EXPORTED MODAL FUNCTIONS ---
 
 export function openQuestUI(activeRoom: any, keys: any, playerName: string) {
     if (isQuestUIOpen || !activeRoom) return;
     isQuestUIOpen = true;
+    injectGlobalChunkyStyles();
 
     for (const key in keys) keys[key as keyof typeof keys] = false;
 
@@ -22,39 +225,36 @@ export function openQuestUI(activeRoom: any, keys: any, playerName: string) {
     if (!modal) {
         modal = document.createElement("div");
         modal.id = "quest-modal";
+        modal.className = "modal-chunky";
         modal.style.position = "fixed"; 
         modal.style.top = "50%"; 
         modal.style.left = "50%";
         modal.style.transform = "translate(-50%, -50%)"; 
-        modal.style.background = "rgba(20, 20, 25, 0.98)";
         modal.style.padding = "30px"; 
-        modal.style.borderRadius = "12px"; 
-        modal.style.border = "2px solid #00ffaa";
         modal.style.zIndex = "1000"; 
-        modal.style.color = "white"; 
-        modal.style.width = "500px";
-        modal.style.boxShadow = "0 10px 40px rgba(0,0,0,0.8)";
-        modal.style.fontFamily = "Arial, sans-serif";
+        modal.style.width = "450px";
         document.body.appendChild(modal);
     }
 
     modal.innerHTML = `
-      <div style="display:flex; justify-content:space-between; align-items:center; border-bottom: 1px solid #444; padding-bottom: 15px; margin-bottom: 20px;">
-        <h2 style="margin:0; color:#00ffaa; font-size: 24px;">Lord Protector's Request</h2>
-        <button id="close-quest-btn" style="background:none; border:none; color:#ff5555; font-size:28px; cursor:pointer; font-weight:bold; line-height: 1;">&times;</button>
+      <div style="display:flex; justify-content:space-between; align-items:center; border-bottom: 4px solid #334155; padding-bottom: 15px; margin-bottom: 20px;">
+        <h2 style="margin:0; color:#38bdf8; font-size: 26px; font-weight: 900;">New Quest!</h2>
+        <button id="close-quest-btn" class="btn-close-chunky">&times;</button>
       </div>
-      <div style="font-size: 16px; line-height: 1.6; color: #ddd; margin-bottom: 20px;">
-        "Greetings, <span id="quest-player-name"></span>. The wilderness beyond these walls grows restless, and the Town of Beginnings requires your strength. Slay the beasts that encroach upon our borders and return to me."
+      <div class="chunky-panel" style="margin-bottom: 20px; text-align: center; font-size: 18px; color: #f8fafc;">
+        <div style="font-size: 40px; margin-bottom: 10px;">📜</div>
+        "Hey, <span id="quest-player-name" style="color: #f59e0b; font-weight: 900;"></span>! The wilderness is crawling with monsters. We need your help to clear them out. Can we count on you?"
       </div>
-      <div style="background: #1a1a20; padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #444;">
-        <div style="font-weight: bold; color: #ffaa00; margin-bottom: 5px;">Objective:</div>
-        <div style="color: #fff;">Defeat 5 Enemies in The Wilderness</div>
-        <div style="font-weight: bold; color: #00aaff; margin-top: 10px; margin-bottom: 5px;">Rewards:</div>
-        <div style="color: #fff;">250 Coins, 500 Experience Points</div>
+      <div class="chunky-panel" style="margin-bottom: 20px; background: #0f172a; border-color: #1e293b;">
+        <div style="font-weight: 900; color: #f59e0b; margin-bottom: 5px; font-size: 14px; text-transform: uppercase;">Your Mission:</div>
+        <div style="color: #fff; font-size: 18px; font-weight: 700;">Defeat 5 Enemies</div>
+        
+        <div style="font-weight: 900; color: #38bdf8; margin-top: 15px; margin-bottom: 5px; font-size: 14px; text-transform: uppercase;">Rewards:</div>
+        <div style="color: #fff; font-weight: 700;">💰 250 Coins <span style="color:#64748b; margin: 0 5px;">|</span> ⭐ 500 XP</div>
       </div>
       <div style="display:flex; gap: 15px;">
-          <button id="accept-quest-btn" style="flex: 1; padding: 15px; font-size: 16px; font-weight: bold; background: #00aa44; border: none; color: white; cursor:pointer; border-radius: 8px; transition: 0.2s;">Accept Quest</button>
-          <button id="decline-quest-btn" style="flex: 1; padding: 15px; font-size: 16px; font-weight: bold; background: #aa2222; border: none; color: white; cursor:pointer; border-radius: 8px; transition: 0.2s;">Decline</button>
+          <button id="accept-quest-btn" class="btn-chunky btn-green" style="flex: 1; padding: 15px;">Accept</button>
+          <button id="decline-quest-btn" class="btn-chunky btn-red" style="flex: 1; padding: 15px;">Decline</button>
       </div>
     `;
 
@@ -80,6 +280,7 @@ export function openQuestUI(activeRoom: any, keys: any, playerName: string) {
 export function openTeleportUI(activeRoom: any, keys: any) {
     if (isTeleportUIOpen || !activeRoom) return;
     isTeleportUIOpen = true;
+    injectGlobalChunkyStyles();
 
     for (const key in keys) {
       keys[key as keyof typeof keys] = false;
@@ -89,31 +290,30 @@ export function openTeleportUI(activeRoom: any, keys: any) {
     if (!modal) {
       modal = document.createElement("div");
       modal.id = "teleport-modal";
+      modal.className = "modal-chunky";
       modal.style.position = "fixed"; 
       modal.style.top = "50%"; 
       modal.style.left = "50%";
       modal.style.transform = "translate(-50%, -50%)"; 
-      modal.style.background = "rgba(20, 20, 25, 0.98)";
       modal.style.padding = "30px"; 
-      modal.style.borderRadius = "12px"; 
-      modal.style.border = "2px solid #00aaff";
       modal.style.zIndex = "1000"; 
-      modal.style.color = "white"; 
       modal.style.width = "400px"; 
-      modal.style.boxShadow = "0 10px 40px rgba(0,0,0,0.8)";
-      modal.style.fontFamily = "Arial, sans-serif";
       modal.style.textAlign = "center";
       document.body.appendChild(modal);
     }
 
     modal.innerHTML = `
-      <div style="display:flex; justify-content:space-between; align-items:center; border-bottom: 1px solid #444; padding-bottom: 15px; margin-bottom: 20px;">
-        <h2 style="margin:0; color:#00aaff; font-size: 24px;">Fast Travel</h2>
-        <button id="close-teleport-btn" style="background:none; border:none; color:#ff5555; font-size:28px; cursor:pointer; font-weight:bold; line-height: 1;">&times;</button>
+      <div style="display:flex; justify-content:space-between; align-items:center; border-bottom: 4px solid #334155; padding-bottom: 15px; margin-bottom: 20px;">
+        <h2 style="margin:0; color:#38bdf8; font-size: 26px; font-weight: 900;">Fast Travel</h2>
+        <button id="close-teleport-btn" class="btn-close-chunky">&times;</button>
       </div>
-      <div style="display:flex; flex-direction:column; gap:15px;">
-          <button id="tp-town" style="background: linear-gradient(135deg, #444, #222); border: 2px solid #ffaa00; padding: 15px; border-radius: 8px; color: white; font-size: 18px; font-weight: bold; cursor: pointer; transition: 0.2s;">🏰 Town of Beginnings</button>
-          <button id="tp-elven" style="background: linear-gradient(135deg, #444, #222); border: 2px solid #00ffaa; padding: 15px; border-radius: 8px; color: white; font-size: 18px; font-weight: bold; cursor: pointer; transition: 0.2s;">✨ The Elven Kingdom</button>
+      <div style="display:flex; flex-direction:column; gap:20px; margin-bottom: 10px;">
+          <button id="tp-town" class="btn-chunky btn-gold" style="padding: 20px; font-size: 18px; display: flex; flex-direction: column; gap: 5px;">
+              <span style="font-size: 24px;">🏰</span> Town of Beginnings
+          </button>
+          <button id="tp-elven" class="btn-chunky btn-green" style="padding: 20px; font-size: 18px; display: flex; flex-direction: column; gap: 5px;">
+              <span style="font-size: 24px;">✨</span> The Elven Kingdom
+          </button>
       </div>
     `;
 
@@ -138,6 +338,7 @@ export function openTeleportUI(activeRoom: any, keys: any) {
 export function openCasinoUI(activeRoom: any, keys: any, gameType: string) {
     if (isCasinoUIOpen || !activeRoom) return;
     isCasinoUIOpen = true;
+    injectGlobalChunkyStyles();
 
     for (const key in keys) keys[key as keyof typeof keys] = false;
 
@@ -155,8 +356,8 @@ export function openCasinoUI(activeRoom: any, keys: any, gameType: string) {
                 100% { transform: rotate(1800deg); }
             }
             @keyframes anim-slot-shake {
-                0% { transform: translateY(3px); }
-                50% { transform: translateY(-3px); }
+                0% { transform: translateY(5px); }
+                50% { transform: translateY(-5px); }
                 100% { transform: translateY(0); }
             }
             @keyframes anim-deal-card {
@@ -175,19 +376,16 @@ export function openCasinoUI(activeRoom: any, keys: any, gameType: string) {
     if (!modal) {
         modal = document.createElement("div");
         modal.id = "casino-modal";
+        modal.className = "modal-chunky";
         modal.style.position = "fixed"; 
         modal.style.top = "50%"; 
         modal.style.left = "50%";
         modal.style.transform = "translate(-50%, -50%)"; 
-        modal.style.background = "linear-gradient(135deg, #1a1a20, #0a0a0f)";
+        modal.style.background = "#4c1d95"; 
+        modal.style.borderColor = "#f472b6";
         modal.style.padding = "30px"; 
-        modal.style.borderRadius = "16px"; 
-        modal.style.border = "3px solid #ff0055";
         modal.style.zIndex = "1000"; 
-        modal.style.color = "white"; 
         modal.style.width = "400px";
-        modal.style.boxShadow = "0 0 50px rgba(255, 0, 85, 0.6)";
-        modal.style.fontFamily = "Arial, sans-serif";
         modal.style.textAlign = "center";
         document.body.appendChild(modal);
     }
@@ -201,77 +399,75 @@ export function openCasinoUI(activeRoom: any, keys: any, gameType: string) {
     if (gameType === "Coin Toss") {
         visualArea = `
             <div style="height: 120px; display: flex; align-items: center; justify-content: center; perspective: 800px;">
-                <div id="2d-coin" style="width: 80px; height: 80px; border-radius: 50%; background: radial-gradient(circle, #ffd700, #b8860b); border: 4px solid #fff; box-shadow: 0 10px 20px rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; font-size: 36px; font-weight: bold; color: white; text-shadow: 2px 2px 0 #886000;">$</div>
+                <div id="2d-coin" style="width: 80px; height: 80px; border-radius: 50%; background: #f59e0b; border: 6px solid #fde68a; box-shadow: 0 10px 0 #b45309; display: flex; align-items: center; justify-content: center; font-size: 40px; font-weight: 900; color: white;">💰</div>
             </div>`;
         customInputs = `
-            <div style="margin: 15px 0; display:flex; justify-content:center; gap:10px;">
-                <button id="btn-heads" style="flex:1; padding: 15px; font-size: 18px; font-weight: bold; background: #222; border: 2px solid #aaa; color: white; cursor:pointer; border-radius: 8px;">HEADS</button>
-                <button id="btn-tails" style="flex:1; padding: 15px; font-size: 18px; font-weight: bold; background: #222; border: 2px solid #aaa; color: white; cursor:pointer; border-radius: 8px;">TAILS</button>
+            <div style="margin: 15px 0; display:flex; justify-content:center; gap:15px;">
+                <button id="btn-heads" class="btn-chunky btn-blue" style="flex:1; padding: 15px;">HEADS</button>
+                <button id="btn-tails" class="btn-chunky btn-red" style="flex:1; padding: 15px;">TAILS</button>
             </div>
         `;
     } else if (gameType === "Roulette") {
         visualArea = `
             <div style="height: 140px; display: flex; align-items: center; justify-content: center; overflow: hidden;">
-                <div id="2d-roulette" style="width: 120px; height: 120px; border-radius: 50%; border: 6px solid #e6dfcc; background: repeating-conic-gradient(#cc3333 0 18deg, #222 18deg 36deg); box-shadow: 0 5px 15px rgba(0,0,0,0.8); display: flex; align-items: center; justify-content: center; position: relative;">
-                    <div style="width: 80px; height: 80px; background: #111; border-radius: 50%; border: 2px solid #e6dfcc;"></div>
-                    <div style="position: absolute; top: 5px; width: 10px; height: 10px; background: white; border-radius: 50%; box-shadow: 0 0 5px white;"></div>
+                <div id="2d-roulette" style="width: 120px; height: 120px; border-radius: 50%; border: 8px solid #334155; background: repeating-conic-gradient(#ef4444 0 18deg, #1e293b 18deg 36deg); box-shadow: 0 10px 0 #0f172a; display: flex; align-items: center; justify-content: center; position: relative;">
+                    <div style="width: 60px; height: 60px; background: #e2e8f0; border-radius: 50%; border: 4px solid #94a3b8;"></div>
+                    <div style="position: absolute; top: 10px; width: 14px; height: 14px; background: white; border-radius: 50%; box-shadow: 0 0 10px white;"></div>
                 </div>
             </div>`;
         customInputs = `
-            <select id="roulette-guess" style="width: 100%; padding: 10px; font-size: 18px; margin: 15px 0; background: #222; color: white; border: 2px solid #ff0055; border-radius: 8px;">
-                <option value="red">Red (2x Payout)</option>
-                <option value="black">Black (2x Payout)</option>
-                <option value="0">Number 0 (35x Payout)</option>
-                <option value="7">Number 7 (35x Payout)</option>
-                <option value="13">Number 13 (35x Payout)</option>
-                <option value="21">Number 21 (35x Payout)</option>
-                <option value="36">Number 36 (35x Payout)</option>
+            <select id="roulette-guess" style="width: 100%; padding: 15px; font-size: 16px; font-weight: bold; margin: 15px 0; background: #334155; color: white; border: 4px solid #f472b6; border-radius: 16px; outline: none; font-family: 'Nunito', sans-serif;">
+                <option value="red">🔴 Red (2x)</option>
+                <option value="black">⚫ Black (2x)</option>
+                <option value="0">🟢 Zero (35x)</option>
+                <option value="7">Lucky 7 (35x)</option>
             </select>
-            <button id="btn-play" style="width: 100%; padding: 15px; font-size: 18px; font-weight: bold; background: #ff0055; border: none; color: white; cursor:pointer; border-radius: 8px; text-transform: uppercase;">Spin Wheel</button>
+            <button id="btn-play" class="btn-chunky btn-green" style="width: 100%; padding: 15px;">SPIN THE WHEEL!</button>
         `;
     } else if (gameType === "Slot Machine") {
         visualArea = `
-            <div style="height: 100px; display: flex; align-items: center; justify-content: center;">
-                <div style="background: #111; border: 4px solid #555; border-radius: 8px; padding: 10px; display: flex; gap: 15px; box-shadow: inset 0 0 20px black;">
-                    <div id="2d-slot-1" style="width: 50px; height: 60px; background: #fff; border-radius: 4px; font-size: 36px; display: flex; align-items: center; justify-content: center; box-shadow: inset 0 5px 10px rgba(0,0,0,0.5);">🍒</div>
-                    <div id="2d-slot-2" style="width: 50px; height: 60px; background: #fff; border-radius: 4px; font-size: 36px; display: flex; align-items: center; justify-content: center; box-shadow: inset 0 5px 10px rgba(0,0,0,0.5);">🍋</div>
-                    <div id="2d-slot-3" style="width: 50px; height: 60px; background: #fff; border-radius: 4px; font-size: 36px; display: flex; align-items: center; justify-content: center; box-shadow: inset 0 5px 10px rgba(0,0,0,0.5);">💎</div>
+            <div style="height: 120px; display: flex; align-items: center; justify-content: center;">
+                <div style="background: #1e293b; border: 6px solid #475569; border-radius: 16px; padding: 15px; display: flex; gap: 15px; box-shadow: inset 0 10px 20px rgba(0,0,0,0.5);">
+                    <div id="2d-slot-1" style="width: 60px; height: 70px; background: #f8fafc; border-radius: 12px; font-size: 40px; display: flex; align-items: center; justify-content: center; box-shadow: inset 0 5px 10px rgba(0,0,0,0.2); border-bottom: 4px solid #cbd5e1;">🍒</div>
+                    <div id="2d-slot-2" style="width: 60px; height: 70px; background: #f8fafc; border-radius: 12px; font-size: 40px; display: flex; align-items: center; justify-content: center; box-shadow: inset 0 5px 10px rgba(0,0,0,0.2); border-bottom: 4px solid #cbd5e1;">🍋</div>
+                    <div id="2d-slot-3" style="width: 60px; height: 70px; background: #f8fafc; border-radius: 12px; font-size: 40px; display: flex; align-items: center; justify-content: center; box-shadow: inset 0 5px 10px rgba(0,0,0,0.2); border-bottom: 4px solid #cbd5e1;">💎</div>
                 </div>
             </div>`;
         customInputs = `
-            <button id="btn-play" style="width: 100%; padding: 20px; font-size: 24px; font-weight: bold; background: linear-gradient(to bottom, #ffaa00, #ff5500); border: none; color: black; cursor:pointer; border-radius: 12px; margin-top: 15px; text-transform: uppercase; box-shadow: 0 5px 0 #cc4400;">PULL LEVER</button>
+            <button id="btn-play" class="btn-chunky btn-gold" style="width: 100%; padding: 20px; font-size: 20px; margin-top: 15px;">🎰 PULL LEVER!</button>
         `;
     } else if (gameType === "Blackjack") {
         visualArea = `
-            <div style="height: 120px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px;">
-                <div id="2d-bj-dealer" style="display: flex; gap: 5px; height: 45px;"></div>
-                <div id="2d-bj-player" style="display: flex; gap: 5px; height: 45px;"></div>
+            <div style="height: 140px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 15px;">
+                <div id="2d-bj-dealer" style="display: flex; gap: 8px; height: 50px;"></div>
+                <div id="2d-bj-player" style="display: flex; gap: 8px; height: 50px;"></div>
             </div>`;
         customInputs = `
-            <button id="btn-play" style="width: 100%; padding: 15px; font-size: 18px; font-weight: bold; background: #00aa44; border: none; color: white; cursor:pointer; border-radius: 8px; margin-top: 15px; text-transform: uppercase;">Deal Hand</button>
+            <button id="btn-play" class="btn-chunky btn-blue" style="width: 100%; padding: 15px; margin-top: 15px;">🃏 DEAL CARDS!</button>
         `;
     }
 
     modal.innerHTML = `
-      <div style="display:flex; justify-content:space-between; align-items:center; border-bottom: 1px solid #444; padding-bottom: 10px; margin-bottom: 15px;">
-        <h2 style="margin:0; color:#ff0055; font-size: 24px; text-transform: uppercase; letter-spacing: 2px;">${gameType}</h2>
-        <button id="close-casino-btn" style="background:none; border:none; color:#ff5555; font-size:28px; cursor:pointer; font-weight:bold; line-height: 1;">&times;</button>
+      <div style="display:flex; justify-content:space-between; align-items:center; border-bottom: 4px solid rgba(255,255,255,0.2); padding-bottom: 10px; margin-bottom: 15px;">
+        <h2 style="margin:0; color:#fbcfe8; font-size: 26px; font-weight: 900;">${gameType}</h2>
+        <button id="close-casino-btn" class="btn-close-chunky" style="background:#db2777; box-shadow: 0 4px 0 #9d174d;">&times;</button>
       </div>
       
-      <div style="font-size: 18px; color: #ffd700; font-weight: bold; margin-bottom: 15px;">
-        Your Balance: <span id="casino-balance">${me.coins}</span> Coins
+      <div class="chunky-panel" style="background: rgba(0,0,0,0.2); border: none; margin-bottom: 15px;">
+        <span style="font-size: 16px; color: #fdf2f8;">Your Coins:</span> 
+        <span id="casino-balance" style="font-size: 20px; color: #fde047; font-weight: 900;">${me.coins}</span>
       </div>
 
       ${visualArea}
   
-      <div style="background: #111; padding: 15px; border-radius: 8px; text-align: left; margin-top: 15px;">
-        <label style="color: #aaa; font-weight: bold;">Bet Amount:</label>
-        <input type="number" id="bet-amount" value="50" min="1" max="${me.coins}" style="width: 100%; padding: 10px; font-size: 18px; margin-top: 5px; background: #222; color: #00ffaa; border: 1px solid #444; border-radius: 4px; box-sizing: border-box;" />
+      <div class="chunky-panel" style="background: #3b0764; border-color: #581c87; text-align: left; margin-top: 15px;">
+        <label style="color: #fbcfe8; font-weight: 900; font-size: 14px;">SET BET:</label>
+        <input type="number" id="bet-amount" value="50" min="1" max="${me.coins}" style="width: 100%; padding: 12px; font-size: 18px; font-weight: bold; margin-top: 8px; background: #fff; color: #1e293b; border: 4px solid #a855f7; border-radius: 12px; box-sizing: border-box; font-family: 'Nunito', sans-serif;" />
       </div>
   
       ${customInputs}
   
-      <div id="casino-result" style="margin-top: 20px; font-size: 18px; font-weight: bold; min-height: 24px; color: #fff;"></div>
+      <div id="casino-result" style="margin-top: 20px; font-size: 18px; font-weight: 900; min-height: 24px; color: #fff;"></div>
     `;
 
     document.getElementById("close-casino-btn")!.onclick = () => {
@@ -294,7 +490,7 @@ export function openCasinoUI(activeRoom: any, keys: any, gameType: string) {
                 coin.classList.remove("flipping");
                 void coin.offsetWidth; 
                 coin.classList.add("flipping");
-                coin.innerText = "?";
+                coin.innerText = "❔";
             }
         } 
         else if (game === "Roulette") {
@@ -327,8 +523,8 @@ export function openCasinoUI(activeRoom: any, keys: any, gameType: string) {
             const dealer = document.getElementById("2d-bj-dealer");
             const player = document.getElementById("2d-bj-player");
             if (dealer && player) {
-                dealer.innerHTML = `<div class="dealing" style="width:30px; height:45px; background:white; border:1px solid black; border-radius:3px; display:flex; align-items:center; justify-content:center; color:black; font-weight:bold;">?</div>`;
-                player.innerHTML = `<div class="dealing" style="width:30px; height:45px; background:white; border:1px solid black; border-radius:3px; display:flex; align-items:center; justify-content:center; color:black; font-weight:bold;">?</div>`;
+                dealer.innerHTML = `<div class="dealing" style="width:40px; height:55px; background:white; border:3px solid #cbd5e1; border-radius:8px; display:flex; align-items:center; justify-content:center; color:#1e293b; font-weight:900; font-size: 20px; box-shadow: 0 4px 0 rgba(0,0,0,0.2);">?</div>`;
+                player.innerHTML = `<div class="dealing" style="width:40px; height:55px; background:white; border:3px solid #cbd5e1; border-radius:8px; display:flex; align-items:center; justify-content:center; color:#1e293b; font-weight:900; font-size: 20px; box-shadow: 0 4px 0 rgba(0,0,0,0.2);">?</div>`;
             }
         }
     };
@@ -352,6 +548,7 @@ export function openCasinoUI(activeRoom: any, keys: any, gameType: string) {
 export function openInventoryUI(activeRoom: any, keys: any, playerClass: string) {
     if (isInventoryUIOpen || !activeRoom) return;
     isInventoryUIOpen = true;
+    injectGlobalChunkyStyles();
 
     for (const key in keys) {
         keys[key as keyof typeof keys] = false;
@@ -361,36 +558,34 @@ export function openInventoryUI(activeRoom: any, keys: any, playerClass: string)
     if (!modal) {
         modal = document.createElement("div");
         modal.id = "inventory-modal";
+        modal.className = "modal-chunky";
         modal.style.position = "fixed"; 
         modal.style.top = "50%"; 
         modal.style.left = "50%";
         modal.style.transform = "translate(-50%, -50%)"; 
-        modal.style.background = "rgba(20, 20, 25, 0.98)";
         modal.style.padding = "30px"; 
-        modal.style.borderRadius = "12px"; 
-        modal.style.border = "2px solid #00aaff";
         modal.style.zIndex = "1000"; 
-        modal.style.color = "white"; 
         modal.style.width = "750px"; 
-        modal.style.boxShadow = "0 10px 40px rgba(0,0,0,0.8)";
-        modal.style.fontFamily = "Arial, sans-serif";
         
         modal.innerHTML = `
-            <div style="display:flex; justify-content:space-between; align-items:center; border-bottom: 1px solid #444; padding-bottom: 15px; margin-bottom: 20px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; border-bottom: 4px solid #334155; padding-bottom: 15px; margin-bottom: 20px;">
                 <div>
-                    <h2 style="margin:0; color:#00aaff; font-size: 24px;"><span id="inv-player-name"></span>'s Inventory</h2>
-                    <div style="margin-top: 6px; font-size: 13px; color: #ddd; font-weight: bold;">
-                        🏅 <span id="inv-player-rank"></span> | Level <span id="inv-player-level"></span> | Class: <span id="inv-player-class"></span>
+                    <h2 style="margin:0; color:#38bdf8; font-size: 26px; font-weight: 900;"><span id="inv-player-name"></span>'s Backpack</h2>
+                    <div style="margin-top: 6px; font-size: 14px; color: #94a3b8; font-weight: 700;">
+                        🏅 <span id="inv-player-rank"></span> <span style="margin: 0 5px;">|</span> Level <span id="inv-player-level"></span> <span style="margin: 0 5px;">|</span> Class: <span id="inv-player-class"></span>
                     </div>
                 </div>
-                <button id="close-inv-btn" style="background:none; border:none; color:#ff5555; font-size:28px; cursor:pointer; font-weight:bold; line-height: 1;">&times;</button>
+                <button id="close-inv-btn" class="btn-close-chunky">&times;</button>
             </div>
             <div style="display:flex; gap:30px;">
-                <div id="inv-equip-container" style="flex: 0 0 220px; background:rgba(255,255,255,0.03); padding:20px; border-radius:10px; display:grid; grid-template-columns: 1fr 1fr; gap:15px; justify-items:center;">
+                <div id="inv-equip-container" class="chunky-panel" style="flex: 0 0 220px; display:grid; grid-template-columns: 1fr 1fr; gap:15px; justify-items:center;">
                 </div>
                 <div style="flex:1;">
-                    <div style="margin-bottom: 10px; font-size: 14px; color: #ffd700; font-weight: bold;">Coins: <span id="inv-player-coins"></span></div>
-                    <div id="inventory-list-container" style="display:flex; flex-direction:column; gap:10px; max-height:380px; overflow-y:auto; padding-right:10px;">
+                    <div class="chunky-panel" style="margin-bottom: 15px; padding: 10px 15px; display: flex; justify-content: space-between; align-items: center;">
+                        <span style="font-weight: 900; color: #94a3b8;">Wallet:</span>
+                        <span style="font-size: 20px; color: #f59e0b; font-weight: 900;">💰 <span id="inv-player-coins"></span></span>
+                    </div>
+                    <div id="inventory-list-container" style="display:flex; flex-direction:column; gap:10px; max-height:350px; overflow-y:auto; padding-right:10px;">
                     </div>
                 </div>
             </div>
@@ -426,15 +621,15 @@ export function refreshInventoryUI(activeRoom: any, playerClass: string) {
     const me = activeRoom.state.players.get(activeRoom.sessionId);
     if (!me) return;
 
-    let rankColor = "#cccccc"; 
-    if (me.rank === "Bronze") rankColor = "#cd7f32";
-    if (me.rank === "Silver") rankColor = "#e6e8fa";
-    if (me.rank === "Gold") rankColor = "#ffd700";
-    if (me.rank === "Diamond") rankColor = "#00ffff";
+    let rankColor = "#94a3b8"; 
+    if (me.rank === "Bronze") rankColor = "#b45309";
+    if (me.rank === "Silver") rankColor = "#cbd5e1";
+    if (me.rank === "Gold") rankColor = "#f59e0b";
+    if (me.rank === "Diamond") rankColor = "#38bdf8";
 
     document.getElementById("inv-player-name")!.textContent = me.name;
     const rankEl = document.getElementById("inv-player-rank")!;
-    rankEl.textContent = `Rank: ${me.rank}`;
+    rankEl.textContent = `${me.rank}`;
     rankEl.style.color = rankColor;
     document.getElementById("inv-player-level")!.textContent = me.level;
     document.getElementById("inv-player-class")!.textContent = playerClass.charAt(0).toUpperCase() + playerClass.slice(1);
@@ -442,12 +637,14 @@ export function refreshInventoryUI(activeRoom: any, playerClass: string) {
 
     const getEquipSlotHTML = (itemName: string, placeholder: string, label: string) => {
         const item = ITEM_DB[itemName];
+        const borderCol = item ? '#22c55e' : '#475569';
+        const bgCol = item ? '#166534' : '#1e293b';
         return `
             <div style="display:flex; flex-direction:column; align-items:center; gap:5px;">
-                <div class="equip-slot" style="width:64px; height:64px; background:#1a1a20; border:2px solid ${item ? '#00ffaa' : '#444'}; border-radius:8px; display:flex; justify-content:center; align-items:center; font-size:32px; position:relative;">
-                    ${item ? item.icon : `<span style="opacity:0.2;">${placeholder}</span>`}
+                <div class="equip-slot" style="width:64px; height:64px; background:${bgCol}; border:4px solid ${borderCol}; border-radius:16px; display:flex; justify-content:center; align-items:center; font-size:32px; position:relative; box-shadow: inset 0 4px 8px rgba(0,0,0,0.3);">
+                    ${item ? item.icon : `<span style="opacity:0.3; filter: grayscale(1);">${placeholder}</span>`}
                 </div>
-                <span style="font-size:10px; color:#888; text-transform:uppercase;">${label}</span>
+                <span style="font-size:12px; font-weight: 900; color:#94a3b8; text-transform:uppercase;">${label}</span>
             </div>
         `;
     };
@@ -475,20 +672,24 @@ export function refreshInventoryUI(activeRoom: any, playerClass: string) {
         const dbItem = ITEM_DB[name];
         const icon = dbItem ? dbItem.icon : "📦";
         listHtml += `
-            <div style="display:flex; justify-content:space-between; align-items:center; background:#2a2a35; padding:12px; border-radius:8px; border:1px solid #555;">
+            <div class="chunky-panel" style="display:flex; justify-content:space-between; align-items:center; padding:12px 15px; margin: 0;">
                 <div style="flex-grow:1;">
-                    <div style="font-weight:bold; font-size:15px; color:#fff;">${icon} ${item.name} <span style="color:#00aaff;">x${item.quantity}</span></div>
-                    <div style="font-size:11px; color:#aaa;">${dbItem?.type || 'item'}</div>
+                    <div style="font-weight:900; font-size:16px; color:#fff;">
+                        <span style="font-size: 20px; margin-right: 5px;">${icon}</span> 
+                        ${item.name} 
+                        <span style="color:#38bdf8; background: #0f172a; padding: 2px 8px; border-radius: 8px; margin-left: 5px; font-size: 14px;">x${item.quantity}</span>
+                    </div>
+                    <div style="font-size:12px; font-weight: 700; color:#94a3b8; margin-top: 4px; text-transform: capitalize;">${dbItem?.type || 'item'}</div>
                 </div>
-                <div style="display:flex; gap: 5px;">
-                    <button class="equip-btn" data-itemname="${name}" style="background:#44aa44; color:#fff; border:none; border-radius:4px; padding:6px 10px; font-size:12px; cursor:pointer;">Equip</button>
-                    <button class="use-btn" data-itemname="${name}" style="background:#00aaff; color:#fff; border:none; border-radius:4px; padding:6px 10px; font-size:12px; cursor:pointer;">Use</button>
+                <div style="display:flex; gap: 8px;">
+                    <button class="btn-chunky btn-green equip-btn" data-itemname="${name}" style="padding: 10px 15px; font-size: 12px;">Equip</button>
+                    <button class="btn-chunky btn-blue use-btn" data-itemname="${name}" style="padding: 10px 15px; font-size: 12px;">Use</button>
                 </div>
             </div>
         `;
     });
 
-    if (!hasItems) listHtml = `<div style="text-align:center; color:#888; padding: 20px;">Empty</div>`;
+    if (!hasItems) listHtml = `<div style="text-align:center; color:#64748b; padding: 30px; font-weight: 900; font-size: 18px;">Backpack is Empty!</div>`;
     listContainer.innerHTML = listHtml;
     listContainer.scrollTop = currentScroll; 
 }
@@ -499,6 +700,7 @@ export function openChestUI(activeRoom: any, keys: any, chestId: string) {
     if (isChestUIOpen || !activeRoom) return;
     isChestUIOpen = true;
     activeChestId = chestId;
+    injectGlobalChunkyStyles();
 
     for (const key in keys) keys[key as keyof typeof keys] = false;
 
@@ -506,33 +708,28 @@ export function openChestUI(activeRoom: any, keys: any, chestId: string) {
     if (!modal) {
         modal = document.createElement("div");
         modal.id = "chest-modal";
+        modal.className = "modal-chunky";
         modal.style.position = "fixed"; 
         modal.style.top = "50%"; 
         modal.style.left = "50%";
         modal.style.transform = "translate(-50%, -50%)"; 
-        modal.style.background = "rgba(20, 20, 25, 0.98)";
         modal.style.padding = "30px"; 
-        modal.style.borderRadius = "12px"; 
-        modal.style.border = "2px solid #00ffaa";
         modal.style.zIndex = "1000"; 
-        modal.style.color = "white"; 
-        modal.style.width = "700px";
-        modal.style.boxShadow = "0 10px 40px rgba(0,0,0,0.8)";
-        modal.style.fontFamily = "Arial, sans-serif";
+        modal.style.width = "750px";
         
         modal.innerHTML = `
-            <div style="display:flex; justify-content:space-between; align-items:center; border-bottom: 1px solid #444; padding-bottom: 15px; margin-bottom: 20px;">
-                <h2 style="margin:0; color:#00ffaa; font-size: 24px;">Storage Chest</h2>
-                <button id="close-chest-btn" style="background:none; border:none; color:#ff5555; font-size:28px; cursor:pointer; font-weight:bold; line-height: 1;">&times;</button>
+            <div style="display:flex; justify-content:space-between; align-items:center; border-bottom: 4px solid #334155; padding-bottom: 15px; margin-bottom: 20px;">
+                <h2 style="margin:0; color:#38bdf8; font-size: 26px; font-weight: 900;">Storage Chest</h2>
+                <button id="close-chest-btn" class="btn-close-chunky">&times;</button>
             </div>
             <div style="display: flex; gap: 20px;">
-                <div style="flex: 1; background: #1a1a20; padding: 15px; border-radius: 8px;">
-                    <h3 style="color: #00aaff; margin-top: 0;">Your Backpack</h3>
-                    <div id="chest-backpack-container" style="display:flex; flex-direction:column; gap:8px; max-height:300px; overflow-y:auto; padding-right: 5px;"></div>
+                <div class="chunky-panel" style="flex: 1;">
+                    <h3 style="color: #38bdf8; margin-top: 0; font-weight: 900;">🎒 Your Backpack</h3>
+                    <div id="chest-backpack-container" style="display:flex; flex-direction:column; gap:10px; max-height:300px; overflow-y:auto; padding-right: 5px;"></div>
                 </div>
-                <div style="flex: 1; background: #1a1a20; padding: 15px; border-radius: 8px;">
-                    <h3 style="color: #ffaa00; margin-top: 0;">Chest Contents</h3>
-                    <div id="chest-contents-container" style="display:flex; flex-direction:column; gap:8px; max-height:300px; overflow-y:auto; padding-right: 5px;"></div>
+                <div class="chunky-panel" style="flex: 1;">
+                    <h3 style="color: #f59e0b; margin-top: 0; font-weight: 900;">🧰 Chest Contents</h3>
+                    <div id="chest-contents-container" style="display:flex; flex-direction:column; gap:10px; max-height:300px; overflow-y:auto; padding-right: 5px;"></div>
                 </div>
             </div>
         `;
@@ -588,13 +785,13 @@ export function refreshChestUI(activeRoom: any) {
         const dbItem = ITEM_DB[name];
         const icon = dbItem ? dbItem.icon : "📦";
         bpHTML += `
-            <div style="display:flex; justify-content:space-between; align-items:center; background:#2a2a35; padding:10px; border-radius:6px; border:1px solid #444;">
-                <div style="font-weight:bold; font-size:14px;">${icon} ${item.name} <span style="color:#00aaff;">x${item.quantity}</span></div>
-                <button class="deposit-btn" data-itemname="${name}" style="background:#00aaff; color:#fff; border:none; border-radius:4px; padding:6px 12px; cursor:pointer; font-weight:bold;">Deposit</button>
+            <div style="display:flex; justify-content:space-between; align-items:center; background:#1e293b; padding:12px; border-radius:12px; border:2px solid #475569;">
+                <div style="font-weight:900; font-size:14px;">${icon} ${item.name} <span style="color:#38bdf8;">x${item.quantity}</span></div>
+                <button class="btn-chunky btn-blue deposit-btn" data-itemname="${name}" style="padding:8px 12px; font-size: 12px;">Deposit</button>
             </div>
         `;
     });
-    if (me.inventory.size === 0) bpHTML = `<div style="text-align:center; color:#888;">Empty</div>`;
+    if (me.inventory.size === 0) bpHTML = `<div style="text-align:center; color:#64748b; font-weight:900; padding: 20px;">Empty</div>`;
     
     let chHTML = "";
     if (chest.inventory) {
@@ -602,15 +799,15 @@ export function refreshChestUI(activeRoom: any) {
             const dbItem = ITEM_DB[name];
             const icon = dbItem ? dbItem.icon : "📦";
             chHTML += `
-                <div style="display:flex; justify-content:space-between; align-items:center; background:#2a2a35; padding:10px; border-radius:6px; border:1px solid #444;">
-                    <div style="font-weight:bold; font-size:14px;">${icon} ${item.name} <span style="color:#ffaa00;">x${item.quantity}</span></div>
-                    <button class="withdraw-btn" data-itemname="${name}" style="background:#ffaa00; color:#000; border:none; border-radius:4px; padding:6px 12px; cursor:pointer; font-weight:bold;">Withdraw</button>
+                <div style="display:flex; justify-content:space-between; align-items:center; background:#1e293b; padding:12px; border-radius:12px; border:2px solid #475569;">
+                    <div style="font-weight:900; font-size:14px;">${icon} ${item.name} <span style="color:#f59e0b;">x${item.quantity}</span></div>
+                    <button class="btn-chunky btn-gold withdraw-btn" data-itemname="${name}" style="padding:8px 12px; font-size: 12px; color: #1e293b;">Withdraw</button>
                 </div>
             `;
         });
-        if (chest.inventory.size === 0) chHTML = `<div style="text-align:center; color:#888;">Empty</div>`;
+        if (chest.inventory.size === 0) chHTML = `<div style="text-align:center; color:#64748b; font-weight:900; padding: 20px;">Empty</div>`;
     } else {
-        chHTML = `<div style="text-align:center; color:#888;">Empty</div>`;
+        chHTML = `<div style="text-align:center; color:#64748b; font-weight:900; padding: 20px;">Empty</div>`;
     }
 
     bpContainer.innerHTML = bpHTML;
@@ -625,6 +822,7 @@ export function openShopUI(activeRoom: any, keys: any, stallType: string) {
     if (isShopUIOpen || !activeRoom) return;
     isShopUIOpen = true;
     activeStallType = stallType;
+    injectGlobalChunkyStyles();
 
     for (const key in keys) {
         keys[key as keyof typeof keys] = false;
@@ -634,27 +832,22 @@ export function openShopUI(activeRoom: any, keys: any, stallType: string) {
     if (!modal) {
         modal = document.createElement("div");
         modal.id = "shop-modal";
+        modal.className = "modal-chunky";
         modal.style.position = "fixed"; 
         modal.style.top = "50%"; 
         modal.style.left = "50%";
         modal.style.transform = "translate(-50%, -50%)"; 
-        modal.style.background = "rgba(20, 20, 25, 0.98)";
         modal.style.padding = "30px"; 
-        modal.style.borderRadius = "12px"; 
-        modal.style.border = "2px solid #ffaa00";
         modal.style.zIndex = "1000"; 
-        modal.style.color = "white"; 
-        modal.style.width = "480px";
-        modal.style.boxShadow = "0 10px 40px rgba(0,0,0,0.8)";
-        modal.style.fontFamily = "Arial, sans-serif";
+        modal.style.width = "500px";
         
         modal.innerHTML = `
-            <div style="display:flex; justify-content:space-between; align-items:center; border-bottom: 1px solid #444; padding-bottom: 15px; margin-bottom: 20px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; border-bottom: 4px solid #334155; padding-bottom: 15px; margin-bottom: 20px;">
                 <div>
-                    <h2 id="shop-title" style="margin:0; color:#ffaa00; font-size: 24px;"></h2>
-                    <div id="shop-subtitle" style="margin-top: 5px; font-size: 14px; font-weight: bold;"></div>
+                    <h2 id="shop-title" style="margin:0; color:#f59e0b; font-size: 26px; font-weight: 900;"></h2>
+                    <div id="shop-subtitle" style="margin-top: 5px; font-size: 14px; font-weight: 900;"></div>
                 </div>
-                <button id="close-shop-btn" style="background:none; border:none; color:#ff5555; font-size:28px; cursor:pointer; font-weight:bold; line-height: 1;">&times;</button>
+                <button id="close-shop-btn" class="btn-close-chunky">&times;</button>
             </div>
             <div id="shop-vault-container"></div>
             <div id="shop-items-container" style="display:flex; flex-direction:column; gap:12px; max-height:350px; overflow-y:auto; padding-right: 5px;"></div>
@@ -721,23 +914,23 @@ export function refreshShopUI(activeRoom: any) {
 
     document.getElementById("shop-title")!.textContent = activeStallType;
     const subEl = document.getElementById("shop-subtitle")!;
-    subEl.textContent = isOwned ? `Owned by: ${isMine ? 'You' : storeObj.ownerName}${leaseText}` : 'Unowned Non-Player Character Store';
-    subEl.style.color = isOwned ? '#44ff44' : '#aaaaaa';
+    subEl.textContent = isOwned ? `Owner: ${isMine ? 'You' : storeObj.ownerName}${leaseText}` : 'Unowned Public Store';
+    subEl.style.color = isOwned ? '#22c55e' : '#94a3b8';
 
     const vaultContainer = document.getElementById("shop-vault-container")!;
     if (isMine) {
         vaultContainer.innerHTML = `
-            <div style="background:#1a1a20; padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #00ffaa;">
+            <div class="chunky-panel" style="margin-bottom: 20px; border-color: #22c55e; background: #14532d;">
                 <div style="display:flex; justify-content:space-between; align-items:center;">
-                    <span style="font-size: 16px; font-weight: bold; color: #ffd700;">Store Vault: ${storeObj.vault} Coins</span>
-                    <button id="collect-vault-btn" data-storeid="${storeObj.id}" style="background:#00ffaa; color:#000; border:none; border-radius:4px; padding:8px 12px; font-weight:bold; cursor:pointer;">Collect</button>
+                    <span style="font-size: 18px; font-weight: 900; color: #fde047;">Vault: 💰 ${storeObj.vault}</span>
+                    <button id="collect-vault-btn" class="btn-chunky btn-green" data-storeid="${storeObj.id}" style="padding:10px 15px;">Collect</button>
                 </div>
             </div>
         `;
     } else if (!isOwned) {
         vaultContainer.innerHTML = `
-            <button id="buy-store-btn" data-storeid="${storeObj.id}" style="width: 100%; background: linear-gradient(to right, #44aaff, #0044ff); color: white; border: none; border-radius: 6px; padding: 12px; margin-bottom: 20px; font-size: 16px; font-weight: bold; cursor: pointer;">
-                Buy Store for 1000 Coins (14-Day Lease)
+            <button id="buy-store-btn" class="btn-chunky btn-blue" data-storeid="${storeObj.id}" style="width: 100%; padding: 15px; margin-bottom: 20px;">
+                Buy Store for 1000 Coins (14 Days)
             </button>
         `;
     } else {
@@ -750,33 +943,33 @@ export function refreshShopUI(activeRoom: any) {
 
     storeObj.inventory.forEach((item: any, name: string) => {
         const inStock = !isOwned || item.stock > 0;
-        const stockText = isOwned ? `Stock: ${item.stock}` : `Infinite Stock`;
+        const stockText = isOwned ? `Stock: ${item.stock}` : `Unlimited Stock`;
         const dbItem = ITEM_DB[item.name];
         const icon = dbItem ? dbItem.icon : "📦";
 
         itemsHTML += `
-            <div style="display:flex; justify-content:space-between; align-items:center; background:#2a2a35; padding:15px; border-radius:8px; border:1px solid #555;">
+            <div class="chunky-panel" style="display:flex; justify-content:space-between; align-items:center; padding:15px; margin: 0;">
                 <div style="padding-right: 15px; flex-grow: 1;">
-                    <div style="font-weight:bold; font-size:16px; color:#fff;">${icon} ${item.name}</div>
-                    <div style="font-size:13px; color:#aaa; margin-top:4px; line-height:1.4;">${item.desc}</div>
-                    <div style="font-size:12px; color:#44aaff; margin-top:6px; font-weight:bold;">${stockText}</div>
+                    <div style="font-weight:900; font-size:18px; color:#fff;">${icon} ${item.name}</div>
+                    <div style="font-size:14px; color:#cbd5e1; margin-top:6px; line-height:1.4; font-weight: 700;">${item.desc}</div>
+                    <div style="font-size:12px; color:#38bdf8; margin-top:8px; font-weight:900;">${stockText}</div>
                 </div>
         `;
 
         if (isMine) {
             itemsHTML += `
-                <div style="display:flex; flex-direction:column; gap: 8px;">
-                    <button class="restock-btn" data-storeid="${storeObj.id}" data-itemname="${name}" style="background:#44aaff; color:#fff; border:none; border-radius:4px; padding:8px 12px; font-weight:bold; cursor:pointer;">
-                        Restock (+1) - ${item.wholesalePrice} Coins
+                <div style="display:flex; flex-direction:column; gap: 10px;">
+                    <button class="btn-chunky btn-blue restock-btn" data-storeid="${storeObj.id}" data-itemname="${name}" style="padding:10px 15px; font-size: 12px;">
+                        Restock (+1) - ${item.wholesalePrice}c
                     </button>
-                    <div style="text-align: right; color: #ffd700; font-size: 14px; font-weight:bold;">Sells for: ${item.price}</div>
+                    <div style="text-align: right; color: #f59e0b; font-size: 14px; font-weight:900;">Sells for: ${item.price}</div>
                 </div>
             `;
         } else {
-            const btnStyle = inStock ? "background:#ffaa00; cursor:pointer;" : "background:#555; cursor:not-allowed; color:#888;";
+            const btnClass = inStock ? "btn-gold" : "btn-slate";
             itemsHTML += `
-                <button class="buy-btn" data-storeid="${storeObj.id}" data-itemname="${name}" ${inStock ? '' : 'disabled'} style="${btnStyle} color:#000; border:none; border-radius:4px; padding:10px 16px; font-weight:bold; transition: background 0.2s; white-space: nowrap;">
-                    ${inStock ? `${item.price} Coins` : 'Out of Stock'}
+                <button class="btn-chunky ${btnClass} buy-btn" data-storeid="${storeObj.id}" data-itemname="${name}" ${inStock ? '' : 'disabled'} style="padding:12px 20px; color: #1e293b; white-space: nowrap;">
+                    ${inStock ? `Buy - ${item.price}c` : 'Sold Out'}
                 </button>
             `;
         }
@@ -791,6 +984,7 @@ export function refreshShopUI(activeRoom: any) {
 
 export function openBlueprintSelector(activeScene: any, keys: any) {
     if (!activeScene || !(activeScene.constructor.name === "TownScene")) return;
+    injectGlobalChunkyStyles();
     
     for (const key in keys) {
       keys[key as keyof typeof keys] = false;
@@ -798,37 +992,32 @@ export function openBlueprintSelector(activeScene: any, keys: any) {
 
     const modal = document.createElement("div");
     modal.id = "blueprint-modal";
+    modal.className = "modal-chunky";
     modal.style.position = "fixed"; 
     modal.style.top = "50%"; 
     modal.style.left = "50%";
     modal.style.transform = "translate(-50%, -50%)"; 
-    modal.style.background = "rgba(20, 20, 25, 0.98)";
     modal.style.padding = "30px"; 
-    modal.style.borderRadius = "12px"; 
-    modal.style.border = "2px solid #00ffaa";
     modal.style.zIndex = "1000"; 
-    modal.style.color = "white"; 
     modal.style.width = "400px";
-    modal.style.boxShadow = "0 10px 40px rgba(0,0,0,0.8)";
-    modal.style.fontFamily = "Arial, sans-serif";
     modal.style.textAlign = "center";
 
     modal.innerHTML = `
-      <h2 style="margin:0; color:#00ffaa;">Select Blueprint</h2>
-      <p style="color:#ccc; font-size:14px; margin-bottom: 20px;">Choose what type of structure you want to build.</p>
+      <h2 style="margin:0 0 10px 0; color:#38bdf8; font-weight: 900; font-size: 26px;">Select Blueprint</h2>
+      <p style="color:#cbd5e1; font-size:16px; margin-bottom: 25px; font-weight: 700;">What do you want to build?</p>
       
-      <div style="display:flex; flex-direction:column; gap:10px;">
-        <button id="bp-house" style="background:#222; color:white; border:1px solid #555; padding:15px; border-radius:8px; cursor:pointer; font-weight:bold; font-size:16px; transition:0.2s;">
-            🏡 House (10 Materials)
+      <div style="display:flex; flex-direction:column; gap:15px;">
+        <button id="bp-house" class="btn-chunky btn-blue" style="padding: 20px; font-size: 18px;">
+            🏡 House (10 Mats)
         </button>
-        <button id="bp-farm" style="background:#222; color:white; border:1px solid #555; padding:15px; border-radius:8px; cursor:pointer; font-weight:bold; font-size:16px; transition:0.2s;">
-            🌾 Farm (5 Materials)
+        <button id="bp-farm" class="btn-chunky btn-green" style="padding: 20px; font-size: 18px;">
+            🌾 Farm (5 Mats)
         </button>
-        <button id="bp-shop" style="background:#222; color:white; border:1px solid #555; padding:15px; border-radius:8px; cursor:pointer; font-weight:bold; font-size:16px; transition:0.2s;">
-            🏪 Shop (20 Materials)
+        <button id="bp-shop" class="btn-chunky btn-gold" style="padding: 20px; font-size: 18px; color: #1e293b;">
+            🏪 Shop (20 Mats)
         </button>
       </div>
-      <button id="close-bp-btn" style="margin-top: 20px; background:#ff5555; color:white; border:none; padding:10px 20px; border-radius:6px; cursor:pointer; font-weight:bold; width:100%;">Cancel</button>
+      <button id="close-bp-btn" class="btn-chunky btn-red" style="margin-top: 25px; padding:15px; width:100%;">Cancel</button>
     `;
 
     document.body.appendChild(modal);
@@ -836,8 +1025,6 @@ export function openBlueprintSelector(activeScene: any, keys: any) {
     const setupBtn = (id: string, type: string) => {
         const btn = document.getElementById(id);
         if (btn) {
-            btn.onmouseover = () => btn.style.background = "#333";
-            btn.onmouseout = () => btn.style.background = "#222";
             btn.onclick = () => {
                 activeScene.currentBlueprintType = type;
                 activeScene.isBuildMode = true;
@@ -857,18 +1044,22 @@ export function openBlueprintSelector(activeScene: any, keys: any) {
 }
 
 export async function showCharacterCreation(): Promise<{ classId: string, pathwayId: string, auraStyle: string }> {
+  injectGlobalChunkyStyles();
   return new Promise((resolve) => {
     const container = document.createElement("div");
     container.style.position = "fixed"; container.style.top = "0"; container.style.left = "0";
     container.style.width = "100vw"; container.style.height = "100vh";
-    container.style.background = "radial-gradient(circle, #2a2a35 0%, #050505 100%)";
+    container.style.background = "#0f172a"; 
     container.style.zIndex = "9999"; container.style.display = "flex";
     container.style.flexDirection = "column"; container.style.alignItems = "center";
-    container.style.justifyContent = "center"; container.style.fontFamily = "Arial, sans-serif";
+    container.style.justifyContent = "center"; 
+    container.style.fontFamily = "'Nunito', 'Segoe UI Rounded', sans-serif";
 
     const title = document.createElement("h1");
-    title.innerText = "STEP 1: SELECT YOUR CLASS";
-    title.style.color = "white"; title.style.fontSize = "48px"; title.style.marginBottom = "40px";
+    title.innerText = "CHOOSE YOUR CLASS!";
+    title.style.color = "white"; title.style.fontSize = "50px"; title.style.marginBottom = "40px";
+    title.style.fontWeight = "900";
+    title.style.textShadow = "0 6px 0 rgba(0,0,0,0.5)";
     container.appendChild(title);
 
     const cardRow = document.createElement("div");
@@ -876,23 +1067,23 @@ export async function showCharacterCreation(): Promise<{ classId: string, pathwa
     container.appendChild(cardRow);
 
     const classes = [
-      { id: "duelist", name: "Duelist", desc: "High mobility melee fighter.", color: "#ffaa00", icon: "⚔️" },
-      { id: "vanguard", name: "Vanguard", desc: "Heavy armor frontline tank.", color: "#00aaff", icon: "🛡️" },
-      { id: "arcanist", name: "Arcanist", desc: "Ranged spellcaster.", color: "#aa00ff", icon: "🪄" }
+      { id: "duelist", name: "Duelist", desc: "Fast hits, high mobility. Dash around the battlefield!", color: "#f59e0b", icon: "⚔️", shadow: "#d97706" },
+      { id: "vanguard", name: "Vanguard", desc: "Heavy armor tank. Take hits and protect your friends!", color: "#3b82f6", icon: "🛡️", shadow: "#2563eb" },
+      { id: "arcanist", name: "Arcanist", desc: "Ranged magic attacks. Stay back and blow things up!", color: "#d946ef", icon: "🪄", shadow: "#c026d3" }
     ];
 
     const pathways = [
-      { id: "shadow", name: "Shadow Essence", desc: "Execute bursts and stealth.", color: "#8800ff", icon: "🌑" },
-      { id: "light", name: "Light Essence", desc: "Healing and holy protection.", color: "#ffffaa", icon: "☀️" },
-      { id: "berserker", name: "Berserker Essence", desc: "Raw physical power and fire.", color: "#ff4444", icon: "🔥" },
-      { id: "nature", name: "Nature Essence", desc: "Healing and area control.", color: "#22cc44", icon: "🌿" }
+      { id: "shadow", name: "Shadow", desc: "Sneaky strikes and burst damage.", color: "#8b5cf6", icon: "🌑", shadow: "#7c3aed" },
+      { id: "light", name: "Light", desc: "Healing spells and protection.", color: "#fde047", icon: "☀️", shadow: "#eab308" },
+      { id: "berserker", name: "Berserker", desc: "Raw power and fire attacks.", color: "#ef4444", icon: "🔥", shadow: "#dc2626" },
+      { id: "nature", name: "Nature", desc: "Healing and area control.", color: "#22c55e", icon: "🌿", shadow: "#16a34a" }
     ];
 
     const auras = [
-        { id: "tyrant", name: "Tyrant Aura", desc: "Oppressive force. Slows and weakens nearby enemies.", color: "#ff2222", icon: "💥" },
-        { id: "sanctuary", name: "Sanctuary Aura", desc: "Protective domain. Heals and shields nearby allies.", color: "#44aaff", icon: "🛡️" },
-        { id: "void", name: "Void Aura", desc: "Absolute concealment. Drops aggro and buffs next strike.", color: "#8800ff", icon: "🥷" },
-        { id: "storm", name: "Storm Aura", desc: "Chaotic energy. Periodically zaps enemies with lightning.", color: "#00ffaa", icon: "🌪️" }
+        { id: "tyrant", name: "Tyrant", desc: "Slows and weakens nearby enemies.", color: "#ef4444", icon: "💥", shadow: "#dc2626" },
+        { id: "sanctuary", name: "Sanctuary", desc: "Heals and shields nearby allies.", color: "#3b82f6", icon: "🛡️", shadow: "#2563eb" },
+        { id: "void", name: "Void", desc: "Sneak up and buff your next strike.", color: "#8b5cf6", icon: "🥷", shadow: "#7c3aed" },
+        { id: "storm", name: "Storm", desc: "Periodically zaps enemies with lightning.", color: "#22c55e", icon: "🌪️", shadow: "#16a34a" }
     ];
 
     let selectedClass = "";
@@ -902,32 +1093,39 @@ export async function showCharacterCreation(): Promise<{ classId: string, pathwa
       cardRow.innerHTML = "";
       items.forEach(item => {
         const card = document.createElement("button");
-        card.style.width = "250px";
-        card.style.height = "350px";
-        card.style.background = "linear-gradient(180deg, #1e1e24 0%, #101015 100%)";
-        card.style.border = `3px solid ${item.color}`; card.style.borderRadius = "12px";
-        card.style.color = "white"; card.style.cursor = "pointer";
-        card.style.padding = "20px"; card.style.display = "flex"; card.style.flexDirection = "column";
-        card.style.transition = "transform 0.2s, box-shadow 0.2s";
+        card.style.width = "260px";
+        card.style.height = "360px";
+        card.style.background = "#1e293b";
+        card.style.border = `6px solid ${item.color}`; 
+        card.style.borderRadius = "24px";
+        card.style.color = "white"; 
+        card.style.cursor = "pointer";
+        card.style.padding = "25px"; 
+        card.style.display = "flex"; 
+        card.style.flexDirection = "column";
+        card.style.transition = "transform 0.1s, box-shadow 0.1s";
+        card.style.fontFamily = "'Nunito', sans-serif";
+        card.style.boxShadow = `0 10px 0 ${item.shadow}`;
 
-        card.onmouseover = () => { card.style.transform = "translateY(-10px)"; card.style.boxShadow = `0 10px 30px ${item.color}66`; };
-        card.onmouseout = () => { card.style.transform = "translateY(0)"; card.style.boxShadow = "none"; };
+        card.onmousedown = () => { card.style.transform = "translateY(10px)"; card.style.boxShadow = "0 0px 0 transparent"; };
+        card.onmouseup = () => { card.style.transform = "translateY(0)"; card.style.boxShadow = `0 10px 0 ${item.shadow}`; };
+        card.onmouseleave = () => { card.style.transform = "translateY(0)"; card.style.boxShadow = `0 10px 0 ${item.shadow}`; };
 
         card.innerHTML = `
-            <div style="font-size: 40px; text-align: center; margin-bottom: 10px;">${item.icon}</div>
-            <h2 style="color: ${item.color}; margin-top: 0; text-align: center;">${item.name}</h2>
-            <p style="font-size: 16px; line-height: 1.5; opacity: 0.9; flex-grow: 1; text-align: center;">${item.desc}</p>
-            <div style="font-weight: bold; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.2); text-align: center;">SELECT</div>
+            <div style="font-size: 60px; text-align: center; margin-bottom: 15px;">${item.icon}</div>
+            <h2 style="color: ${item.color}; margin-top: 0; text-align: center; font-weight: 900; font-size: 28px; text-transform: uppercase;">${item.name}</h2>
+            <p style="font-size: 18px; font-weight: 700; line-height: 1.4; color: #cbd5e1; flex-grow: 1; text-align: center;">${item.desc}</p>
+            <div style="font-weight: 900; font-size: 20px; padding-top: 15px; border-top: 4px solid rgba(255,255,255,0.1); text-align: center; color: white;">SELECT</div>
         `;
         
         card.onclick = () => {
           if (step === 1) {
             selectedClass = item.id;
-            title.innerText = `STEP 2: SELECT AWAKENING PATHWAY`;
+            title.innerText = `PICK A PATHWAY!`;
             renderOptions(pathways, 2);
           } else if (step === 2) {
             selectedPathway = item.id;
-            title.innerText = `STEP 3: MANIFEST YOUR SOUL AURA`;
+            title.innerText = `SELECT YOUR AURA!`;
             renderOptions(auras, 3);
           } else if (step === 3) {
             document.body.removeChild(container);

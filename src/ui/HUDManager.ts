@@ -73,8 +73,8 @@ export function mountMazeUI(durationSeconds: number) {
         ui.className = "hud-absolute-center";
         ui.style.top = "50px";
         ui.innerHTML = `
-            <div class="neon-text-red hud-header" style="font-size: 24px; letter-spacing: 4px;">THE LABYRINTH COLLAPSES IN</div>
-            <div id="maze-countdown" class="neon-text-red hud-header" style="font-size: 64px; font-weight: bold; color: white;">10:00</div>
+            <div class="hud-header" style="color: #ef4444; font-size: 24px; letter-spacing: 4px; text-shadow: 0 4px 0 #b91c1c; font-weight: 900;">THE LABYRINTH COLLAPSES IN</div>
+            <div id="maze-countdown" class="hud-header" style="font-size: 64px; font-weight: 900; color: white; text-shadow: 0 6px 0 #b91c1c;">10:00</div>
         `;
         document.body.appendChild(ui);
     }
@@ -91,7 +91,7 @@ export function mountMazeUI(durationSeconds: number) {
         timerText.innerText = `${m}:${s}`;
         
         if (timeLeft <= 60) {
-            timerText.style.color = "#ff0000";
+            timerText.style.color = "#fca5a5";
             timerText.style.animation = "hudPulse 1s infinite";
         }
         
@@ -121,12 +121,13 @@ export function mountDungeonUI(wave: number, maxWaves: number, enemiesLeft: numb
 
     const m = Math.floor(timeLeftSeconds / 60).toString().padStart(2, "0");
     const s = (timeLeftSeconds % 60).toString().padStart(2, "0");
-    const timeColor = timeLeftSeconds <= 60 ? "var(--neon-red)" : "#ffffff";
+    const timeColor = timeLeftSeconds <= 60 ? "#ef4444" : "#ffffff";
+    const timeShadow = timeLeftSeconds <= 60 ? "#b91c1c" : "#94a3b8";
 
     ui.innerHTML = `
-        <div class="hud-header" style="color: var(--neon-amber); font-size: 24px; letter-spacing: 2px; text-shadow: 0 0 10px var(--neon-amber);">WAVE ${wave} / ${maxWaves}</div>
-        <div class="hud-header" style="color: ${timeColor}; font-size: 48px; font-weight: bold; text-shadow: 0 0 20px ${timeColor};">${m}:${s}</div>
-        <div style="color: var(--neon-red); font-family: var(--font-body); font-size: 16px; font-weight: bold;"><i class="fa-solid fa-skull"></i> Enemies Remaining: ${enemiesLeft}</div>
+        <div class="hud-header" style="color: #f59e0b; font-size: 24px; letter-spacing: 2px; text-shadow: 0 4px 0 #b45309; font-weight: 900;">WAVE ${wave} / ${maxWaves}</div>
+        <div class="hud-header" style="color: ${timeColor}; font-size: 48px; font-weight: 900; text-shadow: 0 6px 0 ${timeShadow};">${m}:${s}</div>
+        <div style="color: #ef4444; font-family: 'Nunito', sans-serif; font-size: 18px; font-weight: 900; background: #1e293b; padding: 5px 15px; border-radius: 12px; border: 3px solid #b91c1c; display: inline-block; margin-top: 10px;"><i class="fa-solid fa-skull"></i> Enemies Remaining: ${enemiesLeft}</div>
     `;
 }
 
@@ -147,346 +148,6 @@ const FAMILIAR_ICONS: Record<string, string> = {
     "radiant_seraph": "⚔️"
 };
 
-// --- EXPORTED MODAL FUNCTIONS ---
-
-export function openQuestUI(activeRoom: any, keys: any, playerName: string) {
-    if (isQuestUIOpen || !activeRoom) return;
-    isQuestUIOpen = true;
-
-    for (const key in keys) keys[key as keyof typeof keys] = false;
-
-    let modal = document.getElementById("quest-modal");
-    if (!modal) {
-        modal = document.createElement("div");
-        modal.id = "quest-modal";
-        modal.style.position = "fixed"; 
-        modal.style.top = "50%"; 
-        modal.style.left = "50%";
-        modal.style.transform = "translate(-50%, -50%)"; 
-        modal.style.background = "rgba(20, 20, 25, 0.98)";
-        modal.style.padding = "30px"; 
-        modal.style.borderRadius = "12px"; 
-        modal.style.border = "2px solid #00ffaa";
-        modal.style.zIndex = "1000"; 
-        modal.style.color = "white"; 
-        modal.style.width = "500px";
-        modal.style.boxShadow = "0 10px 40px rgba(0,0,0,0.8)";
-        modal.style.fontFamily = "Arial, sans-serif";
-        document.body.appendChild(modal);
-    }
-
-    modal.innerHTML = `
-      <div style="display:flex; justify-content:space-between; align-items:center; border-bottom: 1px solid #444; padding-bottom: 15px; margin-bottom: 20px;">
-        <h2 style="margin:0; color:#00ffaa; font-size: 24px;">Lord Protector's Request</h2>
-        <button id="close-quest-btn" style="background:none; border:none; color:#ff5555; font-size:28px; cursor:pointer; font-weight:bold; line-height: 1;">&times;</button>
-      </div>
-      <div style="font-size: 16px; line-height: 1.6; color: #ddd; margin-bottom: 20px;">
-        "Greetings, <span id="quest-player-name"></span>. The wilderness beyond these walls grows restless, and the Town of Beginnings requires your strength. Slay the beasts that encroach upon our borders and return to me."
-      </div>
-      <div style="background: #1a1a20; padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #444;">
-        <div style="font-weight: bold; color: #ffaa00; margin-bottom: 5px;">Objective:</div>
-        <div style="color: #fff;">Defeat 5 Enemies in The Wilderness</div>
-        <div style="font-weight: bold; color: #00aaff; margin-top: 10px; margin-bottom: 5px;">Rewards:</div>
-        <div style="color: #fff;">250 Coins, 500 Experience Points</div>
-      </div>
-      <div style="display:flex; gap: 15px;">
-          <button id="accept-quest-btn" style="flex: 1; padding: 15px; font-size: 16px; font-weight: bold; background: #00aa44; border: none; color: white; cursor:pointer; border-radius: 8px; transition: 0.2s;">Accept Quest</button>
-          <button id="decline-quest-btn" style="flex: 1; padding: 15px; font-size: 16px; font-weight: bold; background: #aa2222; border: none; color: white; cursor:pointer; border-radius: 8px; transition: 0.2s;">Decline</button>
-      </div>
-    `;
-
-    document.getElementById("quest-player-name")!.textContent = playerName;
-
-    document.getElementById("close-quest-btn")!.onclick = () => {
-        isQuestUIOpen = false;
-        document.body.removeChild(modal!);
-    };
-
-    document.getElementById("decline-quest-btn")!.onclick = () => {
-        isQuestUIOpen = false;
-        document.body.removeChild(modal!);
-    };
-
-    document.getElementById("accept-quest-btn")!.onclick = () => {
-        // We leave this here so the button does something, but the state-tracker 
-        // handles the actual onboarding tutorial flow.
-        activeRoom.send("acceptQuest", { questId: "slime_hunt_1" });
-        isQuestUIOpen = false;
-        document.body.removeChild(modal!);
-    };
-}
-
-export function openTeleportUI(activeRoom: any, keys: any) {
-    if (isTeleportUIOpen || !activeRoom) return;
-    isTeleportUIOpen = true;
-
-    for (const key in keys) {
-      keys[key as keyof typeof keys] = false;
-    }
-
-    let modal = document.getElementById("teleport-modal");
-    if (!modal) {
-      modal = document.createElement("div");
-      modal.id = "teleport-modal";
-      modal.style.position = "fixed"; 
-      modal.style.top = "50%"; 
-      modal.style.left = "50%";
-      modal.style.transform = "translate(-50%, -50%)"; 
-      modal.style.background = "rgba(20, 20, 25, 0.98)";
-      modal.style.padding = "30px"; 
-      modal.style.borderRadius = "12px"; 
-      modal.style.border = "2px solid #00aaff";
-      modal.style.zIndex = "1000"; 
-      modal.style.color = "white"; 
-      modal.style.width = "400px"; 
-      modal.style.boxShadow = "0 10px 40px rgba(0,0,0,0.8)";
-      modal.style.fontFamily = "Arial, sans-serif";
-      modal.style.textAlign = "center";
-      document.body.appendChild(modal);
-    }
-
-    modal.innerHTML = `
-      <div style="display:flex; justify-content:space-between; align-items:center; border-bottom: 1px solid #444; padding-bottom: 15px; margin-bottom: 20px;">
-        <h2 style="margin:0; color:#00aaff; font-size: 24px;">Fast Travel</h2>
-        <button id="close-teleport-btn" style="background:none; border:none; color:#ff5555; font-size:28px; cursor:pointer; font-weight:bold; line-height: 1;">&times;</button>
-      </div>
-      <div style="display:flex; flex-direction:column; gap:15px;">
-          <button id="tp-town" style="background: linear-gradient(135deg, #444, #222); border: 2px solid #ffaa00; padding: 15px; border-radius: 8px; color: white; font-size: 18px; font-weight: bold; cursor: pointer; transition: 0.2s;">🏰 Town of Beginnings</button>
-          <button id="tp-elven" style="background: linear-gradient(135deg, #444, #222); border: 2px solid #00ffaa; padding: 15px; border-radius: 8px; color: white; font-size: 18px; font-weight: bold; cursor: pointer; transition: 0.2s;">✨ The Elven Kingdom</button>
-      </div>
-    `;
-
-    document.getElementById("close-teleport-btn")!.onclick = () => {
-      isTeleportUIOpen = false;
-      if (document.body.contains(modal!)) document.body.removeChild(modal!);
-    };
-
-    document.getElementById("tp-town")!.onclick = () => {
-      activeRoom.send("teleport", { destination: "town" });
-      isTeleportUIOpen = false;
-      if (document.body.contains(modal!)) document.body.removeChild(modal!);
-    };
-
-    document.getElementById("tp-elven")!.onclick = () => {
-      activeRoom.send("teleport", { destination: "elven", x: 1155, z: 0 });
-      isTeleportUIOpen = false;
-      if (document.body.contains(modal!)) document.body.removeChild(modal!);
-    };
-}
-
-export function openCasinoUI(activeRoom: any, keys: any, gameType: string) {
-    if (isCasinoUIOpen || !activeRoom) return;
-    isCasinoUIOpen = true;
-
-    for (const key in keys) keys[key as keyof typeof keys] = false;
-
-    if (!document.getElementById("casino-styles")) {
-        const style = document.createElement("style");
-        style.id = "casino-styles";
-        style.innerHTML = `
-            @keyframes anim-flip-coin {
-                0% { transform: rotateY(0deg) scale(1); }
-                50% { transform: rotateY(900deg) scale(1.5); }
-                100% { transform: rotateY(1800deg) scale(1); }
-            }
-            @keyframes anim-spin-roulette {
-                0% { transform: rotate(0deg); }
-                100% { transform: rotate(1800deg); }
-            }
-            @keyframes anim-slot-shake {
-                0% { transform: translateY(3px); }
-                50% { transform: translateY(-3px); }
-                100% { transform: translateY(0); }
-            }
-            @keyframes anim-deal-card {
-                from { transform: translateX(100px) translateY(-50px) rotate(45deg); opacity: 0; }
-                to { transform: translateX(0) translateY(0) rotate(0deg); opacity: 1; }
-            }
-            .flipping { animation: anim-flip-coin 1s cubic-bezier(0.4, 0, 0.2, 1) forwards; }
-            .spinning { animation: anim-spin-roulette 2s cubic-bezier(0.1, 0.7, 0.1, 1) forwards; }
-            .slot-blur { filter: blur(3px); animation: anim-slot-shake 0.1s infinite; }
-            .dealing { animation: anim-deal-card 0.4s ease-out forwards; }
-        `;
-        document.head.appendChild(style);
-    }
-
-    let modal = document.getElementById("casino-modal");
-    if (!modal) {
-        modal = document.createElement("div");
-        modal.id = "casino-modal";
-        modal.style.position = "fixed"; 
-        modal.style.top = "50%"; 
-        modal.style.left = "50%";
-        modal.style.transform = "translate(-50%, -50%)"; 
-        modal.style.background = "linear-gradient(135deg, #1a1a20, #0a0a0f)";
-        modal.style.padding = "30px"; 
-        modal.style.borderRadius = "16px"; 
-        modal.style.border = "3px solid #ff0055";
-        modal.style.zIndex = "1000"; 
-        modal.style.color = "white"; 
-        modal.style.width = "400px";
-        modal.style.boxShadow = "0 0 50px rgba(255, 0, 85, 0.6)";
-        modal.style.fontFamily = "Arial, sans-serif";
-        modal.style.textAlign = "center";
-        document.body.appendChild(modal);
-    }
-
-    const me = activeRoom.state.players.get(activeRoom.sessionId);
-    if (!me) return;
-
-    let customInputs = "";
-    let visualArea = "";
-    
-    if (gameType === "Coin Toss") {
-        visualArea = `
-            <div style="height: 120px; display: flex; align-items: center; justify-content: center; perspective: 800px;">
-                <div id="2d-coin" style="width: 80px; height: 80px; border-radius: 50%; background: radial-gradient(circle, #ffd700, #b8860b); border: 4px solid #fff; box-shadow: 0 10px 20px rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; font-size: 36px; font-weight: bold; color: white; text-shadow: 2px 2px 0 #886000;">$</div>
-            </div>`;
-        customInputs = `
-            <div style="margin: 15px 0; display:flex; justify-content:center; gap:10px;">
-                <button id="btn-heads" style="flex:1; padding: 15px; font-size: 18px; font-weight: bold; background: #222; border: 2px solid #aaa; color: white; cursor:pointer; border-radius: 8px;">HEADS</button>
-                <button id="btn-tails" style="flex:1; padding: 15px; font-size: 18px; font-weight: bold; background: #222; border: 2px solid #aaa; color: white; cursor:pointer; border-radius: 8px;">TAILS</button>
-            </div>
-        `;
-    } else if (gameType === "Roulette") {
-        visualArea = `
-            <div style="height: 140px; display: flex; align-items: center; justify-content: center; overflow: hidden;">
-                <div id="2d-roulette" style="width: 120px; height: 120px; border-radius: 50%; border: 6px solid #e6dfcc; background: repeating-conic-gradient(#cc3333 0 18deg, #222 18deg 36deg); box-shadow: 0 5px 15px rgba(0,0,0,0.8); display: flex; align-items: center; justify-content: center; position: relative;">
-                    <div style="width: 80px; height: 80px; background: #111; border-radius: 50%; border: 2px solid #e6dfcc;"></div>
-                    <div style="position: absolute; top: 5px; width: 10px; height: 10px; background: white; border-radius: 50%; box-shadow: 0 0 5px white;"></div>
-                </div>
-            </div>`;
-        customInputs = `
-            <select id="roulette-guess" style="width: 100%; padding: 10px; font-size: 18px; margin: 15px 0; background: #222; color: white; border: 2px solid #ff0055; border-radius: 8px;">
-                <option value="red">Red (2x Payout)</option>
-                <option value="black">Black (2x Payout)</option>
-                <option value="0">Number 0 (35x Payout)</option>
-                <option value="7">Number 7 (35x Payout)</option>
-                <option value="13">Number 13 (35x Payout)</option>
-                <option value="21">Number 21 (35x Payout)</option>
-                <option value="36">Number 36 (35x Payout)</option>
-            </select>
-            <button id="btn-play" style="width: 100%; padding: 15px; font-size: 18px; font-weight: bold; background: #ff0055; border: none; color: white; cursor:pointer; border-radius: 8px; text-transform: uppercase;">Spin Wheel</button>
-        `;
-    } else if (gameType === "Slot Machine") {
-        visualArea = `
-            <div style="height: 100px; display: flex; align-items: center; justify-content: center;">
-                <div style="background: #111; border: 4px solid #555; border-radius: 8px; padding: 10px; display: flex; gap: 15px; box-shadow: inset 0 0 20px black;">
-                    <div id="2d-slot-1" style="width: 50px; height: 60px; background: #fff; border-radius: 4px; font-size: 36px; display: flex; align-items: center; justify-content: center; box-shadow: inset 0 5px 10px rgba(0,0,0,0.5);">🍒</div>
-                    <div id="2d-slot-2" style="width: 50px; height: 60px; background: #fff; border-radius: 4px; font-size: 36px; display: flex; align-items: center; justify-content: center; box-shadow: inset 0 5px 10px rgba(0,0,0,0.5);">🍋</div>
-                    <div id="2d-slot-3" style="width: 50px; height: 60px; background: #fff; border-radius: 4px; font-size: 36px; display: flex; align-items: center; justify-content: center; box-shadow: inset 0 5px 10px rgba(0,0,0,0.5);">💎</div>
-                </div>
-            </div>`;
-        customInputs = `
-            <button id="btn-play" style="width: 100%; padding: 20px; font-size: 24px; font-weight: bold; background: linear-gradient(to bottom, #ffaa00, #ff5500); border: none; color: black; cursor:pointer; border-radius: 12px; margin-top: 15px; text-transform: uppercase; box-shadow: 0 5px 0 #cc4400;">PULL LEVER</button>
-        `;
-    } else if (gameType === "Blackjack") {
-        visualArea = `
-            <div style="height: 120px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px;">
-                <div id="2d-bj-dealer" style="display: flex; gap: 5px; height: 45px;"></div>
-                <div id="2d-bj-player" style="display: flex; gap: 5px; height: 45px;"></div>
-            </div>`;
-        customInputs = `
-            <button id="btn-play" style="width: 100%; padding: 15px; font-size: 18px; font-weight: bold; background: #00aa44; border: none; color: white; cursor:pointer; border-radius: 8px; margin-top: 15px; text-transform: uppercase;">Deal Hand</button>
-        `;
-    }
-
-    modal.innerHTML = `
-      <div style="display:flex; justify-content:space-between; align-items:center; border-bottom: 1px solid #444; padding-bottom: 10px; margin-bottom: 15px;">
-        <h2 style="margin:0; color:#ff0055; font-size: 24px; text-transform: uppercase; letter-spacing: 2px;">${gameType}</h2>
-        <button id="close-casino-btn" style="background:none; border:none; color:#ff5555; font-size:28px; cursor:pointer; font-weight:bold; line-height: 1;">&times;</button>
-      </div>
-      
-      <div style="font-size: 18px; color: #ffd700; font-weight: bold; margin-bottom: 15px;">
-        Your Balance: <span id="casino-balance">${me.coins}</span> Coins
-      </div>
-
-      ${visualArea}
-  
-      <div style="background: #111; padding: 15px; border-radius: 8px; text-align: left; margin-top: 15px;">
-        <label style="color: #aaa; font-weight: bold;">Bet Amount:</label>
-        <input type="number" id="bet-amount" value="50" min="1" max="${me.coins}" style="width: 100%; padding: 10px; font-size: 18px; margin-top: 5px; background: #222; color: #00ffaa; border: 1px solid #444; border-radius: 4px; box-sizing: border-box;" />
-      </div>
-  
-      ${customInputs}
-  
-      <div id="casino-result" style="margin-top: 20px; font-size: 18px; font-weight: bold; min-height: 24px; color: #fff;"></div>
-    `;
-
-    document.getElementById("close-casino-btn")!.onclick = () => {
-        isCasinoUIOpen = false;
-        if ((window as any).casinoAnimInterval) clearInterval((window as any).casinoAnimInterval);
-        if (document.body.contains(modal!)) document.body.removeChild(modal!);
-    };
-
-    const getBet = () => parseInt((document.getElementById("bet-amount") as HTMLInputElement).value) || 0;
-
-    const start2DAnimation = (game: string) => {
-        const r = document.getElementById("casino-result");
-        if (r) r.innerHTML = "Processing...";
-
-        if ((window as any).casinoAnimInterval) clearInterval((window as any).casinoAnimInterval);
-
-        if (game === "Coin Toss") {
-            const coin = document.getElementById("2d-coin");
-            if (coin) {
-                coin.classList.remove("flipping");
-                void coin.offsetWidth; 
-                coin.classList.add("flipping");
-                coin.innerText = "?";
-            }
-        } 
-        else if (game === "Roulette") {
-            const wheel = document.getElementById("2d-roulette");
-            if (wheel) {
-                wheel.classList.remove("spinning");
-                void wheel.offsetWidth;
-                wheel.classList.add("spinning");
-            }
-        } 
-        else if (game === "Slot Machine") {
-            const s1 = document.getElementById("2d-slot-1");
-            const s2 = document.getElementById("2d-slot-2");
-            const s3 = document.getElementById("2d-slot-3");
-            const symbols = ["🍒", "🍋", "🔔", "💎", "7️⃣"];
-            
-            if (s1 && s2 && s3) {
-                s1.classList.add("slot-blur");
-                s2.classList.add("slot-blur");
-                s3.classList.add("slot-blur");
-                
-                (window as any).casinoAnimInterval = setInterval(() => {
-                    s1.innerText = symbols[Math.floor(Math.random() * symbols.length)];
-                    s2.innerText = symbols[Math.floor(Math.random() * symbols.length)];
-                    s3.innerText = symbols[Math.floor(Math.random() * symbols.length)];
-                }, 50);
-            }
-        }
-        else if (game === "Blackjack") {
-            const dealer = document.getElementById("2d-bj-dealer");
-            const player = document.getElementById("2d-bj-player");
-            if (dealer && player) {
-                dealer.innerHTML = `<div class="dealing" style="width:30px; height:45px; background:white; border:1px solid black; border-radius:3px; display:flex; align-items:center; justify-content:center; color:black; font-weight:bold;">?</div>`;
-                player.innerHTML = `<div class="dealing" style="width:30px; height:45px; background:white; border:1px solid black; border-radius:3px; display:flex; align-items:center; justify-content:center; color:black; font-weight:bold;">?</div>`;
-            }
-        }
-    };
-
-    if (gameType === "Coin Toss") {
-        document.getElementById("btn-heads")!.onclick = () => { start2DAnimation(gameType); activeRoom.send("playCasino", { game: gameType, bet: getBet(), guess: "heads" }); };
-        document.getElementById("btn-tails")!.onclick = () => { start2DAnimation(gameType); activeRoom.send("playCasino", { game: gameType, bet: getBet(), guess: "tails" }); };
-    } else if (gameType === "Roulette") {
-        document.getElementById("btn-play")!.onclick = () => {
-            start2DAnimation(gameType);
-            const guess = (document.getElementById("roulette-guess") as HTMLSelectElement).value;
-            activeRoom.send("playCasino", { game: gameType, bet: getBet(), guess });
-        };
-    } else {
-        document.getElementById("btn-play")!.onclick = () => { start2DAnimation(gameType); activeRoom.send("playCasino", { game: gameType, bet: getBet() }); };
-    }
-}
-
-
 // --- 1. OVERLAY CREATION ---
 export function ensureOverlay(getActiveRoom: () => any, getActionContext: () => any): HTMLDivElement {
     
@@ -495,113 +156,77 @@ export function ensureOverlay(getActiveRoom: () => any, getActionContext: () => 
         assetsContainer.id = "hud-external-assets";
         assetsContainer.innerHTML = `
             <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
-            <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+            <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@700;900&display=swap" rel="stylesheet">
             <style>
                 :root {
-                    --bg-panel: rgba(10, 15, 20, 0.85);
-                    --bg-panel-hover: rgba(20, 30, 40, 0.95);
-                    --border-color: rgba(0, 170, 255, 0.3);
-                    --neon-cyan: #00ffff;
-                    --neon-blue: #00aaff;
-                    --neon-magenta: #ff00aa;
-                    --neon-green: #00ffaa;
-                    --neon-amber: #ffaa00;
-                    --neon-red: #ff4444;
-                    --text-muted: #aaaaaa;
-                    --font-header: 'Orbitron', sans-serif;
-                    --font-body: 'Inter', sans-serif;
+                    --bg-panel: #1e293b;
+                    --border-color: #38bdf8;
+                    --font-header: 'Nunito', 'Segoe UI Rounded', sans-serif;
+                    --font-body: 'Nunito', 'Segoe UI Rounded', sans-serif;
                 }
                 
                 .hud-panel {
                     background: var(--bg-panel);
-                    border: 1px solid var(--border-color);
-                    border-radius: 8px;
-                    backdrop-filter: blur(8px);
+                    border: 4px solid var(--border-color);
+                    border-radius: 16px;
                     color: white;
                     font-family: var(--font-body);
                     padding: 15px;
-                    box-shadow: 0 4px 15px rgba(0,0,0,0.5), inset 0 0 20px rgba(0, 170, 255, 0.05);
+                    box-shadow: 0 10px 25px rgba(0,0,0,0.5);
                     pointer-events: auto;
                 }
-                .hud-header { font-family: var(--font-header); text-transform: uppercase; }
+                .hud-header { font-family: var(--font-header); text-transform: uppercase; font-weight: 900; }
                 .hud-absolute-center { position: fixed; left: 50%; transform: translateX(-50%); text-align: center; pointer-events: none; z-index: 2000; }
                 
-                @keyframes hudPulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
+                @keyframes hudPulse { 0% { opacity: 1; transform: scale(1); } 50% { opacity: 0.8; transform: scale(1.05); } 100% { opacity: 1; transform: scale(1); } }
                 .animate-pulse { animation: hudPulse 1.5s infinite; }
 
-                .text-cyan { color: var(--neon-cyan); }
-                .text-blue { color: var(--neon-blue); }
-                .text-green { color: var(--neon-green); }
-                .text-amber { color: var(--neon-amber); }
-                .text-red { color: var(--neon-red); }
-                .text-magenta { color: var(--neon-magenta); }
-                .text-muted { color: var(--text-muted); }
-                .text-sm { font-size: 12px; }
-                .text-md { font-size: 14px; }
-                .text-lg { font-size: 16px; font-weight: 600; }
-                .text-xl { font-size: 18px; font-weight: 700; }
+                .text-cyan { color: #22d3ee; }
+                .text-blue { color: #38bdf8; }
+                .text-green { color: #22c55e; }
+                .text-amber { color: #f59e0b; }
+                .text-red { color: #ef4444; }
+                .text-magenta { color: #d946ef; }
+                .text-muted { color: #94a3b8; }
+                .text-sm { font-size: 14px; font-weight: 700; }
+                .text-md { font-size: 16px; font-weight: 900; }
+                .text-lg { font-size: 18px; font-weight: 900; }
+                .text-xl { font-size: 22px; font-weight: 900; }
 
-                .hud-btn {
-                    background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.2);
-                    color: white; padding: 6px 12px; border-radius: 4px; cursor: pointer;
-                    font-family: var(--font-header); font-size: 12px; transition: all 0.2s;
-                    display: inline-flex; align-items: center; justify-content: center; gap: 6px;
-                }
-                .hud-btn:hover { background: rgba(0, 170, 255, 0.2); border-color: var(--neon-blue); box-shadow: 0 0 10px rgba(0, 170, 255, 0.3); }
-                .hud-btn.btn-danger:hover { background: rgba(255, 68, 68, 0.2); border-color: var(--neon-red); box-shadow: 0 0 10px rgba(255, 68, 68, 0.3); }
-                .hud-btn.btn-success:hover { background: rgba(0, 255, 170, 0.2); border-color: var(--neon-green); box-shadow: 0 0 10px rgba(0, 255, 170, 0.3); }
-                
                 .hud-input {
-                    background: rgba(0,0,0,0.5); border: 1px solid #444; color: white;
-                    padding: 6px; border-radius: 4px; font-family: var(--font-header);
+                    background: #f8fafc; border: 3px solid #94a3b8; color: #0f172a;
+                    padding: 10px; border-radius: 12px; font-family: var(--font-header); font-weight: bold;
                     width: 80px; outline: none; transition: border-color 0.2s;
                 }
-                .hud-input:focus { border-color: var(--neon-blue); }
+                .hud-input:focus { border-color: #3b82f6; }
 
-                .btn-hack {
-                    padding: 12px; background: linear-gradient(90deg, #002244, #0044aa);
-                    border: 1px solid var(--neon-blue); color: var(--neon-cyan);
-                    text-transform: uppercase; font-weight: bold; font-family: var(--font-header);
-                    border-radius: 4px; cursor: pointer; letter-spacing: 2px;
-                    box-shadow: 0 0 10px rgba(0, 170, 255, 0.2); transition: all 0.2s;
-                }
-                .btn-hack:hover:not(:disabled) { background: linear-gradient(90deg, #003366, #0066cc); box-shadow: 0 0 20px rgba(0, 170, 255, 0.5); color: white; }
-
-                .resource-container { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
-                .resource-icon { width: 24px; text-align: center; font-size: 16px; text-shadow: 0 0 8px currentColor; }
-                .resource-bar-wrapper { flex-grow: 1; height: 16px; background: rgba(0,0,0,0.7); border-radius: 3px; border: 1px solid #333; position: relative; overflow: hidden; }
-                .resource-fill { height: 100%; transition: width 0.2s ease-out; }
-                .fill-hp { background: linear-gradient(90deg, #880000, var(--neon-red)); box-shadow: 0 0 10px var(--neon-red); }
-                .fill-mp { background: linear-gradient(90deg, #004488, var(--neon-blue)); box-shadow: 0 0 10px var(--neon-blue); }
-                .fill-hunger { background: linear-gradient(90deg, #885500, var(--neon-amber)); box-shadow: 0 0 10px var(--neon-amber); }
-                .resource-text { position: absolute; top: 0; left: 0; width: 100%; height: 100%; text-align: center; font-size: 10px; font-weight: bold; line-height: 16px; text-shadow: 1px 1px 0 #000; font-family: var(--font-header); letter-spacing: 1px; }
-
-                .roster-hp-bg { width: 100%; height: 6px; background: rgba(0,0,0,0.8); border: 1px solid #333; border-radius: 3px; overflow: hidden; margin-top: 4px; }
+                .roster-hp-bg { width: 100%; height: 10px; background: #0f172a; border: 2px solid #334155; border-radius: 5px; overflow: hidden; margin-top: 4px; }
                 .roster-hp-fill { height: 100%; transition: width 0.2s; }
 
                 .hud-key {
-                    background: linear-gradient(180deg, #444, #222);
-                    border: 1px solid #111;
-                    border-bottom: 3px solid #000;
-                    border-radius: 4px;
-                    padding: 2px 8px;
+                    background: #f8fafc;
+                    border: 2px solid #cbd5e1;
+                    border-bottom: 4px solid #94a3b8;
+                    border-radius: 8px;
+                    padding: 4px 10px;
                     font-family: var(--font-header);
-                    font-size: 11px;
-                    color: #fff;
+                    font-size: 12px;
+                    font-weight: 900;
+                    color: #0f172a;
                     display: inline-block;
-                    margin: 0 2px;
-                    text-shadow: 1px 1px 0 #000;
-                    box-shadow: 0 2px 4px rgba(0,0,0,0.5);
+                    margin: 0 4px;
                 }
-                .controls-group { display: flex; flex-direction: column; gap: 8px; align-items: flex-end; }
-                .controls-row { display: flex; align-items: center; gap: 6px; }
+                .controls-group { display: flex; flex-direction: column; gap: 10px; align-items: flex-end; }
+                .controls-row { display: flex; align-items: center; gap: 8px; }
 
                 .zone-popup {
                     position: fixed; top: 35%; left: 50%; transform: translate(-50%, -50%);
                     text-align: center; z-index: 2000; pointer-events: none;
                     opacity: 0; transition: opacity 0.5s ease-in-out, transform 0.5s cubic-bezier(0.2, 0.8, 0.2, 1);
-                    background: radial-gradient(circle, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0) 70%);
-                    padding: 40px 80px; border-radius: 50%;
+                    background: rgba(15, 23, 42, 0.8);
+                    border: 4px solid #334155;
+                    padding: 30px 60px; border-radius: 30px;
+                    box-shadow: 0 20px 40px rgba(0,0,0,0.5);
                 }
                 .zone-popup.active {
                     opacity: 1;
@@ -616,56 +241,36 @@ export function ensureOverlay(getActiveRoom: () => any, getActionContext: () => 
                     display: flex;
                     flex-direction: column;
                     justify-content: flex-end;
-                    gap: 4px;
+                    gap: 8px;
                     pointer-events: none;
                     z-index: 1000;
                 }
                 .event-message {
-                    background: rgba(0, 0, 0, 0.6);
+                    background: #1e293b;
                     color: white;
-                    padding: 4px 8px;
-                    border-radius: 2px;
+                    padding: 10px 15px;
+                    border-radius: 12px;
                     font-family: var(--font-body);
-                    font-size: 13px;
-                    font-weight: 600;
-                    text-shadow: 1px 1px 0px #000;
+                    font-size: 14px;
+                    font-weight: 700;
+                    box-shadow: 0 4px 10px rgba(0,0,0,0.3);
                     animation: fadeOutEvent 6s forwards;
-                    border-left: 3px solid rgba(255,255,255,0.5);
+                    border-left: 6px solid #94a3b8;
                 }
-                .event-join { border-left-color: var(--neon-cyan); color: var(--neon-cyan); }
-                .event-kill { border-left-color: var(--neon-red); color: var(--neon-red); }
-                .event-win { border-left-color: var(--neon-amber); color: var(--neon-amber); font-weight: bold; }
-                .event-info { border-left-color: var(--neon-green); color: var(--neon-green); }
+                .event-join { border-left-color: #22d3ee; }
+                .event-kill { border-left-color: #ef4444; }
+                .event-win { border-left-color: #f59e0b; font-weight: 900; }
+                .event-info { border-left-color: #22c55e; }
 
                 @keyframes fadeOutEvent {
-                    0%, 80% { opacity: 1; transform: translateX(0); }
-                    100% { opacity: 0; transform: translateX(-10px); }
+                    0%, 80% { opacity: 1; transform: translateX(0) scale(1); }
+                    100% { opacity: 0; transform: translateX(-20px) scale(0.9); }
                 }
 
-                #event-pointers-container {
-                    position: absolute; top: 0; left: 0; width: 100vw; height: 100vh;
-                    pointer-events: none; overflow: hidden; z-index: 100;
-                }
-                .realm-event-pointer {
-                    position: absolute; display: none; transform-origin: center center;
-                    will-change: transform, left, top; z-index: 100;
-                }
-                .pointer-arrow {
-                    width: 0; height: 0;
-                    border-top: 10px solid transparent; border-bottom: 10px solid transparent;
-                    border-left: 20px solid var(--neon-amber);
-                    filter: drop-shadow(0 0 8px var(--neon-amber));
-                }
-                .pointer-dist {
-                    position: absolute; top: 25px; left: -15px; color: var(--neon-amber);
-                    font-family: var(--font-header); font-weight: bold; font-size: 14px;
-                    text-shadow: 1px 1px 2px black; white-space: nowrap;
-                }
-
-                ::-webkit-scrollbar { width: 6px; }
-                ::-webkit-scrollbar-track { background: rgba(0,0,0,0.2); }
-                ::-webkit-scrollbar-thumb { background: rgba(0, 170, 255, 0.5); border-radius: 3px; }
-                ::-webkit-scrollbar-thumb:hover { background: var(--neon-blue); }
+                ::-webkit-scrollbar { width: 8px; height: 8px; }
+                ::-webkit-scrollbar-track { background: #0f172a; border-radius: 4px; }
+                ::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
+                ::-webkit-scrollbar-thumb:hover { background: #64748b; }
             </style>
         `;
         document.head.appendChild(assetsContainer);
@@ -676,17 +281,19 @@ export function ensureOverlay(getActiveRoom: () => any, getActionContext: () => 
         overlay = document.createElement("div"); 
         overlay.id = "overlay";
         overlay.style.position = "fixed"; 
-        overlay.style.top = "15px"; 
+        overlay.style.top = "150px"; 
         overlay.style.left = "15px";
         overlay.style.display = "flex";
         overlay.style.flexDirection = "column";
-        overlay.style.gap = "10px";
+        overlay.style.gap = "15px";
         overlay.style.zIndex = "20";
         overlay.style.pointerEvents = "none";
 
         const infoPanel = document.createElement("div");
         infoPanel.id = "hud-info-panel";
         infoPanel.className = "hud-panel";
+        infoPanel.style.borderWidth = "3px";
+        infoPanel.style.padding = "10px 15px";
         
         const textDiv = document.createElement("div");
         textDiv.id = "hud-text";
@@ -696,42 +303,35 @@ export function ensureOverlay(getActiveRoom: () => any, getActionContext: () => 
         const rosterDiv = document.createElement("div");
         rosterDiv.id = "team-roster";
         rosterDiv.className = "hud-panel";
+        rosterDiv.style.borderWidth = "3px";
         rosterDiv.style.display = "none"; 
         overlay.appendChild(rosterDiv);
 
         document.body.appendChild(overlay);
 
-        let playerVitals = document.getElementById("player-vitals");
-        if (!playerVitals) {
-            playerVitals = document.createElement("div");
-            playerVitals.id = "player-vitals";
-            playerVitals.style.position = "fixed";
-            playerVitals.style.top = "20px";
-            playerVitals.style.left = "20px";
-            playerVitals.style.display = "none"; 
-            document.body.appendChild(playerVitals);
-        }
-
         let familiarFrame = document.getElementById("familiar-frame");
         if (!familiarFrame) {
             familiarFrame = document.createElement("div");
             familiarFrame.id = "familiar-frame";
+            familiarFrame.className = "hud-panel";
             familiarFrame.style.position = "fixed";
-            familiarFrame.style.top = "160px";
-            familiarFrame.style.left = "30px";
+            familiarFrame.style.top = "20px";
+            familiarFrame.style.left = "290px";
             familiarFrame.style.display = "none";
             familiarFrame.style.flexDirection = "column";
-            familiarFrame.style.gap = "4px";
-            familiarFrame.style.transition = "opacity 0.3s";
+            familiarFrame.style.gap = "8px";
+            familiarFrame.style.padding = "10px 15px";
+            familiarFrame.style.borderWidth = "3px";
+            familiarFrame.style.borderColor = "#d946ef";
             familiarFrame.style.zIndex = "25";
             familiarFrame.innerHTML = `
-                <div style="display: flex; align-items: center; gap: 8px;">
-                    <div id="fam-icon" style="width: 30px; height: 30px; background: rgba(10,10,20,0.8); border: 1px solid #a0f; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 18px; box-shadow: 0 0 8px #a0f;">🐉</div>
-                    <div id="fam-name" style="color: #ddddff; font-family: Arial; font-weight: bold; font-size: 14px; text-shadow: 1px 1px 2px #000; text-transform: capitalize;">Familiar</div>
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <div id="fam-icon" style="width: 36px; height: 36px; background: #0f172a; border: 2px solid #d946ef; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 20px;">🐉</div>
+                    <div id="fam-name" style="color: #fdf4ff; font-family: 'Nunito', sans-serif; font-weight: 900; font-size: 16px; text-transform: capitalize;">Familiar</div>
                 </div>
-                <div style="width: 150px; background: rgba(0,0,0,0.6); border: 1px solid #444; border-radius: 4px; padding: 2px; position: relative;">
-                    <div id="fam-hp-bar" style="width: 100%; height: 8px; background: #a0f; border-radius: 2px; transition: width 0.2s;"></div>
-                    <div id="fam-status-text" style="position: absolute; top: -2px; left: 0; width: 100%; text-align: center; color: white; font-size: 10px; font-weight: bold; text-shadow: 1px 1px 1px #000;"></div>
+                <div style="width: 160px; background: #0f172a; border: 3px solid #334155; border-radius: 8px; padding: 2px; position: relative; height: 14px;">
+                    <div id="fam-hp-bar" style="width: 100%; height: 100%; background: #d946ef; border-radius: 4px; transition: width 0.2s;"></div>
+                    <div id="fam-status-text" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; text-align: center; color: white; font-size: 11px; font-weight: 900; line-height: 14px;"></div>
                 </div>
             `;
             document.body.appendChild(familiarFrame);
@@ -742,11 +342,11 @@ export function ensureOverlay(getActiveRoom: () => any, getActionContext: () => 
             buffContainer = document.createElement("div");
             buffContainer.id = "buff-container";
             buffContainer.style.position = "fixed";
-            buffContainer.style.top = "240px";
-            buffContainer.style.left = "20px";
+            buffContainer.style.top = "250px";
+            buffContainer.style.left = "15px";
             buffContainer.style.display = "flex";
             buffContainer.style.flexWrap = "wrap";
-            buffContainer.style.gap = "5px";
+            buffContainer.style.gap = "8px";
             buffContainer.style.maxWidth = "300px";
             buffContainer.style.zIndex = "25";
             document.body.appendChild(buffContainer);
@@ -756,25 +356,20 @@ export function ensureOverlay(getActiveRoom: () => any, getActionContext: () => 
         if (!globalEventBanner) {
             globalEventBanner = document.createElement("div");
             globalEventBanner.id = "global-event-banner";
+            globalEventBanner.className = "hud-panel";
             globalEventBanner.style.position = "fixed";
             globalEventBanner.style.top = "20px";
             globalEventBanner.style.left = "50%";
             globalEventBanner.style.transform = "translateX(-50%)";
             globalEventBanner.style.display = "none";
-            globalEventBanner.style.background = "rgba(20, 5, 5, 0.8)";
-            globalEventBanner.style.border = "1px solid #ff4444";
-            globalEventBanner.style.padding = "10px 20px";
-            globalEventBanner.style.borderRadius = "8px";
-            globalEventBanner.style.color = "#ffaaaa";
-            globalEventBanner.style.fontFamily = "Arial";
+            globalEventBanner.style.borderColor = "#ef4444";
             globalEventBanner.style.textAlign = "center";
-            globalEventBanner.style.boxShadow = "0 0 15px rgba(255, 0, 0, 0.4)";
             globalEventBanner.style.zIndex = "50";
             
             globalEventBanner.innerHTML = `
-                <div style="font-size: 12px; font-weight: bold; letter-spacing: 2px; text-transform: uppercase;">Next World Event</div>
-                <div id="global-event-name" style="font-size: 18px; font-weight: bold; color: #ff4444; margin: 5px 0;">The Labyrinth</div>
-                <div id="global-event-timer" style="font-size: 16px; font-family: monospace;">00:00</div>
+                <div style="font-size: 14px; font-weight: 900; letter-spacing: 2px; text-transform: uppercase; color: #fca5a5;">Next World Event</div>
+                <div id="global-event-name" style="font-size: 22px; font-weight: 900; color: #ef4444; margin: 5px 0;">The Labyrinth</div>
+                <div id="global-event-timer" style="font-size: 20px; font-weight: 900;">00:00</div>
             `;
             document.body.appendChild(globalEventBanner);
         }
@@ -788,17 +383,17 @@ export function ensureOverlay(getActiveRoom: () => any, getActionContext: () => 
             interactionPrompt.style.left = "50%";
             interactionPrompt.style.transform = "translate(-50%, -50%)";
             interactionPrompt.style.display = "none";
-            interactionPrompt.style.background = "rgba(0, 0, 0, 0.7)";
-            interactionPrompt.style.border = "2px solid #fff";
-            interactionPrompt.style.padding = "8px 16px";
-            interactionPrompt.style.borderRadius = "8px";
+            interactionPrompt.style.background = "#1e293b";
+            interactionPrompt.style.border = "4px solid #f8fafc";
+            interactionPrompt.style.padding = "12px 24px";
+            interactionPrompt.style.borderRadius = "16px";
             interactionPrompt.style.color = "white";
-            interactionPrompt.style.fontFamily = "Arial";
-            interactionPrompt.style.fontWeight = "bold";
-            interactionPrompt.style.fontSize = "18px";
-            interactionPrompt.style.boxShadow = "0 0 10px rgba(255,255,255,0.5)";
+            interactionPrompt.style.fontFamily = "'Nunito', sans-serif";
+            interactionPrompt.style.fontWeight = "900";
+            interactionPrompt.style.fontSize = "20px";
+            interactionPrompt.style.boxShadow = "0 10px 20px rgba(0,0,0,0.5)";
             interactionPrompt.style.zIndex = "50";
-            interactionPrompt.innerText = "Press [F] to Interact";
+            interactionPrompt.innerHTML = "Press <span class='hud-key'>F</span> to Interact";
             document.body.appendChild(interactionPrompt);
         }
 
@@ -812,8 +407,8 @@ export function ensureOverlay(getActiveRoom: () => any, getActionContext: () => 
         let topRightDiv = document.createElement("div");
         topRightDiv.id = "hud-top-right";
         topRightDiv.style.position = "fixed";
-        topRightDiv.style.top = "15px";
-        topRightDiv.style.right = "15px";
+        topRightDiv.style.top = "20px";
+        topRightDiv.style.right = "20px";
         topRightDiv.style.zIndex = "20";
         topRightDiv.style.pointerEvents = "none";
         document.body.appendChild(topRightDiv);
@@ -821,32 +416,33 @@ export function ensureOverlay(getActiveRoom: () => any, getActionContext: () => 
         const minimapContainer = document.createElement("div");
         minimapContainer.id = "minimap-container";
         minimapContainer.style.position = "fixed";
-        minimapContainer.style.top = "70px"; 
-        minimapContainer.style.right = "15px";
-        minimapContainer.style.width = "180px";
-        minimapContainer.style.height = "180px";
+        minimapContainer.style.top = "90px"; 
+        minimapContainer.style.right = "20px";
+        minimapContainer.style.width = "200px";
+        minimapContainer.style.height = "200px";
         minimapContainer.style.borderRadius = "50%"; 
-        minimapContainer.style.border = "2px solid var(--neon-blue)";
+        minimapContainer.style.border = "6px solid #38bdf8";
         minimapContainer.style.overflow = "hidden";
-        minimapContainer.style.boxShadow = "0 5px 15px rgba(0,0,0,0.8), inset 0 0 20px rgba(0, 170, 255, 0.2)";
-        minimapContainer.style.backgroundColor = "var(--bg-panel)";
+        minimapContainer.style.boxShadow = "0 10px 25px rgba(0,0,0,0.6)";
+        minimapContainer.style.backgroundColor = "#0f172a";
         minimapContainer.style.display = "none"; 
         minimapContainer.style.zIndex = "15";
 
         const minimapCanvas = document.createElement("canvas");
         minimapCanvas.id = "minimap-canvas";
-        minimapCanvas.width = 180;
-        minimapCanvas.height = 180;
+        minimapCanvas.width = 200;
+        minimapCanvas.height = 200;
         minimapContainer.appendChild(minimapCanvas);
         
         const compassN = document.createElement("div");
         compassN.className = "hud-header text-amber";
         compassN.innerText = "N";
         compassN.style.position = "absolute";
-        compassN.style.top = "4px";
+        compassN.style.top = "6px";
         compassN.style.left = "50%";
         compassN.style.transform = "translateX(-50%)";
-        compassN.style.fontSize = "14px";
+        compassN.style.fontSize = "16px";
+        compassN.style.fontWeight = "900";
         minimapContainer.appendChild(compassN);
 
         document.body.appendChild(minimapContainer);
@@ -857,35 +453,14 @@ export function ensureOverlay(getActiveRoom: () => any, getActionContext: () => 
             coordDiv.id = "hud-coords";
             coordDiv.className = "hud-header text-muted";
             coordDiv.style.position = "fixed";
-            coordDiv.style.top = "270px"; 
-            coordDiv.style.right = "15px";
-            coordDiv.style.fontSize = "12px";
+            coordDiv.style.top = "300px"; 
+            coordDiv.style.right = "20px";
+            coordDiv.style.fontSize = "14px";
+            coordDiv.style.fontWeight = "900";
             coordDiv.style.textAlign = "right";
             coordDiv.style.zIndex = "20";
             coordDiv.style.pointerEvents = "none";
             document.body.appendChild(coordDiv);
-        }
-
-        let questTracker = document.getElementById("quest-tracker");
-        if (!questTracker) {
-            questTracker = document.createElement("div");
-            questTracker.id = "quest-tracker";
-            questTracker.className = "hud-panel";
-            questTracker.style.position = "fixed";
-            questTracker.style.top = "310px"; 
-            questTracker.style.right = "15px";
-            questTracker.style.width = "220px";
-            questTracker.style.display = "none";
-            questTracker.style.zIndex = "20";
-            questTracker.style.pointerEvents = "none";
-            
-            questTracker.innerHTML = `
-                <div class="hud-header text-amber" style="font-size: 14px; border-bottom: 1px solid #444; padding-bottom: 5px; margin-bottom: 8px;">
-                    <i class="fa-solid fa-scroll"></i> Active Quest
-                </div>
-                <div id="quest-text" class="text-sm" style="color: #fff; line-height: 1.4;"></div>
-            `;
-            document.body.appendChild(questTracker);
         }
 
         let zonePopup = document.createElement("div");
@@ -904,30 +479,33 @@ export function ensureOverlay(getActiveRoom: () => any, getActionContext: () => 
         if (!teamModal) {
             teamModal = document.createElement("div");
             teamModal.id = "team-manager-modal";
-            teamModal.className = "hud-panel hud-absolute-center";
+            teamModal.className = "modal-chunky";
+            teamModal.style.position = "fixed";
             teamModal.style.top = "50%";
+            teamModal.style.left = "50%";
             teamModal.style.transform = "translate(-50%, -50%)";
-            teamModal.style.width = "400px";
+            teamModal.style.width = "450px";
+            teamModal.style.padding = "30px";
             teamModal.style.display = "none";
             teamModal.style.zIndex = "3000";
             teamModal.style.pointerEvents = "auto";
             teamModal.innerHTML = `
-                <div class="hud-header text-blue text-xl" style="margin-bottom: 15px; border-bottom: 1px solid #333; padding-bottom: 10px;">
+                <div class="hud-header text-blue text-xl" style="margin-bottom: 20px; border-bottom: 4px solid #334155; padding-bottom: 15px;">
                     <i class="fa-solid fa-users"></i> Team Management
                 </div>
                 <div style="display: flex; flex-direction: column; gap: 15px;">
-                    <button id="btn-modal-create-team" class="btn-hack" style="background: linear-gradient(90deg, #002244, #0044aa); border-color: var(--neon-blue); color: white;">
+                    <button id="btn-modal-create-team" class="btn-chunky btn-blue" style="padding: 15px;">
                         <i class="fa-solid fa-plus"></i> Form New Team
                     </button>
-                    <div style="display: flex; gap: 8px;">
+                    <div style="display: flex; gap: 10px;">
                         <input type="number" id="modal-join-team-id" class="hud-input" placeholder="Team ID..." style="flex-grow: 1;">
-                        <button id="btn-modal-join-team" class="hud-btn btn-success"><i class="fa-solid fa-right-to-bracket"></i> Join Team</button>
+                        <button id="btn-modal-join-team" class="btn-chunky btn-green" style="padding: 10px 20px;"><i class="fa-solid fa-right-to-bracket"></i> Join</button>
                     </div>
-                    <button id="btn-modal-leave-team" class="hud-btn btn-danger" style="width: 100%; justify-content: center; padding: 10px;">
+                    <button id="btn-modal-leave-team" class="btn-chunky btn-red" style="padding: 15px; margin-top: 10px;">
                         <i class="fa-solid fa-right-from-bracket"></i> Leave Current Team
                     </button>
                 </div>
-                <div class="text-muted text-sm" style="text-align: center; margin-top: 15px;">Press [ESC] to close</div>
+                <div class="text-muted text-sm" style="text-align: center; margin-top: 20px;">Press [ESC] to close</div>
             `;
             document.body.appendChild(teamModal);
 
@@ -951,25 +529,26 @@ export function ensureOverlay(getActiveRoom: () => any, getActionContext: () => 
         if (!craftModal) {
             craftModal = document.createElement("div");
             craftModal.id = "crafting-modal";
-            craftModal.className = "hud-panel hud-absolute-center";
+            craftModal.className = "modal-chunky";
+            craftModal.style.position = "fixed";
             craftModal.style.top = "50%";
+            craftModal.style.left = "50%";
             craftModal.style.transform = "translate(-50%, -50%)";
-            craftModal.style.width = "450px";
+            craftModal.style.width = "500px";
             craftModal.style.maxHeight = "80vh";
             craftModal.style.overflowY = "auto";
+            craftModal.style.padding = "30px";
             craftModal.style.display = "none";
             craftModal.style.zIndex = "3000";
             craftModal.style.pointerEvents = "auto";
-            craftModal.style.boxShadow = "0 10px 50px rgba(0,0,0,0.9), 0 0 30px rgba(255, 170, 0, 0.2)";
-            craftModal.style.border = "2px solid var(--neon-amber)";
 
             craftModal.innerHTML = `
-                <div style="padding-bottom: 15px; border-bottom: 1px solid #444; display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; background: var(--bg-panel); z-index: 10;">
+                <div style="padding-bottom: 15px; border-bottom: 4px solid #334155; display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; background: #1e293b; z-index: 10; margin-bottom: 20px;">
                     <h2 class="hud-header text-amber" style="margin: 0; letter-spacing: 2px;"><i class="fa-solid fa-hammer"></i> The Anvil & Forge</h2>
-                    <button id="close-craft-modal" style="background: none; border: none; color: var(--neon-red); font-size: 24px; cursor: pointer;"><i class="fa-solid fa-xmark"></i></button>
+                    <button id="close-craft-modal" class="btn-close-chunky">&times;</button>
                 </div>
-                <div id="crafting-recipe-list" style="display: flex; flex-direction: column; gap: 15px; margin-top: 15px;">
-                    </div>
+                <div id="crafting-recipe-list" style="display: flex; flex-direction: column; gap: 15px;">
+                </div>
             `;
             document.body.appendChild(craftModal);
 
@@ -986,25 +565,24 @@ export function ensureOverlay(getActiveRoom: () => any, getActionContext: () => 
 
         const worldMapContainer = document.createElement("div");
         worldMapContainer.id = "world-map-modal";
-        worldMapContainer.className = "hud-panel";
+        worldMapContainer.className = "modal-chunky";
         worldMapContainer.style.position = "fixed";
         worldMapContainer.style.top = "50%";
         worldMapContainer.style.left = "50%";
         worldMapContainer.style.transform = "translate(-50%, -50%)";
         worldMapContainer.style.width = "800px";
         worldMapContainer.style.height = "800px";
-        worldMapContainer.style.border = "2px solid var(--neon-blue)";
-        worldMapContainer.style.boxShadow = "0 10px 50px rgba(0,0,0,0.9), 0 0 30px rgba(0, 170, 255, 0.2)";
+        worldMapContainer.style.padding = "20px";
         worldMapContainer.style.zIndex = "1000";
         worldMapContainer.style.display = "none";
 
         worldMapContainer.innerHTML = `
-            <div style="padding-bottom: 15px; border-bottom: 1px solid #444; display: flex; justify-content: space-between; align-items: center;">
+            <div style="padding-bottom: 15px; border-bottom: 4px solid #334155; display: flex; justify-content: space-between; align-items: center;">
                 <h2 class="hud-header text-blue" style="margin: 0; letter-spacing: 2px;"><i class="fa-solid fa-globe"></i> WORLD MAP</h2>
                 <div class="text-muted text-sm">
                     <i class="fa-solid fa-mouse-pointer"></i> Left Click: Teleport | <i class="fa-solid fa-location-crosshairs"></i> Right Click: Set Route
                 </div>
-                <button id="close-world-map" style="background: none; border: none; color: var(--neon-red); font-size: 28px; cursor: pointer;"><i class="fa-solid fa-xmark"></i></button>
+                <button id="close-world-map" class="btn-close-chunky">&times;</button>
             </div>
         `;
 
@@ -1013,10 +591,10 @@ export function ensureOverlay(getActiveRoom: () => any, getActionContext: () => 
         worldCanvas.width = 760;
         worldCanvas.height = 700;
         worldCanvas.style.marginTop = "15px";
-        worldCanvas.style.border = "1px solid #333";
+        worldCanvas.style.border = "4px solid #475569";
         worldCanvas.style.cursor = "crosshair";
-        worldCanvas.style.background = "rgba(0,0,0,0.5)";
-        worldCanvas.style.borderRadius = "4px";
+        worldCanvas.style.background = "#0f172a";
+        worldCanvas.style.borderRadius = "12px";
         
         worldCanvas.addEventListener("mousedown", (e) => {
             const activeRoom = getActiveRoom();
@@ -1072,9 +650,8 @@ export function ensureOverlay(getActiveRoom: () => any, getActionContext: () => 
             storePopup.id = "store-popup";
             storePopup.className = "hud-panel hud-absolute-center";
             storePopup.style.bottom = "25%";
-            storePopup.style.border = "2px solid var(--neon-amber)";
-            storePopup.style.padding = "15px 30px";
-            storePopup.style.boxShadow = "0 0 20px rgba(255, 170, 0, 0.2)";
+            storePopup.style.border = "4px solid var(--neon-amber)";
+            storePopup.style.padding = "20px 40px";
             storePopup.style.display = "none";
             document.body.appendChild(storePopup);
         }
@@ -1098,16 +675,11 @@ export function ensureOverlay(getActiveRoom: () => any, getActionContext: () => 
         auraDiv.className = "hud-panel";
         auraDiv.style.display = "flex";
         auraDiv.style.gap = "30px";
-        auraDiv.style.padding = "8px 20px";
-        auraDiv.style.borderRadius = "20px";
-        auraDiv.style.border = "1px solid var(--neon-blue)";
-        auraDiv.style.background = "linear-gradient(90deg, rgba(0, 30, 60, 0.9), rgba(0, 60, 90, 0.9))";
+        auraDiv.style.padding = "10px 25px";
+        auraDiv.style.borderRadius = "24px";
+        auraDiv.style.borderWidth = "4px";
+        auraDiv.style.borderColor = "#38bdf8";
         bottomCenterContainer.appendChild(auraDiv);
-
-        const resourceDiv = document.createElement("div");
-        resourceDiv.id = "hud-resources";
-        resourceDiv.style.width = "100%";
-        bottomCenterContainer.appendChild(resourceDiv);
 
         document.body.appendChild(bottomCenterContainer);
 
@@ -1129,18 +701,20 @@ export function ensureOverlay(getActiveRoom: () => any, getActionContext: () => 
         if (!medUI) {
             medUI = document.createElement("div");
             medUI.id = "meditation-ui";
-            medUI.className = "hud-panel hud-absolute-center";
+            medUI.className = "modal-chunky";
+            medUI.style.position = "fixed";
             medUI.style.top = "20%";
+            medUI.style.left = "50%";
+            medUI.style.transform = "translateX(-50%)";
             medUI.style.width = "600px";
-            medUI.style.padding = "30px";
-            medUI.style.border = "2px solid var(--neon-blue)";
-            medUI.style.boxShadow = "0 0 40px rgba(0, 170, 255, 0.2)";
+            medUI.style.padding = "40px";
             medUI.style.display = "none"; 
+            medUI.style.zIndex = "3000";
             
             medUI.innerHTML = `
-                <h2 class="hud-header text-blue" style="margin-top: 0; letter-spacing: 2px;"><i class="fa-solid fa-om"></i> MENTAL FOCUS</h2>
-                <p id="med-status" class="text-muted text-sm" style="margin-bottom: 20px;">Clear your mind and fill in the missing data. Press [ESC] to stop.</p>
-                <div id="med-question-container" style="font-size: 20px; color: #ffffff; line-height: 1.8;"></div>
+                <h2 class="hud-header text-blue text-xl" style="margin-top: 0; letter-spacing: 2px; text-align: center;"><i class="fa-solid fa-om"></i> MENTAL FOCUS</h2>
+                <p id="med-status" class="text-muted text-sm" style="margin-bottom: 30px; text-align: center;">Clear your mind and fill in the missing data. Press [ESC] to stop.</p>
+                <div id="med-question-container" style="font-size: 24px; font-weight: 900; color: #ffffff; line-height: 1.8; text-align: center;"></div>
             `;
             document.body.appendChild(medUI);
         }
@@ -1160,7 +734,7 @@ export function ensureOverlay(getActiveRoom: () => any, getActionContext: () => 
             bottomRightContainer.style.pointerEvents = "auto"; 
             
             bottomRightContainer.innerHTML = `
-                <button id="btn-harness-mana" class="btn-hack" style="display: none; width: auto; font-size: 14px; padding: 10px 20px; border-radius: 6px;">
+                <button id="btn-harness-mana" class="btn-chunky btn-blue" style="display: none; padding: 12px 24px;">
                     <i class="fa-solid fa-om"></i> Harness Mana <span class="hud-key">H</span>
                 </button>
                 <div id="controls-combat" class="controls-group" style="text-align: right;">
@@ -1174,15 +748,15 @@ export function ensureOverlay(getActiveRoom: () => any, getActionContext: () => 
                 </div>
                 <div id="controls-other" class="controls-group" style="display: none; text-align: right;">
                     <div class="controls-row"><span class="text-muted text-sm">Interact</span> <span class="hud-key">F</span></div>
-                    <div class="controls-row" id="ctrl-buy-land" style="display: none;"><span class="text-muted text-sm" style="color: var(--neon-green);">Buy Land</span> <span class="hud-key">B</span></div>
-                    <div class="controls-row" id="ctrl-build-mode" style="display: none;"><span class="text-muted text-sm" style="color: var(--neon-green);">Build / Deco Mode</span> <span class="hud-key">V</span></div>
+                    <div class="controls-row" id="ctrl-buy-land" style="display: none;"><span class="text-green text-sm">Buy Land</span> <span class="hud-key">B</span></div>
+                    <div class="controls-row" id="ctrl-build-mode" style="display: none;"><span class="text-green text-sm">Build / Deco Mode</span> <span class="hud-key">V</span></div>
                     <div class="controls-row"><span class="text-muted text-sm">Inventory</span> <span class="hud-key">I</span></div>
                     <div class="controls-row"><span class="text-muted text-sm">Map</span> <span class="hud-key">M</span></div>
                     <div class="controls-row"><span class="text-muted text-sm">Fast Travel</span> <span class="hud-key">T</span></div>
                     <div class="controls-row" id="ctrl-meditate" style="display: none;"><span class="text-muted text-sm">Meditate</span> <span class="hud-key">Z</span></div>
                     <div class="controls-row"><span class="text-muted text-sm">Team Manager</span> <span class="hud-key">ESC</span></div>
                 </div>
-                <button id="btn-toggle-controls" class="hud-btn" style="margin-top: 5px; font-size: 10px; padding: 4px 8px; width: 100%;">
+                <button id="btn-toggle-controls" class="btn-chunky btn-slate" style="margin-top: 10px; font-size: 12px; padding: 10px 16px;">
                     <i class="fa-solid fa-gears"></i> Show Utility Keys
                 </button>
             `;
@@ -1234,7 +808,7 @@ export function updateHUD(
     TOWN_COLLIDERS: any[],
     MARKET_STALLS: any[],
     CASINO_TABLES: any[],
-    isLocallyWolf: boolean  // <--- Add this line back in!
+    isLocallyWolf: boolean 
 ) {
     if (!me || !activeRoom) return;
     const state = activeRoom.state;
@@ -1254,7 +828,7 @@ export function updateHUD(
         } else {
             eventDiv.style.display = "block";
             const timeClass = timeLeftSeconds <= 60 ? 'text-red animate-pulse' : 'text-green';
-            eventDiv.innerHTML = `<span class="hud-header text-amber"><i class="fa-solid fa-star"></i> Next Event:</span> <b>${nextEventName}</b> <span style="margin: 0 8px; color: #555;">|</span> <span class="hud-header ${timeClass}" style="font-size: 18px;">${m}:${s}</span>`;
+            eventDiv.innerHTML = `<span class="hud-header text-amber"><i class="fa-solid fa-star"></i> Next Event:</span> <b style="font-size: 20px;">${nextEventName}</b> <span style="margin: 0 10px; color: #475569;">|</span> <span class="hud-header ${timeClass}" style="font-size: 24px;">${m}:${s}</span>`;
         }
     } else if (eventDiv) {
         eventDiv.style.display = "none";
@@ -1264,7 +838,7 @@ export function updateHUD(
     if (rosterDiv) {
         if (me.teamId && me.teamId > 0) {
             rosterDiv.style.display = "block";
-            let rosterHTML = `<div class="hud-header text-blue text-sm" style="margin-bottom: 10px;"><i class="fa-solid fa-shield-halved"></i> Team ${me.teamId} Roster</div>`;
+            let rosterHTML = `<div class="hud-header text-blue text-md" style="margin-bottom: 12px; border-bottom: 3px solid #334155; padding-bottom: 8px;"><i class="fa-solid fa-shield-halved"></i> Team ${me.teamId} Roster</div>`;
             
             const teamMembers: any[] = [];
             state.players.forEach((p: any) => {
@@ -1277,18 +851,18 @@ export function updateHUD(
 
             teamMembers.forEach(member => {
                 const hpPercent = Math.max(0, Math.min(100, (member.hp / member.maxHp) * 100));
-                const hpColor = hpPercent > 50 ? "var(--neon-green)" : (hpPercent > 20 ? "var(--neon-amber)" : "var(--neon-red)");
+                const hpColor = hpPercent > 50 ? "#22c55e" : (hpPercent > 20 ? "#f59e0b" : "#ef4444");
                 const leaderIcon = member.isTeamLeader ? `<i class="fa-solid fa-crown text-amber"></i> ` : "";
                 const isMe = member.sessionId === me.sessionId;
                 
                 rosterHTML += `
-                    <div style="margin-bottom: 10px;">
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; font-size: 13px;">
-                            <span style="font-weight: 600; color: ${isMe ? 'var(--neon-amber)' : 'white'};">${leaderIcon}${member.name}</span>
+                    <div style="margin-bottom: 12px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                            <span style="font-weight: 900; font-size: 14px; color: ${isMe ? '#f59e0b' : 'white'};">${leaderIcon}${member.name}</span>
                             <span class="text-muted text-sm hud-header">Lv.${member.level}</span>
                         </div>
                         <div class="roster-hp-bg">
-                            <div class="roster-hp-fill" style="width: ${hpPercent}%; background: ${hpColor}; box-shadow: 0 0 5px ${hpColor};"></div>
+                            <div class="roster-hp-fill" style="width: ${hpPercent}%; background: ${hpColor};"></div>
                         </div>
                     </div>
                 `;
@@ -1331,7 +905,7 @@ export function updateHUD(
 
             const tacAlert = document.getElementById("tac-alert");
             if (tacAlert) {
-                tacAlert.style.boxShadow = isAmbushed ? "inset 0 0 100px rgba(255, 68, 68, 0.4)" : "inset 0 0 100px rgba(255, 0, 0, 0)";
+                tacAlert.style.boxShadow = isAmbushed ? "inset 0 0 100px rgba(239, 68, 68, 0.4)" : "inset 0 0 100px rgba(255, 0, 0, 0)";
             }
         } else {
             activeAttackIndicators.length = 0; 
@@ -1351,7 +925,7 @@ export function updateHUD(
             const camX = isWorld ? 0 : localPlayerPos.x;
             const camY = isWorld ? 0 : localPlayerPos.y;
 
-            context.fillStyle = "rgba(100, 100, 100, 0.4)";
+            context.fillStyle = "rgba(71, 85, 105, 0.4)";
             for (const box of TOWN_COLLIDERS) {
                 const relX = box.minX - camX;
                 const relY = box.minY - camY;
@@ -1364,18 +938,16 @@ export function updateHUD(
             }
 
             if (expRank >= 3 && state.lootItems) {
-                context.fillStyle = "var(--neon-green)";
-                context.shadowBlur = 5; context.shadowColor = "var(--neon-green)";
+                context.fillStyle = "#22c55e";
                 state.lootItems.forEach((loot: any) => {
                     const dx = loot.x - camX;
                     const dy = loot.y - camY;
                     if (isWorld || Math.sqrt(dx*dx + dy*dy) <= radius) {
                         context.beginPath();
-                        context.arc(cx + (dx * scale), cy + (dy * scale), isWorld ? 4 : 2.5, 0, Math.PI * 2);
+                        context.arc(cx + (dx * scale), cy + (dy * scale), isWorld ? 4 : 3, 0, Math.PI * 2);
                         context.fill();
                     }
                 });
-                context.shadowBlur = 0;
             }
 
             if (tacRank >= 1 && state.enemies) {
@@ -1385,13 +957,11 @@ export function updateHUD(
                     
                     if (isWorld || Math.sqrt(dx*dx + dy*dy) <= radius) {
                         const dotSize = (tacRank >= 2 && enemy.maxHp > 150) ? (isWorld ? 8 : 4) : (isWorld ? 4 : 2);
-                        context.fillStyle = (tacRank >= 2 && enemy.maxHp > 150) ? "var(--neon-amber)" : "var(--neon-red)";
-                        context.shadowBlur = 5; context.shadowColor = context.fillStyle;
+                        context.fillStyle = (tacRank >= 2 && enemy.maxHp > 150) ? "#f59e0b" : "#ef4444";
                         
                         context.beginPath();
                         context.arc(cx + (dx * scale), cy + (dy * scale), dotSize, 0, Math.PI * 2);
                         context.fill();
-                        context.shadowBlur = 0;
                     }
                 });
             }
@@ -1404,9 +974,9 @@ export function updateHUD(
                     const pdx = localPlayerPos.x - camX;
                     const pdy = localPlayerPos.y - camY;
                     
-                    context.strokeStyle = "rgba(0, 170, 255, 0.5)";
-                    context.lineWidth = isWorld ? 3 : 2;
-                    context.setLineDash([5, 5]);
+                    context.strokeStyle = "rgba(56, 189, 248, 0.6)";
+                    context.lineWidth = isWorld ? 4 : 3;
+                    context.setLineDash([8, 8]);
                     context.beginPath();
                     context.moveTo(cx + (pdx * scale), cy + (pdy * scale));
                     context.lineTo(cx + (mdx * scale), cy + (mdy * scale));
@@ -1415,17 +985,15 @@ export function updateHUD(
                 }
 
                 if (isWorld || Math.sqrt(mdx*mdx + mdy*mdy) <= radius) {
-                    context.fillStyle = "var(--neon-blue)";
-                    context.shadowBlur = 10; context.shadowColor = "var(--neon-blue)";
+                    context.fillStyle = "#38bdf8";
                     context.beginPath();
-                    context.arc(cx + (mdx * scale), cy + (mdy * scale) - 5, isWorld ? 8 : 4, 0, Math.PI * 2);
+                    context.arc(cx + (mdx * scale), cy + (mdy * scale) - 5, isWorld ? 8 : 5, 0, Math.PI * 2);
                     context.fill();
                     context.beginPath();
                     context.moveTo(cx + (mdx * scale), cy + (mdy * scale));
-                    context.lineTo(cx + (mdx * scale) - (isWorld ? 8 : 4), cy + (mdy * scale) - 5);
-                    context.lineTo(cx + (mdx * scale) + (isWorld ? 8 : 4), cy + (mdy * scale) - 5);
+                    context.lineTo(cx + (mdx * scale) - (isWorld ? 8 : 5), cy + (mdy * scale) - 6);
+                    context.lineTo(cx + (mdx * scale) + (isWorld ? 8 : 5), cy + (mdy * scale) - 6);
                     context.fill();
-                    context.shadowBlur = 0;
                 }
             }
 
@@ -1438,33 +1006,31 @@ export function updateHUD(
             context.rotate(angle); 
             
             context.fillStyle = "#ffffff";
-            context.shadowBlur = 5; context.shadowColor = "#ffffff";
-            const as = isWorld ? 2.0 : 1.0;
+            const as = isWorld ? 2.5 : 1.5;
             context.beginPath();
-            context.moveTo(5 * as, 0); 
-            context.lineTo(-4 * as, 4 * as); 
-            context.lineTo(-2 * as, 0); 
-            context.lineTo(-4 * as, -4 * as); 
+            context.moveTo(6 * as, 0); 
+            context.lineTo(-5 * as, 5 * as); 
+            context.lineTo(-3 * as, 0); 
+            context.lineTo(-5 * as, -5 * as); 
             context.closePath();
             context.fill();
-            context.shadowBlur = 0;
 
             if (tacRank >= 5 && activeAttackIndicators.length > 0) {
-                context.strokeStyle = "rgba(255, 68, 68, 0.8)";
-                context.lineWidth = 2;
+                context.strokeStyle = "rgba(239, 68, 68, 0.8)";
+                context.lineWidth = 3;
                 activeAttackIndicators.forEach(ind => {
                     const targetAng = Math.atan2(ind.z - localPlayerPos.y, ind.x - localPlayerPos.x) - angle;
                     context.beginPath();
-                    context.arc(0, 0, 15 * as, targetAng - 0.2, targetAng + 0.2);
+                    context.arc(0, 0, 18 * as, targetAng - 0.2, targetAng + 0.2);
                     context.stroke();
                 });
             }
             context.restore();
 
             if (!isWorld) {
-                const gradient = context.createRadialGradient(cx, cy, cw/4, cx, cy, cw/2);
+                const gradient = context.createRadialGradient(cx, cy, cw/3, cx, cy, cw/1.8);
                 gradient.addColorStop(0, "rgba(0,0,0,0)");
-                gradient.addColorStop(1, "rgba(10,15,20,0.9)");
+                gradient.addColorStop(1, "rgba(15,23,42,0.95)");
                 context.fillStyle = gradient;
                 context.fillRect(0, 0, cw, ch);
             }
@@ -1476,35 +1042,12 @@ export function updateHUD(
         else if (mapContainer && mapCanvas) {
             if (wayRank >= 1) {
                 mapContainer.style.display = "block";
-                mapContainer.style.borderColor = wayRank >= 3 ? "var(--neon-blue)" : "#444";
+                mapContainer.style.borderColor = wayRank >= 3 ? "#38bdf8" : "#475569";
                 const mapRadius = wayRank >= 2 ? 70.0 : 30.0; 
                 renderMap(mapCanvas, mapRadius, false);
             } else {
                 mapContainer.style.display = "none";
             }
-        }
-    }
-
-    const slot = document.getElementById("equipped-slot");
-    if (slot) {
-        if (me.equippedItem) {
-            const dbItem = ITEM_DB[me.equippedItem];
-            const icon = dbItem ? dbItem.icon : "📦"; 
-            slot.innerHTML = `
-                <div class="hotbar-slot" style="border: 2px solid var(--neon-amber);">
-                    <div class="hotbar-key">1</div>
-                    <span id="slot-icon-1" class="hotbar-icon">${icon}</span>
-                    <div class="hotbar-label" style="color: var(--neon-amber);">${me.equippedItem}</div>
-                </div>
-            `;
-        } else {
-            slot.innerHTML = `
-                <div class="hotbar-slot" style="border: 2px solid #555;">
-                    <div class="hotbar-key">1</div>
-                    <span id="slot-icon-1" class="hotbar-icon" style="color: #aaa;"><i class="fa-solid fa-hand-fist"></i></span>
-                    <div class="hotbar-label">FIST</div>
-                </div>
-            `;
         }
     }
 
@@ -1526,49 +1069,17 @@ export function updateHUD(
         `;
     }
 
-    const resourceDiv = document.getElementById("hud-resources");
-    if (resourceDiv) {
-        const generateBar = (current: number, max: number, type: string, iconClass: string) => {
-            const safeMax = max || 100; 
-            const safeCurrent = current !== undefined ? current : 100;
-            const pct = Math.max(0, Math.min(100, (safeCurrent / safeMax) * 100));
-            return `
-                <div class="resource-container">
-                    <div class="resource-icon ${type === 'hp' ? 'text-red' : type === 'mp' ? 'text-blue' : 'text-amber'}"><i class="${iconClass}"></i></div>
-                    <div class="resource-bar-wrapper">
-                        <div class="resource-fill fill-${type}" style="width: ${pct}%"></div>
-                        <div class="resource-text">${Math.floor(safeCurrent)} / ${safeMax}</div>
-                    </div>
-                </div>
-            `;
-        };
-
-        const manaHtml = generateBar(me.mp, me.maxMp, "mp", "fa-solid fa-bolt"); 
-        const healthHtml = generateBar(me.hp, me.maxHp, "hp", "fa-solid fa-heart");
-        const hungerHtml = generateBar(me.hunger, me.maxHunger, "hunger", "fa-solid fa-drumstick-bite"); 
-
-        resourceDiv.innerHTML = `
-            <div style="display: flex; flex-direction: column; width: 100%;">
-                <div style="display: flex; gap: 10px;">
-                    <div style="flex: 1;">${healthHtml}</div>
-                    <div style="flex: 1;">${manaHtml}</div>
-                </div>
-                <div style="width: 50%; margin: 0 auto;">${hungerHtml}</div>
-            </div>
-        `;
-    }
-
     const topRightDiv = document.getElementById("hud-top-right");
     if (topRightDiv) {
         const rankColorMap: Record<string, string> = {
-            "Iron": "#a19d94", "Bronze": "#cd7f32", "Silver": "#c0c0c0", "Gold": "#ffd700", "Diamond": "var(--neon-cyan)"
+            "Iron": "#94a3b8", "Bronze": "#b45309", "Silver": "#cbd5e1", "Gold": "#f59e0b", "Diamond": "#38bdf8"
         };
-        const rCol = rankColorMap[me.rank] || "#a19d94";
+        const rCol = rankColorMap[me.rank] || "#94a3b8";
         
         topRightDiv.innerHTML = `
-            <div class="hud-panel" style="padding: 10px 15px; display: flex; gap: 15px; align-items: center; border-color: ${rCol};">
-                <span class="hud-header" style="color: ${rCol}; font-size: 16px;"><i class="fa-solid fa-medal"></i> ${me.rank} <span style="color: white; font-size: 12px;">(Lv.${me.level})</span></span>
-                <span class="hud-header text-amber" style="font-size: 16px;"><i class="fa-solid fa-coins"></i> ${me.coins}</span>
+            <div class="hud-panel" style="padding: 12px 20px; display: flex; gap: 20px; align-items: center; border-width: 4px; border-color: ${rCol};">
+                <span class="hud-header" style="color: ${rCol}; font-size: 18px;"><i class="fa-solid fa-medal"></i> ${me.rank} <span style="color: white; font-size: 14px;">(Lv.${me.level})</span></span>
+                <span class="hud-header text-amber" style="font-size: 18px;"><i class="fa-solid fa-coins"></i> ${me.coins}</span>
             </div>
         `;
     }
@@ -1590,21 +1101,21 @@ export function updateHUD(
             if (familiar.hp > 0) {
                 const hpPct = Math.max(0, Math.min(100, (familiar.hp / familiar.maxHp) * 100));
                 famHpBar.style.width = `${hpPct}%`;
-                famHpBar.style.background = "#a0f";
+                famHpBar.style.background = "#d946ef";
                 
                 if (familiar.isDetached) {
                     famStatus.innerText = "Deployed";
-                    famStatus.style.color = "#ffaa00";
+                    famStatus.style.color = "#f59e0b";
                 } else if (familiar.action === "attacking") {
                     famStatus.innerText = "Attacking";
-                    famStatus.style.color = "#ff4444";
+                    famStatus.style.color = "#ef4444";
                 } else {
                     famStatus.innerText = ""; 
                 }
             } else {
                 famHpBar.style.width = `100%`;
-                famHpBar.style.background = "#444"; 
-                famStatus.style.color = "#ff4444";
+                famHpBar.style.background = "#334155"; 
+                famStatus.style.color = "#ef4444";
                 
                 if (familiar.actionTimer > 0) {
                     famStatus.innerText = `Respawning: ${Math.ceil(familiar.actionTimer)}s`;
@@ -1623,21 +1134,21 @@ export function updateHUD(
     
     let biomeName = "The Wilderness";
     let biomeIcon = "fa-tree";
-    let biomeColor = "var(--neon-green)";
+    let biomeColor = "#22c55e";
     
     if (activeScene && activeScene.constructor.name === "MazeScene") {
-        biomeName = "The Labyrinth"; biomeIcon = "fa-dungeon"; biomeColor = "var(--neon-magenta)";
+        biomeName = "The Labyrinth"; biomeIcon = "fa-dungeon"; biomeColor = "#d946ef";
     } else if (activeScene && activeScene.constructor.name === "DungeonScene") {
-        biomeName = "The Goblin Cave"; biomeIcon = "fa-skull"; biomeColor = "var(--neon-amber)";
+        biomeName = "The Goblin Cave"; biomeIcon = "fa-skull"; biomeColor = "#f59e0b";
     } else if (activeScene && activeScene.constructor.name === "UnderworldScene") {
-        biomeName = "The Underworld (PvP Arena)"; biomeIcon = "fa-skull-crossbones"; biomeColor = "var(--neon-red)";
+        biomeName = "The Underworld (PvP Arena)"; biomeIcon = "fa-skull-crossbones"; biomeColor = "#ef4444";
     } else if (isSafeZone) {
-        biomeName = "Town of Beginnings"; biomeIcon = "fa-chess-rook"; biomeColor = "var(--neon-amber)";
+        biomeName = "Town of Beginnings"; biomeIcon = "fa-chess-rook"; biomeColor = "#f59e0b";
     } else {
-        if (localPlayerPos.y < -800) { biomeName = "The Frozen Wastes"; biomeIcon = "fa-snowflake"; biomeColor = "var(--neon-cyan)"; }
-        else if (localPlayerPos.y > 800) { biomeName = "The Scorched Desert"; biomeIcon = "fa-sun"; biomeColor = "var(--neon-amber)"; }
-        else if (localPlayerPos.x < -800) { biomeName = "The Toxic Swamp"; biomeIcon = "fa-biohazard"; biomeColor = "#55aa55"; }
-        else if (localPlayerPos.x > 800) { biomeName = "The Elven Kingdom"; biomeIcon = "fa-leaf"; biomeColor = "var(--neon-green)"; }
+        if (localPlayerPos.y < -800) { biomeName = "The Frozen Wastes"; biomeIcon = "fa-snowflake"; biomeColor = "#22d3ee"; }
+        else if (localPlayerPos.y > 800) { biomeName = "The Scorched Desert"; biomeIcon = "fa-sun"; biomeColor = "#f59e0b"; }
+        else if (localPlayerPos.x < -800) { biomeName = "The Toxic Swamp"; biomeIcon = "fa-biohazard"; biomeColor = "#22c55e"; }
+        else if (localPlayerPos.x > 800) { biomeName = "The Elven Kingdom"; biomeIcon = "fa-leaf"; biomeColor = "#22c55e"; }
     }
 
     if (biomeName !== currentBiomeName) {
@@ -1645,16 +1156,16 @@ export function updateHUD(
         zonePopupExpiresAt = Date.now() + 4000; 
         
         const pvpText = isSafeZone ? "SAFE ZONE (PvP/PvE Disabled)" : "PvP & PvE ENABLED";
-        const pvpColor = isSafeZone ? "var(--neon-green)" : "var(--neon-amber)";
+        const pvpColor = isSafeZone ? "#22c55e" : "#f59e0b";
         const pvpIcon = isSafeZone ? "fa-shield-halved" : "fa-khanda";
 
         const zp = document.getElementById("zone-popup");
         if (zp) {
             zp.innerHTML = `
-                <div class="hud-header" style="color: ${biomeColor}; font-size: 42px; text-shadow: 0 0 20px ${biomeColor}; letter-spacing: 2px;">
+                <div class="hud-header" style="color: ${biomeColor}; font-size: 52px; font-weight: 900; text-shadow: 0 6px 0 rgba(0,0,0,0.5); letter-spacing: 2px;">
                     <i class="fa-solid ${biomeIcon}"></i> ${biomeName}
                 </div>
-                <div class="hud-header" style="color: ${pvpColor}; font-size: 16px; margin-top: 10px; letter-spacing: 2px;">
+                <div class="hud-header" style="color: ${pvpColor}; font-size: 20px; font-weight: 900; margin-top: 15px; letter-spacing: 2px;">
                     <i class="fa-solid ${pvpIcon}"></i> ${pvpText}
                 </div>
             `;
@@ -1743,13 +1254,13 @@ export function updateHUD(
 
         if (me.isSleeping) {
             overlayText = `
-            <div class="hud-panel animate-pulse" style="border-color: var(--neon-green); text-align: center; margin-top: 15px; background: rgba(0,20,10,0.8);">
+            <div class="hud-panel animate-pulse" style="border-color: #22c55e; text-align: center; margin-top: 15px;">
                 <div class="hud-header text-green text-xl" style="margin-bottom: 5px;"><i class="fa-solid fa-bed"></i> Sleeping... Zzz...</div>
                 <div class="text-sm">Press <span class="hud-key">W</span><span class="hud-key">A</span><span class="hud-key">S</span><span class="hud-key">D</span> to Wake Up</div>
             </div>`;
         } else if (me.isMeditating) {
             overlayText = `
-            <div class="hud-panel animate-pulse" style="border-color: var(--neon-blue); text-align: center; margin-top: 15px; background: rgba(0,10,20,0.8);">
+            <div class="hud-panel animate-pulse" style="border-color: #38bdf8; text-align: center; margin-top: 15px;">
                 <div class="hud-header text-blue text-xl" style="margin-bottom: 5px;"><i class="fa-solid fa-om"></i> Meditating...</div>
                 <div class="text-sm">Focusing Aura. Press <span class="hud-key">W</span><span class="hud-key">A</span><span class="hud-key">S</span><span class="hud-key">D</span> to stand.</div>
             </div>`;
@@ -1877,7 +1388,7 @@ export function updateHUD(
             }
         }
 
-        const topHeader = `<div class="hud-header text-muted text-sm" style="margin-bottom: 2px;"><i class="fa-solid fa-server"></i> SAO Tower</div>`;
+        const topHeader = `<div class="hud-header text-muted text-sm" style="margin-bottom: 5px;"><i class="fa-solid fa-server"></i> SAO Tower</div>`;
 
         if (!me.hasUnlockedBuilding) {
             landText = "";
@@ -1901,9 +1412,6 @@ export function updateHUD(
     const btnHarnessMana = document.getElementById("btn-harness-mana");
     const auraHUDDiv = document.getElementById("hud-aura");
     const ctrlFamiliar = document.getElementById("ctrl-familiar");
-
-    const questTracker = document.getElementById("quest-tracker");
-    const questText = document.getElementById("quest-text");
 
     if (me) {
         if (me.hasUnlockedSkillTree) {
@@ -1929,28 +1437,6 @@ export function updateHUD(
         if (ctrlFamiliar) {
             ctrlFamiliar.style.display = me.mountedFamiliarId ? "flex" : "none";
         }
-
-        if (questTracker && questText) {
-            let currentQuest = "";
-
-            if (me.activeQuests && me.activeQuests.has("tutorial_1_fish")) {
-                currentQuest = `<b>Survival 101:</b> The town needs food. Head to the lake to the North-West (X: -180, Z: 180) and press <span class="hud-key">F</span> to cast your line.`;
-            } else if (me.activeQuests && me.activeQuests.has("tutorial_2_tree")) {
-                const prog = me.activeQuests.get("tutorial_2_tree").currentAmount;
-                currentQuest = `<b>Survival 102:</b> Excellent catch. Now we need materials. Find a tree and attack it to gather Wood. (${prog}/3)`;
-            } else if (!me.hasUnlockedSkillTree) {
-                currentQuest = `<b>Growing Stronger:</b> Defeat monsters or gather resources to reach Level 2.`;
-            } else if (!me.hasUnlockedBuilding) {
-                currentQuest = `<b>Settling Down:</b> Earn 100 Coins by defeating enemies, selling items, or finding chests to buy your first plot of land.`;
-            }
-
-            if (currentQuest !== "") {
-                questTracker.style.display = "block";
-                questText.innerHTML = currentQuest;
-            } else {
-                questTracker.style.display = "none";
-            }
-        }
     }
 }
 
@@ -1965,8 +1451,8 @@ export function openCraftingMenu(activeRoom: any, playerState: any) {
         const hasCoins = playerState.coins >= r.cost;
         let canCraft = hasCoins;
         
-        let reqText = `<div style="display: flex; gap: 10px; margin-top: 5px; font-size: 12px;">`;
-        reqText += `<span style="color: ${hasCoins ? 'var(--neon-amber)' : 'var(--neon-red)'};"><i class="fa-solid fa-coins"></i> ${r.cost}</span>`;
+        let reqText = `<div style="display: flex; gap: 10px; margin-top: 8px; font-size: 14px; font-weight: 700;">`;
+        reqText += `<span style="color: ${hasCoins ? '#f59e0b' : '#ef4444'};"><i class="fa-solid fa-coins"></i> ${r.cost}</span>`;
         
         r.reqs.forEach(req => {
             const pItem = playerState.inventory.get(req.n);
@@ -1974,17 +1460,17 @@ export function openCraftingMenu(activeRoom: any, playerState: any) {
             const hasEnough = pQty >= req.q;
             if (!hasEnough) canCraft = false;
             
-            reqText += `<span style="color: ${hasEnough ? 'var(--neon-green)' : 'var(--neon-red)'};">${req.n}: ${pQty}/${req.q}</span>`;
+            reqText += `<span style="color: ${hasEnough ? '#22c55e' : '#ef4444'};">${req.n}: ${pQty}/${req.q}</span>`;
         });
         reqText += `</div>`;
 
         html += `
-            <div style="background: rgba(0,0,0,0.4); border: 1px solid #444; border-radius: 6px; padding: 10px; display: flex; justify-content: space-between; align-items: center;">
+            <div style="background: #0f172a; border: 3px solid #334155; border-radius: 12px; padding: 15px; display: flex; justify-content: space-between; align-items: center;">
                 <div>
-                    <div class="hud-header text-blue text-md">${r.icon} ${r.name}</div>
+                    <div class="hud-header text-blue text-lg">${r.icon} ${r.name}</div>
                     ${reqText}
                 </div>
-                <button class="btn-hack craft-btn" data-recipe="${r.id}" ${canCraft ? '' : 'disabled style="filter: grayscale(1); opacity: 0.5; cursor: not-allowed;"'}>
+                <button class="btn-chunky btn-green craft-btn" data-recipe="${r.id}" ${canCraft ? '' : 'disabled style="filter: grayscale(1); opacity: 0.5; cursor: not-allowed;"'} style="padding: 10px 20px;">
                     CRAFT
                 </button>
             </div>
@@ -2010,16 +1496,16 @@ export function openStoreMenu(activeRoom: any, playerState: any, storeState: any
     if (!modal) {
         modal = document.createElement("div");
         modal.id = "store-management-modal";
-        modal.className = "hud-panel hud-absolute-center";
+        modal.className = "modal-chunky";
+        modal.style.position = "fixed";
         modal.style.top = "50%";
         modal.style.transform = "translate(-50%, -50%)";
-        modal.style.width = "500px";
+        modal.style.width = "550px";
         modal.style.maxHeight = "80vh";
         modal.style.overflowY = "auto";
         modal.style.zIndex = "3100";
         modal.style.pointerEvents = "auto";
-        modal.style.boxShadow = "0 10px 50px rgba(0,0,0,0.9), 0 0 30px rgba(0, 170, 255, 0.2)";
-        modal.style.border = "2px solid var(--neon-amber)";
+        modal.style.padding = "30px";
         document.body.appendChild(modal);
 
         window.addEventListener("keydown", (e) => {
@@ -2031,31 +1517,31 @@ export function openStoreMenu(activeRoom: any, playerState: any, storeState: any
     const isUnowned = storeState.ownerId === "";
 
     let html = `
-        <div style="padding-bottom: 15px; border-bottom: 1px solid #444; display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; background: var(--bg-panel); z-index: 10;">
+        <div style="padding-bottom: 15px; border-bottom: 4px solid #334155; display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; background: #1e293b; z-index: 10;">
             <h2 class="hud-header text-amber" style="margin: 0;"><i class="fa-solid fa-store"></i> ${storeState.type}</h2>
-            <button onclick="document.getElementById('store-management-modal').style.display='none'" style="background: none; border: none; color: var(--neon-red); font-size: 24px; cursor: pointer;"><i class="fa-solid fa-xmark"></i></button>
+            <button onclick="document.getElementById('store-management-modal').style.display='none'" class="btn-close-chunky">&times;</button>
         </div>
     `;
 
     if (isUnowned) {
         html += `
-            <div style="text-align: center; margin-top: 20px;">
-                <p class="text-muted">This property is currently vacant.</p>
-                <div class="hud-header text-amber" style="font-size: 24px; margin: 15px 0;"><i class="fa-solid fa-coins"></i> 1,000</div>
-                <button id="btn-buy-property" class="btn-hack" ${playerState.coins < 1000 ? 'disabled style="filter: grayscale(1); opacity: 0.5;"' : ''}>Purchase Property</button>
+            <div style="text-align: center; margin-top: 30px;">
+                <p class="text-muted" style="font-size: 18px; font-weight: 900;">This property is currently vacant.</p>
+                <div class="hud-header text-amber" style="font-size: 32px; margin: 20px 0;"><i class="fa-solid fa-coins"></i> 1,000</div>
+                <button id="btn-buy-property" class="btn-chunky btn-blue" ${playerState.coins < 1000 ? 'disabled style="filter: grayscale(1); opacity: 0.5;"' : ''} style="width: 100%; padding: 20px;">Purchase Property</button>
             </div>
         `;
     } else if (isOwner) {
         html += `
-            <div style="display: flex; justify-content: space-between; margin-top: 15px; background: rgba(0,0,0,0.4); padding: 10px; border-radius: 6px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 20px; background: #0f172a; padding: 15px; border-radius: 12px; border: 3px solid #334155;">
                 <div>
                     <div class="text-muted text-sm">Store Vault (Profits)</div>
-                    <div class="text-amber hud-header" style="font-size: 20px;"><i class="fa-solid fa-coins"></i> ${storeState.vault}</div>
+                    <div class="text-amber hud-header" style="font-size: 24px;"><i class="fa-solid fa-coins"></i> ${storeState.vault}</div>
                 </div>
-                <button id="btn-collect-vault" class="hud-btn btn-success" ${storeState.vault <= 0 ? 'disabled style="filter: grayscale(1); opacity: 0.5;"' : ''}>Collect Profits</button>
+                <button id="btn-collect-vault" class="btn-chunky btn-green" ${storeState.vault <= 0 ? 'disabled style="filter: grayscale(1); opacity: 0.5;"' : ''} style="padding: 12px 20px;">Collect Profits</button>
             </div>
-            <h3 class="hud-header text-sm text-muted" style="margin-top: 20px; margin-bottom: 10px;">Produce Stock</h3>
-            <div style="display: flex; flex-direction: column; gap: 10px;">
+            <h3 class="hud-header text-sm text-muted" style="margin-top: 25px; margin-bottom: 10px;">Produce Stock</h3>
+            <div style="display: flex; flex-direction: column; gap: 15px;">
         `;
         
         storeState.inventory.forEach((item: any, itemName: string) => {
@@ -2068,16 +1554,16 @@ export function openStoreMenu(activeRoom: any, playerState: any, storeState: any
                 const pItem = playerState.inventory.get(req.n);
                 const pQty = pItem ? pItem.quantity : 0;
                 if (pQty < req.q) canCook = false;
-                reqHtml += `<span style="color: ${pQty >= req.q ? 'var(--neon-green)' : 'var(--neon-red)'}; margin-right: 8px;">${req.n} ${pQty}/${req.q}</span>`;
+                reqHtml += `<span style="color: ${pQty >= req.q ? '#22c55e' : '#ef4444'}; margin-right: 8px;">${req.n} ${pQty}/${req.q}</span>`;
             });
 
             html += `
-                <div style="background: rgba(255,255,255,0.05); padding: 10px; border-radius: 6px; display: flex; justify-content: space-between; align-items: center;">
+                <div style="background: #334155; padding: 15px; border-radius: 12px; display: flex; justify-content: space-between; align-items: center;">
                     <div>
-                        <div class="text-md" style="font-weight: bold;">${itemName} (In Stock: <span class="text-blue">${item.stock}</span>)</div>
-                        <div class="text-sm text-muted" style="margin-top: 4px;">Req: ${reqHtml}</div>
+                        <div class="text-lg">${itemName} (In Stock: <span class="text-blue">${item.stock}</span>)</div>
+                        <div class="text-sm text-muted" style="margin-top: 6px;">Req: ${reqHtml}</div>
                     </div>
-                    <button class="btn-hack produce-btn" data-item="${itemName}" ${!canCook ? 'disabled style="filter: grayscale(1); opacity: 0.5;"' : ''}>
+                    <button class="btn-chunky btn-blue produce-btn" data-item="${itemName}" ${!canCook ? 'disabled style="filter: grayscale(1); opacity: 0.5;"' : ''} style="padding: 10px 15px;">
                         Produce (+${recipe.yield})
                     </button>
                 </div>
@@ -2086,19 +1572,19 @@ export function openStoreMenu(activeRoom: any, playerState: any, storeState: any
         html += `</div>`;
     } else {
         html += `
-            <div class="text-muted text-sm" style="margin-top: 10px; text-align: center;">Owned by <span class="text-amber">${storeState.ownerName}</span></div>
-            <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 15px;">
+            <div class="text-muted text-md" style="margin-top: 15px; text-align: center;">Owned by <span class="text-amber">${storeState.ownerName}</span></div>
+            <div style="display: flex; flex-direction: column; gap: 12px; margin-top: 20px;">
         `;
         storeState.inventory.forEach((item: any, itemName: string) => {
             const outOfStock = item.stock <= 0;
             const cantAfford = playerState.coins < item.price;
             html += `
-                <div style="background: rgba(255,255,255,0.05); padding: 10px; border-radius: 6px; display: flex; justify-content: space-between; align-items: center;">
+                <div style="background: #0f172a; border: 3px solid #334155; padding: 15px; border-radius: 12px; display: flex; justify-content: space-between; align-items: center;">
                     <div>
-                        <div class="text-md" style="font-weight: bold;">${itemName}</div>
-                        <div class="text-sm ${outOfStock ? 'text-red' : 'text-muted'}">Stock: ${item.stock}</div>
+                        <div class="text-lg">${itemName}</div>
+                        <div class="text-sm ${outOfStock ? 'text-red' : 'text-muted'}" style="margin-top: 4px;">Stock: ${item.stock}</div>
                     </div>
-                    <button class="btn-hack buy-btn" data-item="${itemName}" ${(outOfStock || cantAfford) ? 'disabled style="filter: grayscale(1); opacity: 0.5;"' : ''}>
+                    <button class="btn-chunky ${outOfStock ? 'btn-slate' : 'btn-gold'} buy-btn" data-item="${itemName}" ${(outOfStock || cantAfford) ? 'disabled style="filter: grayscale(1); opacity: 0.5;"' : ''} style="padding: 12px 20px; color: #0f172a;">
                         <i class="fa-solid fa-coins"></i> ${item.price}
                     </button>
                 </div>

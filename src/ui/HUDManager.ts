@@ -147,10 +147,349 @@ const FAMILIAR_ICONS: Record<string, string> = {
     "radiant_seraph": "⚔️"
 };
 
+// --- EXPORTED MODAL FUNCTIONS ---
+
+export function openQuestUI(activeRoom: any, keys: any, playerName: string) {
+    if (isQuestUIOpen || !activeRoom) return;
+    isQuestUIOpen = true;
+
+    for (const key in keys) keys[key as keyof typeof keys] = false;
+
+    let modal = document.getElementById("quest-modal");
+    if (!modal) {
+        modal = document.createElement("div");
+        modal.id = "quest-modal";
+        modal.style.position = "fixed"; 
+        modal.style.top = "50%"; 
+        modal.style.left = "50%";
+        modal.style.transform = "translate(-50%, -50%)"; 
+        modal.style.background = "rgba(20, 20, 25, 0.98)";
+        modal.style.padding = "30px"; 
+        modal.style.borderRadius = "12px"; 
+        modal.style.border = "2px solid #00ffaa";
+        modal.style.zIndex = "1000"; 
+        modal.style.color = "white"; 
+        modal.style.width = "500px";
+        modal.style.boxShadow = "0 10px 40px rgba(0,0,0,0.8)";
+        modal.style.fontFamily = "Arial, sans-serif";
+        document.body.appendChild(modal);
+    }
+
+    modal.innerHTML = `
+      <div style="display:flex; justify-content:space-between; align-items:center; border-bottom: 1px solid #444; padding-bottom: 15px; margin-bottom: 20px;">
+        <h2 style="margin:0; color:#00ffaa; font-size: 24px;">Lord Protector's Request</h2>
+        <button id="close-quest-btn" style="background:none; border:none; color:#ff5555; font-size:28px; cursor:pointer; font-weight:bold; line-height: 1;">&times;</button>
+      </div>
+      <div style="font-size: 16px; line-height: 1.6; color: #ddd; margin-bottom: 20px;">
+        "Greetings, <span id="quest-player-name"></span>. The wilderness beyond these walls grows restless, and the Town of Beginnings requires your strength. Slay the beasts that encroach upon our borders and return to me."
+      </div>
+      <div style="background: #1a1a20; padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #444;">
+        <div style="font-weight: bold; color: #ffaa00; margin-bottom: 5px;">Objective:</div>
+        <div style="color: #fff;">Defeat 5 Enemies in The Wilderness</div>
+        <div style="font-weight: bold; color: #00aaff; margin-top: 10px; margin-bottom: 5px;">Rewards:</div>
+        <div style="color: #fff;">250 Coins, 500 Experience Points</div>
+      </div>
+      <div style="display:flex; gap: 15px;">
+          <button id="accept-quest-btn" style="flex: 1; padding: 15px; font-size: 16px; font-weight: bold; background: #00aa44; border: none; color: white; cursor:pointer; border-radius: 8px; transition: 0.2s;">Accept Quest</button>
+          <button id="decline-quest-btn" style="flex: 1; padding: 15px; font-size: 16px; font-weight: bold; background: #aa2222; border: none; color: white; cursor:pointer; border-radius: 8px; transition: 0.2s;">Decline</button>
+      </div>
+    `;
+
+    document.getElementById("quest-player-name")!.textContent = playerName;
+
+    document.getElementById("close-quest-btn")!.onclick = () => {
+        isQuestUIOpen = false;
+        document.body.removeChild(modal!);
+    };
+
+    document.getElementById("decline-quest-btn")!.onclick = () => {
+        isQuestUIOpen = false;
+        document.body.removeChild(modal!);
+    };
+
+    document.getElementById("accept-quest-btn")!.onclick = () => {
+        // We leave this here so the button does something, but the state-tracker 
+        // handles the actual onboarding tutorial flow.
+        activeRoom.send("acceptQuest", { questId: "slime_hunt_1" });
+        isQuestUIOpen = false;
+        document.body.removeChild(modal!);
+    };
+}
+
+export function openTeleportUI(activeRoom: any, keys: any) {
+    if (isTeleportUIOpen || !activeRoom) return;
+    isTeleportUIOpen = true;
+
+    for (const key in keys) {
+      keys[key as keyof typeof keys] = false;
+    }
+
+    let modal = document.getElementById("teleport-modal");
+    if (!modal) {
+      modal = document.createElement("div");
+      modal.id = "teleport-modal";
+      modal.style.position = "fixed"; 
+      modal.style.top = "50%"; 
+      modal.style.left = "50%";
+      modal.style.transform = "translate(-50%, -50%)"; 
+      modal.style.background = "rgba(20, 20, 25, 0.98)";
+      modal.style.padding = "30px"; 
+      modal.style.borderRadius = "12px"; 
+      modal.style.border = "2px solid #00aaff";
+      modal.style.zIndex = "1000"; 
+      modal.style.color = "white"; 
+      modal.style.width = "400px"; 
+      modal.style.boxShadow = "0 10px 40px rgba(0,0,0,0.8)";
+      modal.style.fontFamily = "Arial, sans-serif";
+      modal.style.textAlign = "center";
+      document.body.appendChild(modal);
+    }
+
+    modal.innerHTML = `
+      <div style="display:flex; justify-content:space-between; align-items:center; border-bottom: 1px solid #444; padding-bottom: 15px; margin-bottom: 20px;">
+        <h2 style="margin:0; color:#00aaff; font-size: 24px;">Fast Travel</h2>
+        <button id="close-teleport-btn" style="background:none; border:none; color:#ff5555; font-size:28px; cursor:pointer; font-weight:bold; line-height: 1;">&times;</button>
+      </div>
+      <div style="display:flex; flex-direction:column; gap:15px;">
+          <button id="tp-town" style="background: linear-gradient(135deg, #444, #222); border: 2px solid #ffaa00; padding: 15px; border-radius: 8px; color: white; font-size: 18px; font-weight: bold; cursor: pointer; transition: 0.2s;">🏰 Town of Beginnings</button>
+          <button id="tp-elven" style="background: linear-gradient(135deg, #444, #222); border: 2px solid #00ffaa; padding: 15px; border-radius: 8px; color: white; font-size: 18px; font-weight: bold; cursor: pointer; transition: 0.2s;">✨ The Elven Kingdom</button>
+      </div>
+    `;
+
+    document.getElementById("close-teleport-btn")!.onclick = () => {
+      isTeleportUIOpen = false;
+      if (document.body.contains(modal!)) document.body.removeChild(modal!);
+    };
+
+    document.getElementById("tp-town")!.onclick = () => {
+      activeRoom.send("teleport", { destination: "town" });
+      isTeleportUIOpen = false;
+      if (document.body.contains(modal!)) document.body.removeChild(modal!);
+    };
+
+    document.getElementById("tp-elven")!.onclick = () => {
+      activeRoom.send("teleport", { destination: "elven", x: 1155, z: 0 });
+      isTeleportUIOpen = false;
+      if (document.body.contains(modal!)) document.body.removeChild(modal!);
+    };
+}
+
+export function openCasinoUI(activeRoom: any, keys: any, gameType: string) {
+    if (isCasinoUIOpen || !activeRoom) return;
+    isCasinoUIOpen = true;
+
+    for (const key in keys) keys[key as keyof typeof keys] = false;
+
+    if (!document.getElementById("casino-styles")) {
+        const style = document.createElement("style");
+        style.id = "casino-styles";
+        style.innerHTML = `
+            @keyframes anim-flip-coin {
+                0% { transform: rotateY(0deg) scale(1); }
+                50% { transform: rotateY(900deg) scale(1.5); }
+                100% { transform: rotateY(1800deg) scale(1); }
+            }
+            @keyframes anim-spin-roulette {
+                0% { transform: rotate(0deg); }
+                100% { transform: rotate(1800deg); }
+            }
+            @keyframes anim-slot-shake {
+                0% { transform: translateY(3px); }
+                50% { transform: translateY(-3px); }
+                100% { transform: translateY(0); }
+            }
+            @keyframes anim-deal-card {
+                from { transform: translateX(100px) translateY(-50px) rotate(45deg); opacity: 0; }
+                to { transform: translateX(0) translateY(0) rotate(0deg); opacity: 1; }
+            }
+            .flipping { animation: anim-flip-coin 1s cubic-bezier(0.4, 0, 0.2, 1) forwards; }
+            .spinning { animation: anim-spin-roulette 2s cubic-bezier(0.1, 0.7, 0.1, 1) forwards; }
+            .slot-blur { filter: blur(3px); animation: anim-slot-shake 0.1s infinite; }
+            .dealing { animation: anim-deal-card 0.4s ease-out forwards; }
+        `;
+        document.head.appendChild(style);
+    }
+
+    let modal = document.getElementById("casino-modal");
+    if (!modal) {
+        modal = document.createElement("div");
+        modal.id = "casino-modal";
+        modal.style.position = "fixed"; 
+        modal.style.top = "50%"; 
+        modal.style.left = "50%";
+        modal.style.transform = "translate(-50%, -50%)"; 
+        modal.style.background = "linear-gradient(135deg, #1a1a20, #0a0a0f)";
+        modal.style.padding = "30px"; 
+        modal.style.borderRadius = "16px"; 
+        modal.style.border = "3px solid #ff0055";
+        modal.style.zIndex = "1000"; 
+        modal.style.color = "white"; 
+        modal.style.width = "400px";
+        modal.style.boxShadow = "0 0 50px rgba(255, 0, 85, 0.6)";
+        modal.style.fontFamily = "Arial, sans-serif";
+        modal.style.textAlign = "center";
+        document.body.appendChild(modal);
+    }
+
+    const me = activeRoom.state.players.get(activeRoom.sessionId);
+    if (!me) return;
+
+    let customInputs = "";
+    let visualArea = "";
+    
+    if (gameType === "Coin Toss") {
+        visualArea = `
+            <div style="height: 120px; display: flex; align-items: center; justify-content: center; perspective: 800px;">
+                <div id="2d-coin" style="width: 80px; height: 80px; border-radius: 50%; background: radial-gradient(circle, #ffd700, #b8860b); border: 4px solid #fff; box-shadow: 0 10px 20px rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; font-size: 36px; font-weight: bold; color: white; text-shadow: 2px 2px 0 #886000;">$</div>
+            </div>`;
+        customInputs = `
+            <div style="margin: 15px 0; display:flex; justify-content:center; gap:10px;">
+                <button id="btn-heads" style="flex:1; padding: 15px; font-size: 18px; font-weight: bold; background: #222; border: 2px solid #aaa; color: white; cursor:pointer; border-radius: 8px;">HEADS</button>
+                <button id="btn-tails" style="flex:1; padding: 15px; font-size: 18px; font-weight: bold; background: #222; border: 2px solid #aaa; color: white; cursor:pointer; border-radius: 8px;">TAILS</button>
+            </div>
+        `;
+    } else if (gameType === "Roulette") {
+        visualArea = `
+            <div style="height: 140px; display: flex; align-items: center; justify-content: center; overflow: hidden;">
+                <div id="2d-roulette" style="width: 120px; height: 120px; border-radius: 50%; border: 6px solid #e6dfcc; background: repeating-conic-gradient(#cc3333 0 18deg, #222 18deg 36deg); box-shadow: 0 5px 15px rgba(0,0,0,0.8); display: flex; align-items: center; justify-content: center; position: relative;">
+                    <div style="width: 80px; height: 80px; background: #111; border-radius: 50%; border: 2px solid #e6dfcc;"></div>
+                    <div style="position: absolute; top: 5px; width: 10px; height: 10px; background: white; border-radius: 50%; box-shadow: 0 0 5px white;"></div>
+                </div>
+            </div>`;
+        customInputs = `
+            <select id="roulette-guess" style="width: 100%; padding: 10px; font-size: 18px; margin: 15px 0; background: #222; color: white; border: 2px solid #ff0055; border-radius: 8px;">
+                <option value="red">Red (2x Payout)</option>
+                <option value="black">Black (2x Payout)</option>
+                <option value="0">Number 0 (35x Payout)</option>
+                <option value="7">Number 7 (35x Payout)</option>
+                <option value="13">Number 13 (35x Payout)</option>
+                <option value="21">Number 21 (35x Payout)</option>
+                <option value="36">Number 36 (35x Payout)</option>
+            </select>
+            <button id="btn-play" style="width: 100%; padding: 15px; font-size: 18px; font-weight: bold; background: #ff0055; border: none; color: white; cursor:pointer; border-radius: 8px; text-transform: uppercase;">Spin Wheel</button>
+        `;
+    } else if (gameType === "Slot Machine") {
+        visualArea = `
+            <div style="height: 100px; display: flex; align-items: center; justify-content: center;">
+                <div style="background: #111; border: 4px solid #555; border-radius: 8px; padding: 10px; display: flex; gap: 15px; box-shadow: inset 0 0 20px black;">
+                    <div id="2d-slot-1" style="width: 50px; height: 60px; background: #fff; border-radius: 4px; font-size: 36px; display: flex; align-items: center; justify-content: center; box-shadow: inset 0 5px 10px rgba(0,0,0,0.5);">🍒</div>
+                    <div id="2d-slot-2" style="width: 50px; height: 60px; background: #fff; border-radius: 4px; font-size: 36px; display: flex; align-items: center; justify-content: center; box-shadow: inset 0 5px 10px rgba(0,0,0,0.5);">🍋</div>
+                    <div id="2d-slot-3" style="width: 50px; height: 60px; background: #fff; border-radius: 4px; font-size: 36px; display: flex; align-items: center; justify-content: center; box-shadow: inset 0 5px 10px rgba(0,0,0,0.5);">💎</div>
+                </div>
+            </div>`;
+        customInputs = `
+            <button id="btn-play" style="width: 100%; padding: 20px; font-size: 24px; font-weight: bold; background: linear-gradient(to bottom, #ffaa00, #ff5500); border: none; color: black; cursor:pointer; border-radius: 12px; margin-top: 15px; text-transform: uppercase; box-shadow: 0 5px 0 #cc4400;">PULL LEVER</button>
+        `;
+    } else if (gameType === "Blackjack") {
+        visualArea = `
+            <div style="height: 120px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px;">
+                <div id="2d-bj-dealer" style="display: flex; gap: 5px; height: 45px;"></div>
+                <div id="2d-bj-player" style="display: flex; gap: 5px; height: 45px;"></div>
+            </div>`;
+        customInputs = `
+            <button id="btn-play" style="width: 100%; padding: 15px; font-size: 18px; font-weight: bold; background: #00aa44; border: none; color: white; cursor:pointer; border-radius: 8px; margin-top: 15px; text-transform: uppercase;">Deal Hand</button>
+        `;
+    }
+
+    modal.innerHTML = `
+      <div style="display:flex; justify-content:space-between; align-items:center; border-bottom: 1px solid #444; padding-bottom: 10px; margin-bottom: 15px;">
+        <h2 style="margin:0; color:#ff0055; font-size: 24px; text-transform: uppercase; letter-spacing: 2px;">${gameType}</h2>
+        <button id="close-casino-btn" style="background:none; border:none; color:#ff5555; font-size:28px; cursor:pointer; font-weight:bold; line-height: 1;">&times;</button>
+      </div>
+      
+      <div style="font-size: 18px; color: #ffd700; font-weight: bold; margin-bottom: 15px;">
+        Your Balance: <span id="casino-balance">${me.coins}</span> Coins
+      </div>
+
+      ${visualArea}
+  
+      <div style="background: #111; padding: 15px; border-radius: 8px; text-align: left; margin-top: 15px;">
+        <label style="color: #aaa; font-weight: bold;">Bet Amount:</label>
+        <input type="number" id="bet-amount" value="50" min="1" max="${me.coins}" style="width: 100%; padding: 10px; font-size: 18px; margin-top: 5px; background: #222; color: #00ffaa; border: 1px solid #444; border-radius: 4px; box-sizing: border-box;" />
+      </div>
+  
+      ${customInputs}
+  
+      <div id="casino-result" style="margin-top: 20px; font-size: 18px; font-weight: bold; min-height: 24px; color: #fff;"></div>
+    `;
+
+    document.getElementById("close-casino-btn")!.onclick = () => {
+        isCasinoUIOpen = false;
+        if ((window as any).casinoAnimInterval) clearInterval((window as any).casinoAnimInterval);
+        if (document.body.contains(modal!)) document.body.removeChild(modal!);
+    };
+
+    const getBet = () => parseInt((document.getElementById("bet-amount") as HTMLInputElement).value) || 0;
+
+    const start2DAnimation = (game: string) => {
+        const r = document.getElementById("casino-result");
+        if (r) r.innerHTML = "Processing...";
+
+        if ((window as any).casinoAnimInterval) clearInterval((window as any).casinoAnimInterval);
+
+        if (game === "Coin Toss") {
+            const coin = document.getElementById("2d-coin");
+            if (coin) {
+                coin.classList.remove("flipping");
+                void coin.offsetWidth; 
+                coin.classList.add("flipping");
+                coin.innerText = "?";
+            }
+        } 
+        else if (game === "Roulette") {
+            const wheel = document.getElementById("2d-roulette");
+            if (wheel) {
+                wheel.classList.remove("spinning");
+                void wheel.offsetWidth;
+                wheel.classList.add("spinning");
+            }
+        } 
+        else if (game === "Slot Machine") {
+            const s1 = document.getElementById("2d-slot-1");
+            const s2 = document.getElementById("2d-slot-2");
+            const s3 = document.getElementById("2d-slot-3");
+            const symbols = ["🍒", "🍋", "🔔", "💎", "7️⃣"];
+            
+            if (s1 && s2 && s3) {
+                s1.classList.add("slot-blur");
+                s2.classList.add("slot-blur");
+                s3.classList.add("slot-blur");
+                
+                (window as any).casinoAnimInterval = setInterval(() => {
+                    s1.innerText = symbols[Math.floor(Math.random() * symbols.length)];
+                    s2.innerText = symbols[Math.floor(Math.random() * symbols.length)];
+                    s3.innerText = symbols[Math.floor(Math.random() * symbols.length)];
+                }, 50);
+            }
+        }
+        else if (game === "Blackjack") {
+            const dealer = document.getElementById("2d-bj-dealer");
+            const player = document.getElementById("2d-bj-player");
+            if (dealer && player) {
+                dealer.innerHTML = `<div class="dealing" style="width:30px; height:45px; background:white; border:1px solid black; border-radius:3px; display:flex; align-items:center; justify-content:center; color:black; font-weight:bold;">?</div>`;
+                player.innerHTML = `<div class="dealing" style="width:30px; height:45px; background:white; border:1px solid black; border-radius:3px; display:flex; align-items:center; justify-content:center; color:black; font-weight:bold;">?</div>`;
+            }
+        }
+    };
+
+    if (gameType === "Coin Toss") {
+        document.getElementById("btn-heads")!.onclick = () => { start2DAnimation(gameType); activeRoom.send("playCasino", { game: gameType, bet: getBet(), guess: "heads" }); };
+        document.getElementById("btn-tails")!.onclick = () => { start2DAnimation(gameType); activeRoom.send("playCasino", { game: gameType, bet: getBet(), guess: "tails" }); };
+    } else if (gameType === "Roulette") {
+        document.getElementById("btn-play")!.onclick = () => {
+            start2DAnimation(gameType);
+            const guess = (document.getElementById("roulette-guess") as HTMLSelectElement).value;
+            activeRoom.send("playCasino", { game: gameType, bet: getBet(), guess });
+        };
+    } else {
+        document.getElementById("btn-play")!.onclick = () => { start2DAnimation(gameType); activeRoom.send("playCasino", { game: gameType, bet: getBet() }); };
+    }
+}
+
+
 // --- 1. OVERLAY CREATION ---
 export function ensureOverlay(getActiveRoom: () => any, getActionContext: () => any): HTMLDivElement {
     
-    // Inject Fonts & Icons if not present
     if (!document.getElementById("hud-external-assets")) {
         const assetsContainer = document.createElement("div");
         assetsContainer.id = "hud-external-assets";
@@ -173,7 +512,6 @@ export function ensureOverlay(getActiveRoom: () => any, getActionContext: () => 
                     --font-body: 'Inter', sans-serif;
                 }
                 
-                /* Core Layout Classes */
                 .hud-panel {
                     background: var(--bg-panel);
                     border: 1px solid var(--border-color);
@@ -191,7 +529,6 @@ export function ensureOverlay(getActiveRoom: () => any, getActionContext: () => 
                 @keyframes hudPulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
                 .animate-pulse { animation: hudPulse 1.5s infinite; }
 
-                /* Typography & Colors */
                 .text-cyan { color: var(--neon-cyan); }
                 .text-blue { color: var(--neon-blue); }
                 .text-green { color: var(--neon-green); }
@@ -204,7 +541,6 @@ export function ensureOverlay(getActiveRoom: () => any, getActionContext: () => 
                 .text-lg { font-size: 16px; font-weight: 600; }
                 .text-xl { font-size: 18px; font-weight: 700; }
 
-                /* Buttons */
                 .hud-btn {
                     background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.2);
                     color: white; padding: 6px 12px; border-radius: 4px; cursor: pointer;
@@ -222,7 +558,6 @@ export function ensureOverlay(getActiveRoom: () => any, getActionContext: () => 
                 }
                 .hud-input:focus { border-color: var(--neon-blue); }
 
-                /* Action Button */
                 .btn-hack {
                     padding: 12px; background: linear-gradient(90deg, #002244, #0044aa);
                     border: 1px solid var(--neon-blue); color: var(--neon-cyan);
@@ -232,7 +567,6 @@ export function ensureOverlay(getActiveRoom: () => any, getActionContext: () => 
                 }
                 .btn-hack:hover:not(:disabled) { background: linear-gradient(90deg, #003366, #0066cc); box-shadow: 0 0 20px rgba(0, 170, 255, 0.5); color: white; }
 
-                /* Resource Bars */
                 .resource-container { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
                 .resource-icon { width: 24px; text-align: center; font-size: 16px; text-shadow: 0 0 8px currentColor; }
                 .resource-bar-wrapper { flex-grow: 1; height: 16px; background: rgba(0,0,0,0.7); border-radius: 3px; border: 1px solid #333; position: relative; overflow: hidden; }
@@ -242,11 +576,9 @@ export function ensureOverlay(getActiveRoom: () => any, getActionContext: () => 
                 .fill-hunger { background: linear-gradient(90deg, #885500, var(--neon-amber)); box-shadow: 0 0 10px var(--neon-amber); }
                 .resource-text { position: absolute; top: 0; left: 0; width: 100%; height: 100%; text-align: center; font-size: 10px; font-weight: bold; line-height: 16px; text-shadow: 1px 1px 0 #000; font-family: var(--font-header); letter-spacing: 1px; }
 
-                /* Roster HP Bar */
                 .roster-hp-bg { width: 100%; height: 6px; background: rgba(0,0,0,0.8); border: 1px solid #333; border-radius: 3px; overflow: hidden; margin-top: 4px; }
                 .roster-hp-fill { height: 100%; transition: width 0.2s; }
 
-                /* Keyboard Keys */
                 .hud-key {
                     background: linear-gradient(180deg, #444, #222);
                     border: 1px solid #111;
@@ -264,7 +596,6 @@ export function ensureOverlay(getActiveRoom: () => any, getActionContext: () => 
                 .controls-group { display: flex; flex-direction: column; gap: 8px; align-items: flex-end; }
                 .controls-row { display: flex; align-items: center; gap: 6px; }
 
-                /* Zone Popup Fade */
                 .zone-popup {
                     position: fixed; top: 35%; left: 50%; transform: translate(-50%, -50%);
                     text-align: center; z-index: 2000; pointer-events: none;
@@ -277,7 +608,6 @@ export function ensureOverlay(getActiveRoom: () => any, getActionContext: () => 
                     transform: translate(-50%, -45%);
                 }
 
-                /* Minecraft Style Event Log */
                 #event-log-container {
                     position: fixed;
                     bottom: 20px;
@@ -312,7 +642,6 @@ export function ensureOverlay(getActiveRoom: () => any, getActionContext: () => 
                     100% { opacity: 0; transform: translateX(-10px); }
                 }
 
-                /* Realm Event Pointers */
                 #event-pointers-container {
                     position: absolute; top: 0; left: 0; width: 100vw; height: 100vh;
                     pointer-events: none; overflow: hidden; z-index: 100;
@@ -333,7 +662,6 @@ export function ensureOverlay(getActiveRoom: () => any, getActionContext: () => 
                     text-shadow: 1px 1px 2px black; white-space: nowrap;
                 }
 
-                /* Custom Scrollbar for HUD */
                 ::-webkit-scrollbar { width: 6px; }
                 ::-webkit-scrollbar-track { background: rgba(0,0,0,0.2); }
                 ::-webkit-scrollbar-thumb { background: rgba(0, 170, 255, 0.5); border-radius: 3px; }
@@ -345,7 +673,6 @@ export function ensureOverlay(getActiveRoom: () => any, getActionContext: () => 
 
     let overlay = document.getElementById("overlay") as HTMLDivElement | null;
     if (!overlay) {
-        // --- MASTER TOP-LEFT CONTAINER ---
         overlay = document.createElement("div"); 
         overlay.id = "overlay";
         overlay.style.position = "fixed"; 
@@ -357,7 +684,6 @@ export function ensureOverlay(getActiveRoom: () => any, getActionContext: () => 
         overlay.style.zIndex = "20";
         overlay.style.pointerEvents = "none";
 
-        // 1. Main Text Info Panel
         const infoPanel = document.createElement("div");
         infoPanel.id = "hud-info-panel";
         infoPanel.className = "hud-panel";
@@ -367,7 +693,6 @@ export function ensureOverlay(getActiveRoom: () => any, getActionContext: () => 
         infoPanel.appendChild(textDiv);
         overlay.appendChild(infoPanel);
 
-        // 2. Team Roster Panel
         const rosterDiv = document.createElement("div");
         rosterDiv.id = "team-roster";
         rosterDiv.className = "hud-panel";
@@ -376,7 +701,6 @@ export function ensureOverlay(getActiveRoom: () => any, getActionContext: () => 
 
         document.body.appendChild(overlay);
 
-        // --- PLAYER VITALS (Old Style Fallback for Safety) ---
         let playerVitals = document.getElementById("player-vitals");
         if (!playerVitals) {
             playerVitals = document.createElement("div");
@@ -384,11 +708,10 @@ export function ensureOverlay(getActiveRoom: () => any, getActionContext: () => 
             playerVitals.style.position = "fixed";
             playerVitals.style.top = "20px";
             playerVitals.style.left = "20px";
-            playerVitals.style.display = "none"; // Hide standard vitals since bottom-center has them
+            playerVitals.style.display = "none"; 
             document.body.appendChild(playerVitals);
         }
 
-        // --- FAMILIAR FRAME (Phase 4) ---
         let familiarFrame = document.getElementById("familiar-frame");
         if (!familiarFrame) {
             familiarFrame = document.createElement("div");
@@ -414,7 +737,6 @@ export function ensureOverlay(getActiveRoom: () => any, getActionContext: () => 
             document.body.appendChild(familiarFrame);
         }
 
-        // --- BUFF CONTAINER ---
         let buffContainer = document.getElementById("buff-container");
         if (!buffContainer) {
             buffContainer = document.createElement("div");
@@ -430,7 +752,6 @@ export function ensureOverlay(getActiveRoom: () => any, getActionContext: () => 
             document.body.appendChild(buffContainer);
         }
 
-        // --- GLOBAL EVENT BANNER ---
         let globalEventBanner = document.getElementById("global-event-banner");
         if (!globalEventBanner) {
             globalEventBanner = document.createElement("div");
@@ -458,7 +779,6 @@ export function ensureOverlay(getActiveRoom: () => any, getActionContext: () => 
             document.body.appendChild(globalEventBanner);
         }
 
-        // --- INTERACTION PROMPT ---
         let interactionPrompt = document.getElementById("interaction-prompt");
         if (!interactionPrompt) {
             interactionPrompt = document.createElement("div");
@@ -478,11 +798,10 @@ export function ensureOverlay(getActiveRoom: () => any, getActionContext: () => 
             interactionPrompt.style.fontSize = "18px";
             interactionPrompt.style.boxShadow = "0 0 10px rgba(255,255,255,0.5)";
             interactionPrompt.style.zIndex = "50";
-            interactionPrompt.innerText = "Press [E] to Interact";
+            interactionPrompt.innerText = "Press [F] to Interact";
             document.body.appendChild(interactionPrompt);
         }
 
-        // --- EVENT POINTER CONTAINER (DIABLO-STYLE) ---
         let pointersContainer = document.getElementById("event-pointers-container");
         if (!pointersContainer) {
             pointersContainer = document.createElement("div");
@@ -490,7 +809,6 @@ export function ensureOverlay(getActiveRoom: () => any, getActionContext: () => 
             document.body.appendChild(pointersContainer);
         }
 
-        // --- STATS TOP RIGHT PANEL ---
         let topRightDiv = document.createElement("div");
         topRightDiv.id = "hud-top-right";
         topRightDiv.style.position = "fixed";
@@ -500,11 +818,10 @@ export function ensureOverlay(getActiveRoom: () => any, getActionContext: () => 
         topRightDiv.style.pointerEvents = "none";
         document.body.appendChild(topRightDiv);
 
-        // --- WAYFINDER MINIMAP CANVAS ---
         const minimapContainer = document.createElement("div");
         minimapContainer.id = "minimap-container";
         minimapContainer.style.position = "fixed";
-        minimapContainer.style.top = "70px"; // Shifted down to accommodate Stats Top Right
+        minimapContainer.style.top = "70px"; 
         minimapContainer.style.right = "15px";
         minimapContainer.style.width = "180px";
         minimapContainer.style.height = "180px";
@@ -534,14 +851,13 @@ export function ensureOverlay(getActiveRoom: () => any, getActionContext: () => 
 
         document.body.appendChild(minimapContainer);
 
-        // --- COORDS ---
         let coordDiv = document.getElementById("hud-coords");
         if (!coordDiv) {
             coordDiv = document.createElement("div");
             coordDiv.id = "hud-coords";
             coordDiv.className = "hud-header text-muted";
             coordDiv.style.position = "fixed";
-            coordDiv.style.top = "270px"; // Shifted down for minimap
+            coordDiv.style.top = "270px"; 
             coordDiv.style.right = "15px";
             coordDiv.style.fontSize = "12px";
             coordDiv.style.textAlign = "right";
@@ -550,14 +866,13 @@ export function ensureOverlay(getActiveRoom: () => any, getActionContext: () => 
             document.body.appendChild(coordDiv);
         }
 
-        // --- QUEST TRACKER (ONBOARDING) ---
         let questTracker = document.getElementById("quest-tracker");
         if (!questTracker) {
             questTracker = document.createElement("div");
             questTracker.id = "quest-tracker";
             questTracker.className = "hud-panel";
             questTracker.style.position = "fixed";
-            questTracker.style.top = "310px"; // Below coords
+            questTracker.style.top = "310px"; 
             questTracker.style.right = "15px";
             questTracker.style.width = "220px";
             questTracker.style.display = "none";
@@ -573,13 +888,11 @@ export function ensureOverlay(getActiveRoom: () => any, getActionContext: () => 
             document.body.appendChild(questTracker);
         }
 
-        // --- ZONE POPUP CONTAINER ---
         let zonePopup = document.createElement("div");
         zonePopup.id = "zone-popup";
         zonePopup.className = "zone-popup";
         document.body.appendChild(zonePopup);
 
-        // --- EVENT LOG CONTAINER ---
         let eventLog = document.getElementById("event-log-container");
         if (!eventLog) {
             eventLog = document.createElement("div");
@@ -587,7 +900,6 @@ export function ensureOverlay(getActiveRoom: () => any, getActionContext: () => 
             document.body.appendChild(eventLog);
         }
 
-        // --- TEAM MANAGER MODAL (Opened via ESC) ---
         let teamModal = document.getElementById("team-manager-modal");
         if (!teamModal) {
             teamModal = document.createElement("div");
@@ -635,7 +947,6 @@ export function ensureOverlay(getActiveRoom: () => any, getActionContext: () => 
             });
         }
 
-        // --- CRAFTING MODAL (Opened via Blacksmith NPC) ---
         let craftModal = document.getElementById("crafting-modal");
         if (!craftModal) {
             craftModal = document.createElement("div");
@@ -673,7 +984,6 @@ export function ensureOverlay(getActiveRoom: () => any, getActionContext: () => 
             });
         }
 
-        // --- WORLD MAP MODAL ---
         const worldMapContainer = document.createElement("div");
         worldMapContainer.id = "world-map-modal";
         worldMapContainer.className = "hud-panel";
@@ -756,7 +1066,6 @@ export function ensureOverlay(getActiveRoom: () => any, getActionContext: () => 
             worldMapContainer.style.display = "none";
         };
 
-        // --- STORE POPUP ---
         let storePopup = document.getElementById("store-popup");
         if (!storePopup) {
             storePopup = document.createElement("div");
@@ -770,11 +1079,10 @@ export function ensureOverlay(getActiveRoom: () => any, getActionContext: () => 
             document.body.appendChild(storePopup);
         }
 
-        // --- AURA & RESOURCES BOTTOM CENTER ---
         const bottomCenterContainer = document.createElement("div");
         bottomCenterContainer.id = "hud-bottom-center";
         bottomCenterContainer.style.position = "fixed";
-        bottomCenterContainer.style.bottom = "110px"; // Shifted up above hotbar
+        bottomCenterContainer.style.bottom = "110px"; 
         bottomCenterContainer.style.left = "50%";
         bottomCenterContainer.style.transform = "translateX(-50%)";
         bottomCenterContainer.style.display = "flex";
@@ -803,7 +1111,6 @@ export function ensureOverlay(getActiveRoom: () => any, getActionContext: () => 
 
         document.body.appendChild(bottomCenterContainer);
 
-        // --- TACTICAL ALERT OVERLAY ---
         let tacOverlay = document.getElementById("tac-alert");
         if (!tacOverlay) {
             tacOverlay = document.createElement("div");
@@ -818,7 +1125,6 @@ export function ensureOverlay(getActiveRoom: () => any, getActionContext: () => 
             document.body.appendChild(tacOverlay);
         }
 
-        // --- MEDITATION QUIZ UI ---
         let medUI = document.getElementById("meditation-ui");
         if (!medUI) {
             medUI = document.createElement("div");
@@ -839,7 +1145,6 @@ export function ensureOverlay(getActiveRoom: () => any, getActionContext: () => 
             document.body.appendChild(medUI);
         }
         
-        // --- BOTTOM RIGHT: HARNESS MANA & CONTROLS ---
         let bottomRightContainer = document.getElementById("hud-bottom-right");
         if(!bottomRightContainer) {
             bottomRightContainer = document.createElement("div");
@@ -883,7 +1188,6 @@ export function ensureOverlay(getActiveRoom: () => any, getActionContext: () => 
             `;
             document.body.appendChild(bottomRightContainer);
 
-            // Harness Mana Click Logic
             document.getElementById("btn-harness-mana")!.onclick = () => {
                 const ctx = getActionContext();
                 const activeRoom = getActiveRoom();
@@ -896,7 +1200,6 @@ export function ensureOverlay(getActiveRoom: () => any, getActionContext: () => 
                 }
             };
 
-            // Toggle Controls Logic
             document.getElementById("btn-toggle-controls")!.onclick = () => {
                 const combat = document.getElementById("controls-combat")!;
                 const other = document.getElementById("controls-other")!;
@@ -931,12 +1234,11 @@ export function updateHUD(
     TOWN_COLLIDERS: any[],
     MARKET_STALLS: any[],
     CASINO_TABLES: any[],
-    isLocallyWolf: boolean
+    isLocallyWolf: boolean  // <--- Add this line back in!
 ) {
     if (!me || !activeRoom) return;
     const state = activeRoom.state;
 
-    // --- TICK GLOBAL EVENT TIMER ---
     const eventDiv = document.getElementById("hud-global-event");
     if (eventDiv && nextEventTargetTime > 0) {
         const timeLeftSeconds = Math.max(0, Math.floor((nextEventTargetTime - Date.now()) / 1000));
@@ -958,7 +1260,6 @@ export function updateHUD(
         eventDiv.style.display = "none";
     }
 
-    // --- TEAM ROSTER UPDATE LOGIC ---
     const rosterDiv = document.getElementById("team-roster");
     if (rosterDiv) {
         if (me.teamId && me.teamId > 0) {
@@ -972,7 +1273,6 @@ export function updateHUD(
                 }
             });
 
-            // Sort members so the leader is at the top
             teamMembers.sort((a, b) => (b.isTeamLeader ? 1 : 0) - (a.isTeamLeader ? 1 : 0));
 
             teamMembers.forEach(member => {
@@ -1000,7 +1300,6 @@ export function updateHUD(
         }
     }
 
-    // --- A. MAP & WAYFINDER LOGIC ---
     if (me.skillTree && me.skillTree.activeAbilities) {
         const wayNode = me.skillTree.activeAbilities.get("wayfinder_base");
         const wayRank = wayNode?.upgrades.get("core_progression")?.currentRank || 0;
@@ -1186,7 +1485,6 @@ export function updateHUD(
         }
     }
 
-    // --- B. EQUIPPED ITEM SLOT ---
     const slot = document.getElementById("equipped-slot");
     if (slot) {
         if (me.equippedItem) {
@@ -1210,7 +1508,6 @@ export function updateHUD(
         }
     }
 
-    // --- C. HUD TEXT ELEMENTS ---
     const textDiv = document.getElementById("hud-text");
     const storePopup = document.getElementById("store-popup");
 
@@ -1261,7 +1558,6 @@ export function updateHUD(
         `;
     }
 
-    // --- TOP RIGHT STATS ---
     const topRightDiv = document.getElementById("hud-top-right");
     if (topRightDiv) {
         const rankColorMap: Record<string, string> = {
@@ -1277,7 +1573,6 @@ export function updateHUD(
         `;
     }
 
-    // --- PHASE 4: UPDATE FAMILIAR FRAME ---
     const famFrame = document.getElementById("familiar-frame");
     const famHpBar = document.getElementById("fam-hp-bar");
     const famStatus = document.getElementById("fam-status-text");
@@ -1292,7 +1587,6 @@ export function updateHUD(
             famIcon.innerText = FAMILIAR_ICONS[familiar.type] || "🔮";
             famName.innerText = familiar.name;
 
-            // Health / Death Status
             if (familiar.hp > 0) {
                 const hpPct = Math.max(0, Math.min(100, (familiar.hp / familiar.maxHp) * 100));
                 famHpBar.style.width = `${hpPct}%`;
@@ -1305,12 +1599,11 @@ export function updateHUD(
                     famStatus.innerText = "Attacking";
                     famStatus.style.color = "#ff4444";
                 } else {
-                    famStatus.innerText = ""; // Orbiting cleanly
+                    famStatus.innerText = ""; 
                 }
             } else {
-                // Familiar is dead/recovering
                 famHpBar.style.width = `100%`;
-                famHpBar.style.background = "#444"; // Greyed out
+                famHpBar.style.background = "#444"; 
                 famStatus.style.color = "#ff4444";
                 
                 if (familiar.actionTimer > 0) {
@@ -1324,7 +1617,6 @@ export function updateHUD(
         }
     }
 
-    // --- ZONE LOGIC & POPUP ---
     const isTownScene = activeScene && activeScene.constructor.name === "TownScene";
     const isOutsideTown = isTownScene && activeScene.isOutsideTown(localPlayerPos.x, localPlayerPos.y);
     const isSafeZone = isTownScene && !isOutsideTown;
@@ -1378,7 +1670,6 @@ export function updateHUD(
         }
     }
 
-    // --- CONTEXTUAL ACTIONS (TOP LEFT) ---
     if (textDiv) {
         const isBuyMode = isTownScene && activeScene.isBuyMode;
         const isBuildMode = isTownScene && activeScene.isBuildMode;
@@ -1386,7 +1677,7 @@ export function updateHUD(
 
         let nearestScenery: any = null;
         let nearestSceneryDist = 999;
-        const nearbyInteractionScenery = clientSceneryGrid.getNearby(localPlayerPos.x, localPlayerPos.y, 4.5);
+        const nearbyInteractionScenery = clientSceneryGrid?.getNearby(localPlayerPos.x, localPlayerPos.y, 4.5) || [];
         for (const scenery of nearbyInteractionScenery) {
             const d = distance(localPlayerPos.x, localPlayerPos.y, scenery.x, scenery.y);
             if (d < 4.5 && d < nearestSceneryDist) {
@@ -1405,7 +1696,7 @@ export function updateHUD(
                     isNearGiantGod = true;
                 }
 
-                if (!isNearGiantGod) {
+                if (!isNearGiantGod && MARKET_STALLS) {
                     for (const stall of MARKET_STALLS) {
                         if (distance(localPlayerPos.x, localPlayerPos.y, stall.x, stall.y) < 6.0) {
                             activeStall = stall;
@@ -1413,7 +1704,7 @@ export function updateHUD(
                         }
                     }
 
-                    if (!activeStall) {
+                    if (!activeStall && CASINO_TABLES) {
                         for (const table of CASINO_TABLES) {
                             if (distance(localPlayerPos.x, localPlayerPos.y, table.x, table.y) < 4.0) {
                                 activeCasino = table;
@@ -1426,13 +1717,13 @@ export function updateHUD(
 
             if (isNearGiantGod) {
                 storePopup.style.display = "block";
-                storePopup.innerHTML = `<div class="hud-header text-green text-xl mb-1"><i class="fa-solid fa-monument"></i> Lord Protector</div><div class="text-muted text-sm"><span class="hud-key">E</span> Talk</div>`;
+                storePopup.innerHTML = `<div class="hud-header text-green text-xl mb-1"><i class="fa-solid fa-monument"></i> Lord Protector</div><div class="text-muted text-sm"><span class="hud-key">F</span> Talk</div>`;
             } else if (activeStall) {
                 storePopup.style.display = "block";
-                storePopup.innerHTML = `<div class="hud-header text-amber text-xl mb-1"><i class="fa-solid fa-store"></i> ${activeStall.type}</div><div class="text-muted text-sm"><span class="hud-key">E</span> Shop</div>`;
+                storePopup.innerHTML = `<div class="hud-header text-amber text-xl mb-1"><i class="fa-solid fa-store"></i> ${activeStall.type}</div><div class="text-muted text-sm"><span class="hud-key">F</span> Shop</div>`;
             } else if (activeCasino) {
                 storePopup.style.display = "block";
-                storePopup.innerHTML = `<div class="hud-header text-magenta text-xl mb-1"><i class="fa-solid fa-dice"></i> ${activeCasino.type}</div><div class="text-muted text-sm"><span class="hud-key">E</span> Gamble</div>`;
+                storePopup.innerHTML = `<div class="hud-header text-magenta text-xl mb-1"><i class="fa-solid fa-dice"></i> ${activeCasino.type}</div><div class="text-muted text-sm"><span class="hud-key">F</span> Gamble</div>`;
             } else {
                 storePopup.style.display = "none";
             }
@@ -1466,12 +1757,11 @@ export function updateHUD(
             if (isSafeZone && (isBuyMode || isBuildMode)) {
                 overlayText = `<div class="text-red text-md" style="margin-top: 8px;"><i class="fa-solid fa-ban"></i> Cannot modify land inside Town walls!</div>`;
             } else if (!isSafeZone) {
-                // ADDED: Fishing Context Action
                 if (isTownScene) {
                     const lakeX = -180;
                     const lakeZ = 180;
-                    const distSq = (localPlayerPos.x - lakeX) ** 2 + (localPlayerPos.y - lakeZ) ** 2;
-                    if (distSq <= 2025.0) { // 45^2
+                    const distSqValue = (localPlayerPos.x - lakeX) ** 2 + (localPlayerPos.y - lakeZ) ** 2;
+                    if (distSqValue <= 2025.0) { // 45^2
                         interactText += `<div class="text-blue animate-pulse text-md mt-2"><i class="fa-solid fa-fish"></i> <span class="hud-key">F</span> Cast Fishing Line</div>`;
                     }
                 }
@@ -1497,11 +1787,36 @@ export function updateHUD(
                     });
                 }
 
+                // Add Giant God to context text
+                if (isSafeZone && !ctx.isUIOpen && !me.isSleeping && !me.isMeditating && distance(localPlayerPos.x, localPlayerPos.y, 35, -35) < 18.0) {
+                    interactText += `<div class="text-green animate-pulse text-md mt-2"><i class="fa-solid fa-monument"></i> <span class="hud-key">F</span> Talk to Lord Protector</div>`;
+                }
+
+                // Add Stalls to context text
+                if (isSafeZone && !ctx.isUIOpen && !me.isSleeping && !me.isMeditating && MARKET_STALLS) {
+                    for (const stall of MARKET_STALLS) {
+                        if (distance(localPlayerPos.x, localPlayerPos.y, stall.x, stall.y) < 6.0) {
+                            interactText += `<div class="text-amber animate-pulse text-md mt-2"><i class="fa-solid fa-store"></i> <span class="hud-key">F</span> Browse ${stall.type}</div>`;
+                            break;
+                        }
+                    }
+                }
+
+                // Add Casino to context text
+                if (isSafeZone && !ctx.isUIOpen && !me.isSleeping && !me.isMeditating && CASINO_TABLES) {
+                    for (const table of CASINO_TABLES) {
+                        if (distance(localPlayerPos.x, localPlayerPos.y, table.x, table.y) < 4.0) {
+                            interactText += `<div class="text-magenta animate-pulse text-md mt-2"><i class="fa-solid fa-dice"></i> <span class="hud-key">F</span> Play ${table.type}</div>`;
+                            break;
+                        }
+                    }
+                }
+
                 if (nearestDeco && !isBuildMode && !isBuyMode && !isDecoModeActive) {
                     if (nearestDeco.type === "Storage Chest") {
-                        interactText += `<div class="text-cyan text-md mt-2"><i class="fa-solid fa-box-archive"></i> <span class="hud-key">E</span> Open Chest</div>`;
+                        interactText += `<div class="text-cyan text-md mt-2"><i class="fa-solid fa-box-archive"></i> <span class="hud-key">F</span> Open Chest</div>`;
                     } else if (nearestDeco.type === "Oak Bed") {
-                        interactText += `<div class="text-amber text-md mt-2"><i class="fa-solid fa-bed"></i> <span class="hud-key">E</span> Sleep</div>`;
+                        interactText += `<div class="text-amber text-md mt-2"><i class="fa-solid fa-bed"></i> <span class="hud-key">F</span> Sleep</div>`;
                     }
                 }
 
@@ -1564,7 +1879,6 @@ export function updateHUD(
 
         const topHeader = `<div class="hud-header text-muted text-sm" style="margin-bottom: 2px;"><i class="fa-solid fa-server"></i> SAO Tower</div>`;
 
-        // Before injecting the string into the UI, suppress if not unlocked yet
         if (!me.hasUnlockedBuilding) {
             landText = "";
             buildText = "";
@@ -1580,7 +1894,6 @@ export function updateHUD(
         `.trim();
     }
 
-    // --- PROGRESSIVE DISCLOSURE LOGIC ---
     const ctrlSkillTree = document.getElementById("ctrl-skilltree");
     const ctrlMeditate = document.getElementById("ctrl-meditate");
     const ctrlBuyLand = document.getElementById("ctrl-buy-land");
@@ -1593,7 +1906,6 @@ export function updateHUD(
     const questText = document.getElementById("quest-text");
 
     if (me) {
-        // Skill Tree & Aura/Meditation Unlocks
         if (me.hasUnlockedSkillTree) {
             if (ctrlSkillTree) ctrlSkillTree.style.display = "flex";
             if (ctrlMeditate) ctrlMeditate.style.display = "flex";
@@ -1602,11 +1914,10 @@ export function updateHUD(
         } else {
             if (ctrlSkillTree) ctrlSkillTree.style.display = "none";
             if (ctrlMeditate) ctrlMeditate.style.display = "none";
-            if (auraHUDDiv) auraHUDDiv.style.display = "none"; // Completely hides the Mana/Aura bar
+            if (auraHUDDiv) auraHUDDiv.style.display = "none"; 
             if (btnHarnessMana) btnHarnessMana.style.display = "none";
         }
 
-        // Base Building Unlocks
         if (me.hasUnlockedBuilding) {
             if (ctrlBuyLand) ctrlBuyLand.style.display = "flex";
             if (ctrlBuildMode) ctrlBuildMode.style.display = "flex";
@@ -1615,18 +1926,16 @@ export function updateHUD(
             if (ctrlBuildMode) ctrlBuildMode.style.display = "none";
         }
 
-        // Familiar Spells only show if they actually have a familiar equipped
         if (ctrlFamiliar) {
             ctrlFamiliar.style.display = me.mountedFamiliarId ? "flex" : "none";
         }
 
-        // --- DYNAMIC ONBOARDING QUEST INJECTION ---
         if (questTracker && questText) {
             let currentQuest = "";
 
-            if (me.activeQuests.has("tutorial_1_fish")) {
+            if (me.activeQuests && me.activeQuests.has("tutorial_1_fish")) {
                 currentQuest = `<b>Survival 101:</b> The town needs food. Head to the lake to the North-West (X: -180, Z: 180) and press <span class="hud-key">F</span> to cast your line.`;
-            } else if (me.activeQuests.has("tutorial_2_tree")) {
+            } else if (me.activeQuests && me.activeQuests.has("tutorial_2_tree")) {
                 const prog = me.activeQuests.get("tutorial_2_tree").currentAmount;
                 currentQuest = `<b>Survival 102:</b> Excellent catch. Now we need materials. Find a tree and attack it to gather Wood. (${prog}/3)`;
             } else if (!me.hasUnlockedSkillTree) {
@@ -1645,7 +1954,6 @@ export function updateHUD(
     }
 }
 
-// --- 3. CRAFTING MENU RENDERER ---
 export function openCraftingMenu(activeRoom: any, playerState: any) {
     const modal = document.getElementById("crafting-modal");
     const list = document.getElementById("crafting-recipe-list");
@@ -1691,14 +1999,12 @@ export function openCraftingMenu(activeRoom: any, playerState: any) {
             const recipeId = (e.currentTarget as HTMLElement).getAttribute("data-recipe");
             if (recipeId) {
                 activeRoom.send("craftItem", { recipeId });
-                // Re-render instantly to update material counts and disable buttons if broke
                 setTimeout(() => openCraftingMenu(activeRoom, playerState), 100); 
             }
         });
     });
 }
 
-// --- 4. STORE MANAGEMENT MENU ---
 export function openStoreMenu(activeRoom: any, playerState: any, storeState: any) {
     let modal = document.getElementById("store-management-modal");
     if (!modal) {
@@ -1752,7 +2058,6 @@ export function openStoreMenu(activeRoom: any, playerState: any, storeState: any
             <div style="display: flex; flex-direction: column; gap: 10px;">
         `;
         
-        // Owner Production View
         storeState.inventory.forEach((item: any, itemName: string) => {
             const recipe = STORE_RECIPES[itemName];
             if (!recipe) return; 
@@ -1780,7 +2085,6 @@ export function openStoreMenu(activeRoom: any, playerState: any, storeState: any
         });
         html += `</div>`;
     } else {
-        // Customer Shopping View
         html += `
             <div class="text-muted text-sm" style="margin-top: 10px; text-align: center;">Owned by <span class="text-amber">${storeState.ownerName}</span></div>
             <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 15px;">
@@ -1806,7 +2110,6 @@ export function openStoreMenu(activeRoom: any, playerState: any, storeState: any
     modal.innerHTML = html;
     modal.style.display = "block";
 
-    // --- ATTACH LISTENERS ---
     const btnBuyProp = document.getElementById("btn-buy-property");
     if (btnBuyProp) {
         btnBuyProp.onclick = () => { activeRoom.send("buyStore", { storeId: storeState.id }); setTimeout(() => openStoreMenu(activeRoom, playerState, storeState), 100); };

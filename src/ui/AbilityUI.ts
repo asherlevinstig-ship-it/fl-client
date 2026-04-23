@@ -72,8 +72,143 @@ function injectGlobalChunkyStyles() {
             .chunky-panel {
                 background: #334155; border-radius: 16px; padding: 15px; border: 3px solid #475569;
             }
+
+            /* --- HUD STYLES --- */
+            #chunky-hud-container {
+                position: fixed;
+                top: 20px;
+                left: 20px;
+                display: flex;
+                flex-direction: column;
+                gap: 12px;
+                z-index: 50;
+                font-family: 'Nunito', 'Segoe UI Rounded', sans-serif;
+                pointer-events: none; 
+            }
+            .hud-bar-bg {
+                width: 250px;
+                height: 32px;
+                background: #1e293b;
+                border: 4px solid #475569;
+                border-radius: 16px;
+                position: relative;
+                overflow: hidden;
+                box-shadow: 0 8px 15px rgba(0,0,0,0.3);
+            }
+            .hud-bar-fill {
+                height: 100%;
+                border-radius: 10px;
+                transition: width 0.2s ease-out;
+                position: relative;
+            }
+            .hud-bar-fill::after {
+                content: '';
+                position: absolute;
+                top: 2px;
+                left: 2px;
+                right: 2px;
+                height: 8px;
+                background: rgba(255, 255, 255, 0.3);
+                border-radius: 6px;
+            }
+            .hud-icon {
+                position: absolute;
+                left: -15px;
+                top: -10px;
+                font-size: 36px;
+                filter: drop-shadow(0 4px 0 rgba(0,0,0,0.4));
+                z-index: 2;
+            }
+            .hud-text {
+                position: absolute;
+                right: 12px;
+                top: 50%;
+                transform: translateY(-50%);
+                color: white;
+                font-weight: 900;
+                font-size: 14px;
+                text-shadow: 0 2px 0 rgba(0,0,0,0.5);
+                z-index: 2;
+            }
+            .fill-hp { background: #ef4444; border-right: 2px solid #b91c1c; }
+            .fill-mp { background: #3b82f6; border-right: 2px solid #2563eb; }
+            .fill-stamina { background: #eab308; border-right: 2px solid #b45309; z-index: 1;}
+            .fill-hunger-cap { 
+                position: absolute; 
+                right: 0; top: 0; height: 100%; 
+                background: repeating-linear-gradient(45deg, #7f1d1d, #7f1d1d 10px, #991b1b 10px, #991b1b 20px); 
+                z-index: 0;
+            }
         `;
         document.head.appendChild(style);
+    }
+}
+
+// --- EXPORTED HUD RENDERING ---
+export function renderChunkyHUD(player: any) {
+    if (!player) return;
+    injectGlobalChunkyStyles();
+
+    let hud = document.getElementById("chunky-hud-container");
+    
+    // Create the HUD structure if it doesn't exist yet
+    if (!hud) {
+        hud = document.createElement("div");
+        hud.id = "chunky-hud-container";
+        hud.innerHTML = `
+            <div style="position: relative; margin-left: 15px;">
+                <div class="hud-icon">❤️</div>
+                <div class="hud-bar-bg">
+                    <div id="hud-hp-fill" class="hud-bar-fill fill-hp" style="width: 100%;"></div>
+                    <div id="hud-hp-text" class="hud-text">100 / 100</div>
+                </div>
+            </div>
+            <div style="position: relative; margin-left: 15px;">
+                <div class="hud-icon">⚡</div>
+                <div class="hud-bar-bg">
+                    <div id="hud-mp-fill" class="hud-bar-fill fill-mp" style="width: 100%;"></div>
+                    <div id="hud-mp-text" class="hud-text">100 / 100</div>
+                </div>
+            </div>
+            <div style="position: relative; margin-left: 15px;" title="Eat food to restore your maximum stamina!">
+                <div class="hud-icon">🍗</div>
+                <div class="hud-bar-bg" style="border-color: #b45309;">
+                    <div id="hud-hunger-fill" class="fill-hunger-cap" style="width: 0%;"></div>
+                    <div id="hud-stamina-fill" class="hud-bar-fill fill-stamina" style="width: 100%;"></div>
+                    <div id="hud-stamina-text" class="hud-text">100 / 100</div>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(hud);
+    }
+
+    // Update existing HUD elements without recreating the DOM
+    const hpPct = Math.max(0, Math.min(100, (player.hp / player.maxHp) * 100));
+    const mpPct = Math.max(0, Math.min(100, (player.mp / player.maxMp) * 100));
+    const staminaPct = Math.max(0, Math.min(100, (player.stamina / player.maxStamina) * 100));
+    const hungerDeficitPct = 100 - Math.max(0, Math.min(100, (player.hunger / player.maxHunger) * 100));
+
+    const hpFill = document.getElementById("hud-hp-fill");
+    const hpText = document.getElementById("hud-hp-text");
+    if (hpFill && hpText) {
+        hpFill.style.width = `${hpPct}%`;
+        hpText.innerText = `${Math.ceil(player.hp)} / ${player.maxHp}`;
+    }
+
+    const mpFill = document.getElementById("hud-mp-fill");
+    const mpText = document.getElementById("hud-mp-text");
+    if (mpFill && mpText) {
+        mpFill.style.width = `${mpPct}%`;
+        mpText.innerText = `${Math.ceil(player.mp)} / ${player.maxMp}`;
+    }
+
+    const stamFill = document.getElementById("hud-stamina-fill");
+    const hungerFill = document.getElementById("hud-hunger-fill");
+    const stamText = document.getElementById("hud-stamina-text");
+    if (stamFill && hungerFill && stamText) {
+        stamFill.style.width = `${staminaPct}%`;
+        hungerFill.style.width = `${hungerDeficitPct}%`;
+        stamText.innerText = `${Math.ceil(player.stamina)} / ${Math.ceil(player.hunger)}`;
     }
 }
 
@@ -914,7 +1049,7 @@ export async function showCharacterCreation(): Promise<{ classId: string, pathwa
     const container = document.createElement("div");
     container.style.position = "fixed"; container.style.top = "0"; container.style.left = "0";
     container.style.width = "100vw"; container.style.height = "100vh";
-    container.style.background = "#0f172a"; // Solid dark blue instead of gritty gradient
+    container.style.background = "#0f172a"; 
     container.style.zIndex = "9999"; container.style.display = "flex";
     container.style.flexDirection = "column"; container.style.alignItems = "center";
     container.style.justifyContent = "center"; 

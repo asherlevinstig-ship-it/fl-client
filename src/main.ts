@@ -7,6 +7,7 @@ import { MazeScene } from "./game/MazeScene";
 import { UnderworldScene } from "./game/UnderworldScene";
 import { FloorFieldState } from "./schema/FloorFieldState";
 import { ITEM_DB } from "./ItemDatabase";
+import { QUEST_DB } from "./QuestDatabase"; 
 
 // --- ABILITY UI IMPORTS ---
 import { 
@@ -40,7 +41,8 @@ import {
   isShopUIOpen,
   refreshInventoryUI,
   refreshChestUI,
-  refreshShopUI
+  refreshShopUI,
+  renderChunkyHUD
 } from "./ui/ModalManager";
 
 // --- HUD MANAGER IMPORTS ---
@@ -160,7 +162,7 @@ function getHeightCached(x: number, z: number): number {
             if (h !== undefined && h !== null && !isNaN(h)) {
                 heightCache.set(key, h);
             } else {
-                return 0; // Return safe default but DO NOT cache early failures
+                return 0; 
             }
         } catch (e) {
             return 0; 
@@ -323,6 +325,58 @@ function initAdminPanel() {
     panel.appendChild(closeText);
 
     document.body.appendChild(panel);
+}
+
+// --- CHUNKY QUEST TRACKER UI ---
+export function renderQuestTracker(me: any) {
+    let tracker = document.getElementById("quest-tracker");
+    if (!tracker) {
+        tracker = document.createElement("div");
+        tracker.id = "quest-tracker";
+        tracker.style.position = "fixed";
+        tracker.style.top = "20px";
+        tracker.style.right = "20px";
+        tracker.style.display = "flex";
+        tracker.style.flexDirection = "column";
+        tracker.style.gap = "15px";
+        tracker.style.zIndex = "40";
+        tracker.style.fontFamily = "'Nunito', 'Segoe UI Rounded', sans-serif";
+        tracker.style.pointerEvents = "none";
+        document.body.appendChild(tracker);
+    }
+
+    let html = "";
+    if (me && me.activeQuests && me.activeQuests.size > 0) {
+        me.activeQuests.forEach((qState: any, qId: string) => {
+            const def = QUEST_DB[qId];
+            if (def) {
+                const reqAmt = def.objectives[0]?.requiredAmount || 1;
+                const curAmt = qState.currentAmount || 0;
+                const pct = Math.min(100, (curAmt / reqAmt) * 100);
+
+                html += `
+                    <div style="background: #1e293b; border: 4px solid #38bdf8; border-radius: 20px; padding: 15px; width: 280px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); pointer-events: auto;">
+                        <div style="color: #fde047; font-size: 18px; font-weight: 900; text-transform: uppercase; border-bottom: 4px solid #334155; padding-bottom: 8px; margin-bottom: 10px; display: flex; align-items: center; gap: 8px;">
+                            <span style="font-size: 24px; filter: drop-shadow(0 2px 0 rgba(0,0,0,0.5));">📜</span> ${def.title}
+                        </div>
+                        <div style="color: #f8fafc; font-size: 14px; font-weight: 700; line-height: 1.4; margin-bottom: 15px;">
+                            ${def.dialogue.replace(/<span class='hud-key'>/g, "<span style='background: white; color: #1e293b; padding: 2px 6px; border-radius: 6px; border: 2px solid #cbd5e1; font-weight: 900; font-size: 12px;'>")}
+                        </div>
+                        <div style="background: #0f172a; padding: 10px; border-radius: 12px; border: 3px solid #334155;">
+                            <div style="color: #38bdf8; font-size: 12px; font-weight: 900; margin-bottom: 6px; text-transform: uppercase;">Objective Progress:</div>
+                            <div style="width: 100%; height: 14px; background: #1e293b; border-radius: 7px; overflow: hidden; border: 2px solid #475569;">
+                                <div style="width: ${pct}%; height: 100%; background: #22c55e; border-right: 2px solid #16a34a; transition: width 0.3s ease;"></div>
+                            </div>
+                            <div style="text-align: right; color: #fff; font-size: 14px; font-weight: 900; margin-top: 6px;">
+                                ${curAmt} / ${reqAmt}
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+        });
+    }
+    tracker.innerHTML = html;
 }
 
 // --- COLYSEUS HYDRATION HELPER ---
@@ -2049,11 +2103,13 @@ function startHudLoop(): void {
   let lastTime = performance.now();
   let timeSinceLastInput = 0; 
   let wasInputting = false; 
-let frameCount = 0; // 1️⃣ ADD THIS LINE HERE
+  let frameCount = 0; 
+
   const tick = () => {
     const now = performance.now(); 
     const dt = Math.min((now - lastTime) / 1000, 0.1); 
     lastTime = now;
+    frameCount++;
 
     tickCooldownsUI(dt);
     updateDayNightCycle(dt);
@@ -2081,6 +2137,12 @@ let frameCount = 0; // 1️⃣ ADD THIS LINE HERE
           refreshInventoryUI(activeRoom, PLAYER_CLASS);
           if (isShopUIOpen) refreshShopUI(activeRoom);
           if (isChestUIOpen) refreshChestUI(activeRoom);
+      }
+
+      // --- CHUNKY HUD & QUEST TRACKER UPDATE ---
+      if (frameCount % 10 === 0) {
+          renderChunkyHUD(me);
+          renderQuestTracker(me);
       }
 
       const ctx = getActionContext();

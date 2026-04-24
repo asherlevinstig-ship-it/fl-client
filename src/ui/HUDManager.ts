@@ -947,7 +947,7 @@ export function updateHUD(
     if (!me || !activeRoom) return;
     const state = activeRoom.state;
 
-    const eventDiv = document.getElementById("hud-global-event");
+   const eventDiv = document.getElementById("global-event-banner");
     if (eventDiv && nextEventTargetTime > 0) {
         const timeLeftSeconds = Math.max(0, Math.floor((nextEventTargetTime - Date.now()) / 1000));
         const m = Math.floor(timeLeftSeconds / 60).toString().padStart(2, "0");

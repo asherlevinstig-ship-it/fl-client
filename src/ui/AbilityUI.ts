@@ -132,13 +132,17 @@ function injectGlobalChunkyStyles() {
             }
             .fill-hp { background: #ef4444; border-right: 2px solid #b91c1c; }
             .fill-mp { background: #3b82f6; border-right: 2px solid #2563eb; }
-            .fill-stamina { background: #eab308; border-right: 2px solid #b45309; z-index: 1;}
-            .fill-hunger-cap { 
-                position: absolute; 
-                right: 0; top: 0; height: 100%; 
-                background: repeating-linear-gradient(45deg, #7f1d1d, #7f1d1d 10px, #991b1b 10px, #991b1b 20px); 
-                z-index: 0;
-            }
+            .fill-stamina { 
+    background: #eab308; 
+    border-right: 2px solid #b45309; 
+    z-index: 0; /* Lowered from 1 */
+}
+.fill-hunger-cap { 
+    position: absolute; 
+    right: 0; top: 0; height: 100%; 
+    background: repeating-linear-gradient(45deg, #7f1d1d, #7f1d1d 10px, #991b1b 10px, #991b1b 20px); 
+    z-index: 1; /* Raised from 0 */
+}
         `;
         document.head.appendChild(style);
     }

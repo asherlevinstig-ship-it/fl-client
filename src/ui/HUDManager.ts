@@ -946,6 +946,7 @@ export function updateHUD(
 ) {
     if (!me || !activeRoom) return;
     const state = activeRoom.state;
+    const roomName = activeRoom.name || "";
 
    const eventDiv = document.getElementById("global-event-banner");
     if (eventDiv && nextEventTargetTime > 0) {
@@ -953,11 +954,7 @@ export function updateHUD(
         const m = Math.floor(timeLeftSeconds / 60).toString().padStart(2, "0");
         const s = (timeLeftSeconds % 60).toString().padStart(2, "0");
         
-        if (activeScene && (
-            activeScene.constructor.name === "MazeScene" || 
-            activeScene.constructor.name === "DungeonScene" || 
-            activeScene.constructor.name === "UnderworldScene"
-        )) {
+        if (roomName === "maze" || roomName === "dungeon" || roomName === "underworld") {
             eventDiv.style.display = "none";
         } else {
             eventDiv.style.display = "block";
@@ -1262,19 +1259,19 @@ export function updateHUD(
         }
     }
 
-    const isTownScene = activeScene && activeScene.constructor.name === "TownScene";
-    const isOutsideTown = isTownScene && activeScene.isOutsideTown(localPlayerPos.x, localPlayerPos.y);
+    const isTownScene = roomName === "town";
+    const isOutsideTown = isTownScene && activeScene && typeof activeScene.isOutsideTown === "function" ? activeScene.isOutsideTown(localPlayerPos.x, localPlayerPos.y) : false;
     const isSafeZone = isTownScene && !isOutsideTown;
     
     let biomeName = "The Wilderness";
     let biomeIcon = "fa-tree";
     let biomeColor = "#22c55e";
     
-    if (activeScene && activeScene.constructor.name === "MazeScene") {
+    if (roomName === "maze") {
         biomeName = "The Labyrinth"; biomeIcon = "fa-dungeon"; biomeColor = "#d946ef";
-    } else if (activeScene && activeScene.constructor.name === "DungeonScene") {
+    } else if (roomName === "dungeon") {
         biomeName = "The Goblin Cave"; biomeIcon = "fa-skull"; biomeColor = "#f59e0b";
-    } else if (activeScene && activeScene.constructor.name === "UnderworldScene") {
+    } else if (roomName === "underworld") {
         biomeName = "The Underworld (PvP Arena)"; biomeIcon = "fa-skull-crossbones"; biomeColor = "#ef4444";
     } else if (isSafeZone) {
         biomeName = "Town of Beginnings"; biomeIcon = "fa-chess-rook"; biomeColor = "#f59e0b";
@@ -1316,9 +1313,9 @@ export function updateHUD(
     }
 
     if (textDiv) {
-        const isBuyMode = isTownScene && activeScene.isBuyMode;
-        const isBuildMode = isTownScene && activeScene.isBuildMode;
-        const isDecoModeActive = isTownScene && activeScene.isDecoMode;
+        const isBuyMode = roomName === "town" && activeScene.isBuyMode;
+        const isBuildMode = roomName === "town" && activeScene.isBuildMode;
+        const isDecoModeActive = roomName === "town" && activeScene.isDecoMode;
 
         let nearestScenery: any = null;
         let nearestSceneryDist = 999;
@@ -2199,7 +2196,7 @@ export function refreshShopUI(activeRoom: any) {
 
 
 export function openBlueprintSelector(activeScene: any, keys: any) {
-    if (!activeScene || !(activeScene.constructor.name === "TownScene")) return;
+    if (!activeScene || typeof activeScene.currentBlueprintType === "undefined") return;
     injectGlobalChunkyStyles();
     
     for (const key in keys) {

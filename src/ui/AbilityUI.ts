@@ -157,6 +157,7 @@ export function renderChunkyHUD(player: any) {
 
     let hud = document.getElementById("chunky-hud-container");
     
+    // Create the HUD structure if it doesn't exist yet
     if (!hud) {
         hud = document.createElement("div");
         hud.id = "chunky-hud-container";
@@ -187,6 +188,7 @@ export function renderChunkyHUD(player: any) {
         document.body.appendChild(hud);
     }
 
+    // Update existing HUD elements without recreating the DOM
     const hpPct = Math.max(0, Math.min(100, (player.hp / player.maxHp) * 100));
     const mpPct = Math.max(0, Math.min(100, (player.mp / player.maxMp) * 100));
     const staminaPct = Math.max(0, Math.min(100, (player.stamina / player.maxStamina) * 100));
@@ -225,7 +227,6 @@ export function renderChunkyHUD(player: any) {
 }
 
 // --- EXPORTED MODAL FUNCTIONS ---
-
 export function openQuestUI(activeRoom: any, keys: any, playerName: string) {
     if (isQuestUIOpen || !activeRoom) return;
     isQuestUIOpen = true;
@@ -1179,39 +1180,75 @@ export function setAbilityUIRoom(room: any) {
     uiRoom = room;
 
     const attachListeners = (player: any) => {
-        if (player.hotbar) {
-            player.hotbar.forEach((value: string, key: string) => {
-                playerHotbar[key] = value;
-            });
+        // Safe sync function for initial load
+        const syncLocalHotbar = () => {
+            if (!player.hotbar) return;
+            if (typeof player.hotbar.forEach === "function") {
+                player.hotbar.forEach((value: string, key: string) => {
+                    playerHotbar[key] = value;
+                });
+            } else {
+                for (const key in player.hotbar) {
+                    playerHotbar[key] = player.hotbar[key];
+                }
+            }
             renderHotbar();
+        };
 
-            player.hotbar.onAdd((value: string, key: string) => {
+        syncLocalHotbar();
+
+        // Safe binding for MapSchema (Colyseus 0.14 vs 0.15+)
+        if (player.hotbar) {
+            const handleHotbarUpdate = (value: string, key: string) => {
                 playerHotbar[key] = value;
                 renderHotbar();
-            });
-            player.hotbar.onChange((value: string, key: string) => {
-                playerHotbar[key] = value;
-                renderHotbar();
-            });
+            };
+
+            if (typeof player.hotbar.onAdd === "function") {
+                // Colyseus >= 0.15
+                player.hotbar.onAdd(handleHotbarUpdate);
+                player.hotbar.onChange(handleHotbarUpdate);
+            } else {
+                // Colyseus <= 0.14
+                player.hotbar.onAdd = handleHotbarUpdate;
+                player.hotbar.onChange = handleHotbarUpdate;
+            }
         }
 
         if (player.utilityPathway) currentUtilityPathway = player.utilityPathway;
         if (player.familiarPathway) currentFamiliarPathway = player.familiarPathway;
 
-        player.onChange((changes: any[]) => {
+        const handlePlayerChange = (changes: any[]) => {
+            if (!changes) return;
             changes.forEach((change: any) => {
                 if (change.field === "utilityPathway") currentUtilityPathway = change.value;
                 if (change.field === "familiarPathway") currentFamiliarPathway = change.value;
             });
-        });
+        };
+
+        if (typeof player.onChange === "function") {
+            player.onChange(handlePlayerChange);
+        } else {
+            player.onChange = handlePlayerChange;
+        }
     };
 
+    // If the player state is already populated when this binds
     const me = uiRoom.state.players.get(uiRoom.sessionId);
     if (me) attachListeners(me);
 
-    uiRoom.state.players.onAdd((player: any, sessionId: string) => {
+    // Catch the player state arriving slightly later
+    const handlePlayerAdd = (player: any, sessionId: string) => {
         if (sessionId === uiRoom.sessionId) attachListeners(player);
-    });
+    };
+
+    if (uiRoom.state.players) {
+        if (typeof uiRoom.state.players.onAdd === "function") {
+            uiRoom.state.players.onAdd(handlePlayerAdd);
+        } else {
+            uiRoom.state.players.onAdd = handlePlayerAdd;
+        }
+    }
 }
 
 export function setTemporarySkill(skill: { id: string, label: string, icon: string } | null) {
@@ -1394,6 +1431,50 @@ function injectSkillTreeStyles() {
     }
 }
 
+export function tickCooldownsUI(dt: number) {
+    const isChatOpen = document.querySelector(".chat-slot") !== null;
+    if (isChatOpen) return;
+
+    if (abilityCooldowns.slot2 > 0) abilityCooldowns.slot2 -= dt;
+    if (abilityCooldowns.slot3 > 0) abilityCooldowns.slot3 -= dt;
+    if (abilityCooldowns.slot4 > 0) abilityCooldowns.slot4 -= dt;
+    if (abilityCooldowns.slot5 > 0) abilityCooldowns.slot5 -= dt;
+    if (abilityCooldowns.slot6 > 0) abilityCooldowns.slot6 -= dt;
+    if (abilityCooldowns.slot7 > 0) abilityCooldowns.slot7 -= dt;
+    if (abilityCooldowns.slot8 > 0) abilityCooldowns.slot8 -= dt;
+    if (abilityCooldowns.slot9 > 0) abilityCooldowns.slot9 -= dt;
+
+    const updateOverlay = (slot: string, current: number, max: number) => {
+        const overlay = document.getElementById(`cd-overlay-${slot}`);
+        const textLabel = document.getElementById(`cd-text-${slot}`);
+        
+        if (overlay && textLabel) {
+            if (current > 0) {
+                overlay.style.height = `${(current / max) * 100}%`;
+                textLabel.style.display = "block";
+                
+                if (current < 3.0) {
+                    textLabel.innerText = current.toFixed(1);
+                } else {
+                    textLabel.innerText = Math.ceil(current).toString();
+                }
+            } else {
+                overlay.style.height = "0%";
+                textLabel.style.display = "none";
+            }
+        }
+    };
+    
+    [2, 3, 4, 5, 6, 7, 8, 9].forEach(slotNum => {
+        const abilityId = playerHotbar[`slot${slotNum}`];
+        if (abilityId) {
+            const def = getSkillDef(abilityId);
+            const currentCooldown = abilityCooldowns[`slot${slotNum}` as keyof typeof abilityCooldowns];
+            if (def) updateOverlay(slotNum.toString(), currentCooldown, def.cooldownTime || 5.0);
+        }
+    });
+}
+
 export function renderHotbar() {
     injectSkillTreeStyles(); 
 
@@ -1482,99 +1563,6 @@ export function renderHotbar() {
             };
         }
     }
-}
-
-// --- QUICK CHAT HOTBAR RENDERER ---
-(window as any).renderChatHotbar = function(showChat: boolean) {
-    const container = document.getElementById("action-bar");
-    if (!container) return;
-
-    if (!showChat) {
-        renderHotbar(); 
-        return;
-    }
-
-    const isTeam = currentChatChannel === "team";
-    const barColor = isTeam ? "#22d3ee" : "#22c55e";
-    const titleText = isTeam ? "TEAM CHAT" : "LOCAL CHAT";
-    const subText = isTeam ? "(Shift+Tab for Local)" : "(Shift+Tab for Team)";
-
-    let html = `
-        <div style="position: absolute; top: -55px; left: 50%; transform: translateX(-50%); text-align: center; width: 300px; pointer-events: none; font-family: 'Nunito', sans-serif;">
-            <div style="color: ${barColor}; font-size: 22px; font-weight: 900; background: #0f172a; padding: 5px 15px; border-radius: 12px; border: 3px solid ${barColor}; display: inline-block;">
-                💬 ${titleText}
-            </div>
-            <div style="color: #cbd5e1; font-size: 14px; margin-top: 5px; font-weight: 700;">${subText}</div>
-        </div>
-    `;
-
-    for (let i = 1; i <= 8; i++) {
-        const text = QUICK_CHATS[i.toString()] || "";
-        
-        let icon = "💬";
-        if (text.includes("Hello")) icon = "👋";
-        else if (text.includes("Follow")) icon = "🏃";
-        else if (text.includes("help")) icon = "🚑";
-        else if (text.includes("Enemies")) icon = "⚔️";
-        else if (text.includes("Thank")) icon = "🙏";
-        else if (text.includes("Good")) icon = "👍";
-        else if (text.includes("Wait")) icon = "🛑";
-        else if (text.includes("Run")) icon = "💨";
-
-        html += `
-            <div class="hotbar-slot chat-slot" style="border: 4px solid ${barColor}; background: #1e293b; width: 70px; height: 70px; margin-left: ${i === 1 ? '12px' : '0'}; display: flex; flex-direction: column; justify-content: center; align-items: center;">
-                <div class="hotbar-key" style="background: white; color: ${barColor}; border-color: ${barColor};">${i}</div>
-                <div style="font-size: 28px; margin-bottom: 2px; filter: drop-shadow(0 2px 0 rgba(0,0,0,0.5));">${icon}</div>
-                <div style="font-size: 11px; font-weight: 900; color: white; text-align: center; line-height: 1; padding: 0 4px; font-family: 'Nunito', sans-serif;">${text}</div>
-            </div>
-        `;
-    }
-
-    container.innerHTML = html;
-};
-
-export function tickCooldownsUI(dt: number) {
-    const isChatOpen = document.querySelector(".chat-slot") !== null;
-    if (isChatOpen) return;
-
-    if (abilityCooldowns.slot2 > 0) abilityCooldowns.slot2 -= dt;
-    if (abilityCooldowns.slot3 > 0) abilityCooldowns.slot3 -= dt;
-    if (abilityCooldowns.slot4 > 0) abilityCooldowns.slot4 -= dt;
-    if (abilityCooldowns.slot5 > 0) abilityCooldowns.slot5 -= dt;
-    if (abilityCooldowns.slot6 > 0) abilityCooldowns.slot6 -= dt;
-    if (abilityCooldowns.slot7 > 0) abilityCooldowns.slot7 -= dt;
-    if (abilityCooldowns.slot8 > 0) abilityCooldowns.slot8 -= dt;
-    if (abilityCooldowns.slot9 > 0) abilityCooldowns.slot9 -= dt;
-
-    const updateOverlay = (slot: string, current: number, max: number) => {
-        const overlay = document.getElementById(`cd-overlay-${slot}`);
-        const textLabel = document.getElementById(`cd-text-${slot}`);
-        
-        if (overlay && textLabel) {
-            if (current > 0) {
-                overlay.style.height = `${(current / max) * 100}%`;
-                textLabel.style.display = "block";
-                
-                if (current < 3.0) {
-                    textLabel.innerText = current.toFixed(1);
-                } else {
-                    textLabel.innerText = Math.ceil(current).toString();
-                }
-            } else {
-                overlay.style.height = "0%";
-                textLabel.style.display = "none";
-            }
-        }
-    };
-    
-    [2, 3, 4, 5, 6, 7, 8, 9].forEach(slotNum => {
-        const abilityId = playerHotbar[`slot${slotNum}`];
-        if (abilityId) {
-            const def = getSkillDef(abilityId);
-            const currentCooldown = abilityCooldowns[`slot${slotNum}` as keyof typeof abilityCooldowns];
-            if (def) updateOverlay(slotNum.toString(), currentCooldown, def.cooldownTime || 5.0);
-        }
-    });
 }
 
 export function openSkillTreeUI(activeRoom: any, pathway: string, keys: any) {

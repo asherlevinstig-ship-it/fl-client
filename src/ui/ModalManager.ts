@@ -7,6 +7,7 @@ export let isTeleportUIOpen = false;
 export let isInventoryUIOpen = false;
 export let isChestUIOpen = false;
 export let isShopUIOpen = false;
+export let isEventInviteOpen = false;
 export let activeChestId: string | null = null;
 export let activeStallType: string | null = null;
 
@@ -145,7 +146,6 @@ function injectGlobalChunkyStyles() {
 }
 
 // --- EXPORTED HUD RENDERING ---
-// --- EXPORTED HUD RENDERING ---
 export function renderChunkyHUD(player: any) {
     if (!player) return;
     injectGlobalChunkyStyles();
@@ -213,8 +213,8 @@ export function renderChunkyHUD(player: any) {
         stamText.innerText = `${Math.ceil(player.stamina)} / ${player.maxStamina}`;
     }
 }
-// --- EXPORTED MODAL FUNCTIONS ---
 
+// --- EXPORTED MODAL FUNCTIONS ---
 export function openQuestUI(activeRoom: any, keys: any, playerName: string) {
     if (isQuestUIOpen || !activeRoom) return;
     isQuestUIOpen = true;
@@ -1219,4 +1219,58 @@ export async function showCharacterCreation(): Promise<{ classId: string, pathwa
     renderOptions(classes, 1);
     document.body.appendChild(container);
   });
+}
+
+export function openEventInviteUI(activeRoom: any, eventName: string, targetZone: string) {
+    if (isEventInviteOpen || !activeRoom) return;
+    isEventInviteOpen = true;
+    injectGlobalChunkyStyles();
+
+    let modal = document.getElementById("event-invite-modal");
+    if (!modal) {
+        modal = document.createElement("div");
+        modal.id = "event-invite-modal";
+        modal.className = "modal-chunky";
+        modal.style.position = "fixed";
+        // Spawns near the top so it doesn't block the center of the screen during combat
+        modal.style.top = "15%"; 
+        modal.style.left = "50%";
+        modal.style.transform = "translateX(-50%)";
+        modal.style.padding = "30px";
+        modal.style.zIndex = "4000";
+        modal.style.width = "420px";
+        modal.style.textAlign = "center";
+        document.body.appendChild(modal);
+    }
+
+    modal.innerHTML = `
+      <div style="display:flex; justify-content:space-between; align-items:center; border-bottom: 4px solid #334155; padding-bottom: 15px; margin-bottom: 20px;">
+        <h2 style="margin:0; color:#f59e0b; font-size: 24px; font-weight: 900;">🔥 Event Starting!</h2>
+        <button id="close-event-invite-btn" class="btn-close-chunky">&times;</button>
+      </div>
+      <p style="color:white; font-size:18px; margin-bottom: 25px; font-weight: 700;">
+        The <b style="color: #38bdf8;">${eventName}</b> is now open! Do you want to teleport there immediately?
+      </p>
+      <div style="display:flex; gap: 15px;">
+          <button id="join-event-btn" class="btn-chunky btn-green" style="flex: 1; padding: 15px;">Yes, Join!</button>
+          <button id="decline-event-btn" class="btn-chunky btn-slate" style="flex: 1; padding: 15px;">Ignore</button>
+      </div>
+    `;
+
+    document.getElementById("close-event-invite-btn")!.onclick = () => {
+        isEventInviteOpen = false;
+        if (document.body.contains(modal!)) document.body.removeChild(modal!);
+    };
+
+    document.getElementById("decline-event-btn")!.onclick = () => {
+        isEventInviteOpen = false;
+        if (document.body.contains(modal!)) document.body.removeChild(modal!);
+    };
+
+    document.getElementById("join-event-btn")!.onclick = () => {
+        // Triggers the existing teleport handler on your server
+        activeRoom.send("teleport", { destination: targetZone }); 
+        isEventInviteOpen = false;
+        if (document.body.contains(modal!)) document.body.removeChild(modal!);
+    };
 }

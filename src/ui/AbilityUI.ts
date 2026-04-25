@@ -1,4 +1,6 @@
 import { ITEM_DB } from "../ItemDatabase";
+import { SKILL_TREE_DATA, CATEGORY_MAP, UTILITY_TREE_DATA, UTILITY_CATEGORY_MAP, FAMILIAR_TREE_DATA, FAMILIAR_CATEGORY_MAP, getSkillDef, getAbilityCategory } from "../data/AbilityDatabase";
+import { QUICK_CHATS, currentChatChannel } from "../game/PlayerController"; 
 
 // --- EXPORTED UI STATE ---
 export let isQuestUIOpen = false;
@@ -7,11 +9,12 @@ export let isCasinoUIOpen = false;
 export let isInventoryUIOpen = false;
 export let isChestUIOpen = false;
 export let isShopUIOpen = false;
+export let isSkillTreeUIOpen = false;
 export let activeChestId: string | null = null;
 export let activeStallType: string | null = null;
 
 // --- GLOBAL CHUNKY STYLES INJECTION ---
-function injectGlobalChunkyStyles() {
+export function injectGlobalChunkyStyles() {
     if (!document.getElementById("chunky-ui-styles")) {
         const style = document.createElement("style");
         style.id = "chunky-ui-styles";
@@ -134,7 +137,6 @@ function injectGlobalChunkyStyles() {
             .fill-hp { background: #ef4444; border-right: 2px solid #b91c1c; }
             .fill-mp { background: #3b82f6; border-right: 2px solid #2563eb; }
             
-            /* FIXED: Flipped z-index so the red starvation cap renders OVER the yellow stamina */
             .fill-stamina { background: #eab308; border-right: 2px solid #b45309; z-index: 0;}
             .fill-hunger-cap { 
                 position: absolute; 
@@ -155,7 +157,6 @@ export function renderChunkyHUD(player: any) {
 
     let hud = document.getElementById("chunky-hud-container");
     
-    // Create the HUD structure if it doesn't exist yet
     if (!hud) {
         hud = document.createElement("div");
         hud.id = "chunky-hud-container";
@@ -186,7 +187,6 @@ export function renderChunkyHUD(player: any) {
         document.body.appendChild(hud);
     }
 
-    // Update existing HUD elements without recreating the DOM
     const hpPct = Math.max(0, Math.min(100, (player.hp / player.maxHp) * 100));
     const mpPct = Math.max(0, Math.min(100, (player.mp / player.maxMp) * 100));
     const staminaPct = Math.max(0, Math.min(100, (player.stamina / player.maxStamina) * 100));
@@ -214,17 +214,16 @@ export function renderChunkyHUD(player: any) {
         stamFill.style.width = `${staminaPct}%`;
         hungerFill.style.width = `${hungerDeficitPct}%`;
         
-        // FIXED: Clear starvation text logic
         if (player.hunger <= 0) {
             stamText.innerText = "STARVING!";
-            stamText.style.color = "#fca5a5"; // Light red warning text
+            stamText.style.color = "#fca5a5";
         } else {
-            // Clearly label Stamina vs. Hunger so the numbers make sense
             stamText.innerText = `${Math.ceil(player.stamina)} ⚡ / ${Math.ceil(player.hunger)} 🍗`;
             stamText.style.color = "white";
         }
     }
 }
+
 // --- EXPORTED MODAL FUNCTIONS ---
 
 export function openQuestUI(activeRoom: any, keys: any, playerName: string) {
@@ -556,7 +555,6 @@ export function openCasinoUI(activeRoom: any, keys: any, gameType: string) {
     }
 }
 
-// --- INVENTORY UI ---
 export function openInventoryUI(activeRoom: any, keys: any, playerClass: string) {
     if (isInventoryUIOpen || !activeRoom) return;
     isInventoryUIOpen = true;
@@ -706,8 +704,6 @@ export function refreshInventoryUI(activeRoom: any, playerClass: string) {
     listContainer.scrollTop = currentScroll; 
 }
 
-
-// --- CHEST UI ---
 export function openChestUI(activeRoom: any, keys: any, chestId: string) {
     if (isChestUIOpen || !activeRoom) return;
     isChestUIOpen = true;
@@ -828,8 +824,6 @@ export function refreshChestUI(activeRoom: any) {
     chestContainer.scrollTop = chestScroll;
 }
 
-
-// --- SHOP UI ---
 export function openShopUI(activeRoom: any, keys: any, stallType: string) {
     if (isShopUIOpen || !activeRoom) return;
     isShopUIOpen = true;
@@ -993,7 +987,6 @@ export function refreshShopUI(activeRoom: any) {
     itemsContainer.scrollTop = itemsScroll;
 }
 
-
 export function openBlueprintSelector(activeScene: any, keys: any) {
     if (!activeScene || !(activeScene.constructor.name === "TownScene")) return;
     injectGlobalChunkyStyles();
@@ -1153,13 +1146,7 @@ export async function showCharacterCreation(): Promise<{ classId: string, pathwa
   });
 }
 
-import { SKILL_TREE_DATA, CATEGORY_MAP, UTILITY_TREE_DATA, UTILITY_CATEGORY_MAP, FAMILIAR_TREE_DATA, FAMILIAR_CATEGORY_MAP, getSkillDef, getAbilityCategory } from "../data/AbilityDatabase";
-import { QUICK_CHATS, currentChatChannel } from "../game/PlayerController"; 
-
-// --- EXPORTED STATE ---
-export let isSkillTreeUIOpen = false;
-
-// Local hotbar mirror (Synced dynamically with Colyseus Server State)
+// --- SKILL TREE AND HOTBAR STATE ---
 export const playerHotbar: Record<string, string> = {
     slot2: "", slot3: "", slot4: "", slot5: "",
     slot6: "", slot7: "", slot8: "", slot9: ""
@@ -1167,7 +1154,6 @@ export const playerHotbar: Record<string, string> = {
 
 export const abilityCooldowns = { slot2: 0, slot3: 0, slot4: 0, slot5: 0, slot6: 0, slot7: 0, slot8: 0, slot9: 0 };
 
-// --- LOCAL UI STATE ---
 type TreeMode = "combat" | "utility" | "familiar";
 let currentTreeMode: TreeMode = "combat";
 
@@ -1184,12 +1170,48 @@ let currentFamiliarPathway = "apocalyptic_swarm";
 
 const localCommittedSlots: Record<string, string> = {}; 
 
-// --- TEMPORARY SKILL STATE (Town Recall) ---
 export let temporarySkill: { id: string, label: string, icon: string } | null = null;
 let uiRoom: any = null;
 
+// The vital fix: Synchronizes initial state and tracks future network updates
 export function setAbilityUIRoom(room: any) {
+    if (uiRoom === room) return; 
     uiRoom = room;
+
+    const attachListeners = (player: any) => {
+        if (player.hotbar) {
+            player.hotbar.forEach((value: string, key: string) => {
+                playerHotbar[key] = value;
+            });
+            renderHotbar();
+
+            player.hotbar.onAdd((value: string, key: string) => {
+                playerHotbar[key] = value;
+                renderHotbar();
+            });
+            player.hotbar.onChange((value: string, key: string) => {
+                playerHotbar[key] = value;
+                renderHotbar();
+            });
+        }
+
+        if (player.utilityPathway) currentUtilityPathway = player.utilityPathway;
+        if (player.familiarPathway) currentFamiliarPathway = player.familiarPathway;
+
+        player.onChange((changes: any[]) => {
+            changes.forEach((change: any) => {
+                if (change.field === "utilityPathway") currentUtilityPathway = change.value;
+                if (change.field === "familiarPathway") currentFamiliarPathway = change.value;
+            });
+        });
+    };
+
+    const me = uiRoom.state.players.get(uiRoom.sessionId);
+    if (me) attachListeners(me);
+
+    uiRoom.state.players.onAdd((player: any, sessionId: string) => {
+        if (sessionId === uiRoom.sessionId) attachListeners(player);
+    });
 }
 
 export function setTemporarySkill(skill: { id: string, label: string, icon: string } | null) {
@@ -1203,7 +1225,6 @@ function syncLocalStateToServer(activeRoom: any) {
     activeRoom.send("changeFamiliarPathway", { pathwayId: currentFamiliarPathway });
 }
 
-// --- ADMIN FUNCTION ---
 export function adminResetCommitments() {
     playerHotbar.slot2 = "";
     playerHotbar.slot3 = "";
@@ -1270,7 +1291,6 @@ export function initDefaultHotbar(pathway: string) {
     }
 }
 
-// --- CSS INJECTION (Hotbar & Skill Tree) ---
 function injectSkillTreeStyles() {
     if (!document.getElementById("skill-tree-css")) {
         const style = document.createElement("style");
@@ -1377,7 +1397,6 @@ function injectSkillTreeStyles() {
 export function renderHotbar() {
     injectSkillTreeStyles(); 
 
-    // Sync our local hotbar mirror with the authoritative server state
     if (uiRoom) {
         const me = uiRoom.state.players.get(uiRoom.sessionId);
         if (me && me.hotbar) {
@@ -1575,7 +1594,6 @@ export function openSkillTreeUI(activeRoom: any, pathway: string, keys: any) {
         document.body.appendChild(modal);
     }
 
-    // Capture initial server state on load so the UI matches the DB
     const me = activeRoom.state.players.get(activeRoom.sessionId);
     if (me) {
         if (me.utilityPathway) currentUtilityPathway = me.utilityPathway;
@@ -1588,7 +1606,6 @@ export function openSkillTreeUI(activeRoom: any, pathway: string, keys: any) {
         const me = state.players.get(activeRoom.sessionId);
         if (!me) return;
 
-        // SYNC local UI pathways to server state on first render
         if (currentUtilityPathway === "wayfinder" && me.utilityPathway) currentUtilityPathway = me.utilityPathway;
         if (currentFamiliarPathway === "apocalyptic_swarm" && me.familiarPathway) currentFamiliarPathway = me.familiarPathway;
 
@@ -1608,11 +1625,9 @@ export function openSkillTreeUI(activeRoom: any, pathway: string, keys: any) {
         let unspentAwakening = me.skillTree?.unspentAwakeningPoints || 0;
         let activeAbilities = me.skillTree?.activeAbilities || new Map();
 
-        // --- GLOBAL PATHWAY COMMITMENT CHECKS ---
         let committedUtilityPathway: string | null = null;
         let committedFamiliarPathway: string | null = null;
         
-        // Scan for Utility Commitments
         for (const pKey in UTILITY_TREE_DATA) {
             for (const cKey in UTILITY_TREE_DATA[pKey as keyof typeof UTILITY_TREE_DATA]) {
                 for (const sKey in UTILITY_TREE_DATA[pKey as keyof typeof UTILITY_TREE_DATA][cKey as any]) {
@@ -1628,7 +1643,6 @@ export function openSkillTreeUI(activeRoom: any, pathway: string, keys: any) {
             }
         }
 
-        // Scan for Familiar Commitments
         for (const pKey in FAMILIAR_TREE_DATA) {
             for (const cKey in FAMILIAR_TREE_DATA[pKey as keyof typeof FAMILIAR_TREE_DATA]) {
                 for (const sKey in FAMILIAR_TREE_DATA[pKey as keyof typeof FAMILIAR_TREE_DATA][cKey as any]) {
@@ -1644,7 +1658,6 @@ export function openSkillTreeUI(activeRoom: any, pathway: string, keys: any) {
             }
         }
 
-        // --- CURRENT TAB COMMITMENT CHECK ---
         const targetSlot = activeMap[activeCategoryTab as keyof typeof activeMap].slot;
         let committedAbilityId: string | null = null;
         
@@ -1690,7 +1703,6 @@ export function openSkillTreeUI(activeRoom: any, pathway: string, keys: any) {
 
         const tabColor = currentTreeMode === "familiar" ? "#d946ef" : (currentTreeMode === "utility" ? "#38bdf8" : "#22c55e");
 
-        // --- 1. Top Tabs ---
         let tabsHtml = `<div style="display:flex; margin-bottom: 0;">`;
         Object.keys(activeMap).forEach(category => {
             const isTabActive = category === activeCategoryTab;
@@ -1699,7 +1711,6 @@ export function openSkillTreeUI(activeRoom: any, pathway: string, keys: any) {
         });
         tabsHtml += `</div>`;
 
-        // --- Secondary System Selector ---
         let navHtml = "";
         if (currentTreeMode === "utility") {
             navHtml = `<div class="st-util-nav-container st-scrollbar">`;
@@ -1744,7 +1755,6 @@ export function openSkillTreeUI(activeRoom: any, pathway: string, keys: any) {
             navHtml += `</div>`;
         }
 
-        // --- 2. Left Pane: Ability Selection ---
         let leftPaneHtml = `<div class="st-scrollbar" style="display:flex; flex-wrap:wrap; justify-content:center; gap: 15px; padding: 10px;">`;
         
         if (abilityKeys.length === 0) {
@@ -1772,7 +1782,6 @@ export function openSkillTreeUI(activeRoom: any, pathway: string, keys: any) {
         }
         leftPaneHtml += `</div>`;
 
-        // --- 3. Right Pane: Ability Details & Upgrade ---
         let rightPaneHtml = "";
 
         if (activeSkillData) {
@@ -1959,7 +1968,6 @@ export function openSkillTreeUI(activeRoom: any, pathway: string, keys: any) {
           </div>
         `;
 
-        // --- Attach Event Listeners ---
         document.getElementById("close-skills-btn")!.onclick = () => {
             isSkillTreeUIOpen = false;
             if (document.body.contains(modal!)) document.body.removeChild(modal!);
@@ -1981,7 +1989,7 @@ export function openSkillTreeUI(activeRoom: any, pathway: string, keys: any) {
                     btn.onclick = () => {
                         currentUtilityPathway = pathId;
                         activeUtilitySkillId = "";
-                        syncLocalStateToServer(activeRoom); // SYNC TO SERVER
+                        syncLocalStateToServer(activeRoom); 
                         renderTree();
                     };
                 }
@@ -1994,7 +2002,7 @@ export function openSkillTreeUI(activeRoom: any, pathway: string, keys: any) {
                     btn.onclick = () => {
                         currentFamiliarPathway = pathId;
                         activeFamiliarSkillId = "";
-                        syncLocalStateToServer(activeRoom); // SYNC TO SERVER
+                        syncLocalStateToServer(activeRoom); 
                         renderTree();
                     };
                 }
@@ -2038,10 +2046,8 @@ export function openSkillTreeUI(activeRoom: any, pathway: string, keys: any) {
             
             if (equipBtnNode && !isEquipped && !isCurrentlyViewedSkillLocked && !isSystemPathwayLockedOut) {
                 equipBtnNode.onclick = () => {
-                    // Send to server to maintain ground truth
                     activeRoom.send("updateHotbar", { slot: `slot${targetSlot}`, abilityId: newActiveSkillId });
                     
-                    // Optimistically update the UI mirror
                     playerHotbar[`slot${targetSlot}`] = newActiveSkillId;
                     renderHotbar();
                     renderTree();
@@ -2063,10 +2069,8 @@ export function openSkillTreeUI(activeRoom: any, pathway: string, keys: any) {
                             
                             activeRoom.send("upgradeSkill", { abilityId: newActiveSkillId, upgradeId: uKey });
                             
-                            // Send to server to ensure it is locked into the hotbar
                             activeRoom.send("updateHotbar", { slot: `slot${targetSlot}`, abilityId: newActiveSkillId });
                             
-                            // Optimistically update local UI
                             playerHotbar[`slot${targetSlot}`] = newActiveSkillId;
                             renderHotbar();
                             

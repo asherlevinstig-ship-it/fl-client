@@ -1,7 +1,7 @@
 import { ITEM_DB } from "../ItemDatabase";
 import { distance } from "../game/CollisionSystem";
 import { CRAFTING_RECIPES, STORE_RECIPES } from "../RecipeDatabase";
-
+import { setAbilityUIRoom } from "./AbilityUI";
 // --- EXPORTED HUD STATE ---
 export let isWorldMapOpen = false;
 export let myMapMarker: { x: number, z: number } | null = null;
@@ -948,6 +948,7 @@ export function updateHUD(
     isLocallyWolf: boolean 
 ) {
     if (!me || !activeRoom) return;
+    setAbilityUIRoom(activeRoom);
     const state = activeRoom.state;
     const roomName = activeRoom.name || "";
 

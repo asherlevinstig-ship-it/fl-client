@@ -233,10 +233,6 @@ function getActionContext(): ActionContext {
     };
 }
 
-function clearContainer(container: HTMLElement): void { 
-  while (container.firstChild) container.removeChild(container.firstChild); 
-}
-
 function sendMove(room: ActiveRoom, x: number, y: number): void { 
   const ctx = getActionContext();
   if (room && (room.connection as any).isOpen) {
@@ -2085,6 +2081,7 @@ function syncStateToScene(room: ActiveRoom, sceneObj: ActiveScene) {
 
         if (state.familiars && typeof state.familiars.forEach === "function" && (sceneObj as any).familiarRenderer) {
             state.familiars.forEach((fam: any, id: string) => {
+                const renderer = (sceneObj as any).familiarRenderer;
                 const safeX = isNaN(fam.x) ? 0 : fam.x;
                 const safeY = isNaN(fam.y) ? 0 : fam.y;
                 
@@ -2093,8 +2090,15 @@ function syncStateToScene(room: ActiveRoom, sceneObj: ActiveScene) {
                     th = getHeightCached(safeX, safeY);
                 }
                 
-                if (typeof (sceneObj as any).familiarRenderer.updateFamiliar === "function") {
-                    (sceneObj as any).familiarRenderer.updateFamiliar(id, safeX, th, safeY, fam.isDetached, fam.action);
+                // SAFEGUARD: Force spawn if it missed the initial Colyseus onAdd
+                if (!renderer.visuals.has(id)) {
+                    if (typeof renderer.addFamiliar === "function") {
+                        renderer.addFamiliar(id, fam.type, safeX, th, safeY);
+                    }
+                }
+                
+                if (typeof renderer.updateFamiliar === "function") {
+                    renderer.updateFamiliar(id, safeX, th, safeY, fam.isDetached, fam.action);
                 }
             });
         }
@@ -2448,6 +2452,10 @@ function startHudLoop(): void {
     requestAnimationFrame(tick);
   };
   tick();
+}
+
+function clearContainer(container: HTMLElement): void { 
+  while (container.firstChild) container.removeChild(container.firstChild); 
 }
 
 async function boot(): Promise<void> {

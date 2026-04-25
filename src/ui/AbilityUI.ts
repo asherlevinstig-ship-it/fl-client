@@ -11,6 +11,7 @@ export let activeChestId: string | null = null;
 export let activeStallType: string | null = null;
 
 // --- GLOBAL CHUNKY STYLES INJECTION ---
+// --- GLOBAL CHUNKY STYLES INJECTION ---
 function injectGlobalChunkyStyles() {
     if (!document.getElementById("chunky-ui-styles")) {
         const style = document.createElement("style");
@@ -130,19 +131,18 @@ function injectGlobalChunkyStyles() {
                 text-shadow: 0 2px 0 rgba(0,0,0,0.5);
                 z-index: 2;
             }
+            
             .fill-hp { background: #ef4444; border-right: 2px solid #b91c1c; }
             .fill-mp { background: #3b82f6; border-right: 2px solid #2563eb; }
-            .fill-stamina { 
-    background: #eab308; 
-    border-right: 2px solid #b45309; 
-    z-index: 0; /* Lowered from 1 */
-}
-.fill-hunger-cap { 
-    position: absolute; 
-    right: 0; top: 0; height: 100%; 
-    background: repeating-linear-gradient(45deg, #7f1d1d, #7f1d1d 10px, #991b1b 10px, #991b1b 20px); 
-    z-index: 1; /* Raised from 0 */
-}
+            
+            /* FIXED: Flipped z-index so the red starvation cap renders OVER the yellow stamina */
+            .fill-stamina { background: #eab308; border-right: 2px solid #b45309; z-index: 0;}
+            .fill-hunger-cap { 
+                position: absolute; 
+                right: 0; top: 0; height: 100%; 
+                background: repeating-linear-gradient(45deg, #7f1d1d, #7f1d1d 10px, #991b1b 10px, #991b1b 20px); 
+                z-index: 1;
+            }
         `;
         document.head.appendChild(style);
     }
@@ -209,13 +209,22 @@ export function renderChunkyHUD(player: any) {
     const stamFill = document.getElementById("hud-stamina-fill");
     const hungerFill = document.getElementById("hud-hunger-fill");
     const stamText = document.getElementById("hud-stamina-text");
+    
     if (stamFill && hungerFill && stamText) {
         stamFill.style.width = `${staminaPct}%`;
         hungerFill.style.width = `${hungerDeficitPct}%`;
-        stamText.innerText = `${Math.ceil(player.stamina)} / ${Math.ceil(player.hunger)}`;
+        
+        // FIXED: Clear starvation text logic
+        if (player.hunger <= 0) {
+            stamText.innerText = "STARVING!";
+            stamText.style.color = "#fca5a5"; // Light red warning text
+        } else {
+            // Clearly label Stamina vs. Hunger so the numbers make sense
+            stamText.innerText = `${Math.ceil(player.stamina)} ⚡ / ${Math.ceil(player.hunger)} 🍗`;
+            stamText.style.color = "white";
+        }
     }
 }
-
 // --- EXPORTED MODAL FUNCTIONS ---
 
 export function openQuestUI(activeRoom: any, keys: any, playerName: string) {

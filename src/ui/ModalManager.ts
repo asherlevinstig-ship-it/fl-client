@@ -3,7 +3,7 @@ import { ITEM_DB } from "../ItemDatabase";
 // --- EXPORTED UI STATE ---
 export let isQuestUIOpen = false;
 export let isTeleportUIOpen = false;
-export let isCasinoUIOpen = false;
+
 export let isInventoryUIOpen = false;
 export let isChestUIOpen = false;
 export let isShopUIOpen = false;
@@ -336,10 +336,20 @@ export function openTeleportUI(activeRoom: any, keys: any) {
     };
 }
 
+// --- EXPORTED UI STATE ---
+export let isCasinoUIOpen = false;
+
+// If you have a global style injector, ensure it's imported or defined.
+// import { injectGlobalChunkyStyles } from "./ModalManager"; 
+
 export function openCasinoUI(activeRoom: any, keys: any, gameType: string) {
     if (isCasinoUIOpen || !activeRoom) return;
     isCasinoUIOpen = true;
-    injectGlobalChunkyStyles();
+    
+    // Assumes injectGlobalChunkyStyles() is called elsewhere or here
+    if (typeof (window as any).injectGlobalChunkyStyles === "function") {
+        (window as any).injectGlobalChunkyStyles();
+    }
 
     for (const key in keys) keys[key as keyof typeof keys] = false;
 
@@ -369,6 +379,15 @@ export function openCasinoUI(activeRoom: any, keys: any, gameType: string) {
             .spinning { animation: anim-spin-roulette 2s cubic-bezier(0.1, 0.7, 0.1, 1) forwards; }
             .slot-blur { filter: blur(3px); animation: anim-slot-shake 0.1s infinite; }
             .dealing { animation: anim-deal-card 0.4s ease-out forwards; }
+            
+            /* Quick Bet Buttons */
+            .quick-bet-btn {
+                background: #334155; border: 2px solid #475569; color: #cbd5e1;
+                border-radius: 8px; padding: 5px 10px; font-weight: 900; font-size: 12px;
+                cursor: pointer; transition: all 0.1s; flex: 1; font-family: 'Nunito', sans-serif;
+            }
+            .quick-bet-btn:hover { background: #475569; color: #fff; }
+            .quick-bet-btn:active { transform: translateY(2px); }
         `;
         document.head.appendChild(style);
     }
@@ -417,11 +436,11 @@ export function openCasinoUI(activeRoom: any, keys: any, gameType: string) {
                 </div>
             </div>`;
         customInputs = `
-            <select id="roulette-guess" style="width: 100%; padding: 15px; font-size: 16px; font-weight: bold; margin: 15px 0; background: #334155; color: white; border: 4px solid #f472b6; border-radius: 16px; outline: none; font-family: 'Nunito', sans-serif;">
-                <option value="red">🔴 Red (2x)</option>
-                <option value="black">⚫ Black (2x)</option>
-                <option value="0">🟢 Zero (35x)</option>
-                <option value="7">Lucky 7 (35x)</option>
+            <select id="roulette-guess" style="width: 100%; padding: 15px; font-size: 16px; font-weight: bold; margin: 15px 0; background: #334155; color: white; border: 4px solid #f472b6; border-radius: 16px; outline: none; font-family: 'Nunito', sans-serif; cursor: pointer;">
+                <option value="red">🔴 Red (2x Multiplier)</option>
+                <option value="black">⚫ Black (2x Multiplier)</option>
+                <option value="0">🟢 Zero (35x Multiplier)</option>
+                <option value="7">⭐ Lucky 7 (35x Multiplier)</option>
             </select>
             <button id="btn-play" class="btn-chunky btn-green" style="width: 100%; padding: 15px;">SPIN THE WHEEL!</button>
         `;
@@ -440,11 +459,17 @@ export function openCasinoUI(activeRoom: any, keys: any, gameType: string) {
     } else if (gameType === "Blackjack") {
         visualArea = `
             <div style="height: 140px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 15px;">
-                <div id="2d-bj-dealer" style="display: flex; gap: 8px; height: 50px;"></div>
-                <div id="2d-bj-player" style="display: flex; gap: 8px; height: 50px;"></div>
+                <div id="2d-bj-dealer" style="display: flex; gap: 8px; height: 50px; justify-content: center; width: 100%;"></div>
+                <div id="2d-bj-player" style="display: flex; gap: 8px; height: 50px; justify-content: center; width: 100%;"></div>
             </div>`;
         customInputs = `
-            <button id="btn-play" class="btn-chunky btn-blue" style="width: 100%; padding: 15px; margin-top: 15px;">🃏 DEAL CARDS!</button>
+            <div id="bj-start-controls">
+                <button id="btn-play" class="btn-chunky btn-blue" style="width: 100%; padding: 15px; margin-top: 15px;">🃏 DEAL CARDS!</button>
+            </div>
+            <div id="bj-action-controls" style="display: none; gap: 10px; margin-top: 15px;">
+                <button id="btn-hit" class="btn-chunky btn-green" style="flex: 1; padding: 15px;">👇 HIT</button>
+                <button id="btn-stand" class="btn-chunky btn-red" style="flex: 1; padding: 15px;">✋ STAND</button>
+            </div>
         `;
     }
 
@@ -462,8 +487,15 @@ export function openCasinoUI(activeRoom: any, keys: any, gameType: string) {
       ${visualArea}
   
       <div class="chunky-panel" style="background: #3b0764; border-color: #581c87; text-align: left; margin-top: 15px;">
-        <label style="color: #fbcfe8; font-weight: 900; font-size: 14px;">SET BET:</label>
-        <input type="number" id="bet-amount" value="50" min="1" max="${me.coins}" style="width: 100%; padding: 12px; font-size: 18px; font-weight: bold; margin-top: 8px; background: #fff; color: #1e293b; border: 4px solid #a855f7; border-radius: 12px; box-sizing: border-box; font-family: 'Nunito', sans-serif;" />
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <label style="color: #fbcfe8; font-weight: 900; font-size: 14px;">SET BET:</label>
+            <div style="display: flex; gap: 5px; width: 60%;">
+                <button class="quick-bet-btn" data-amt="min">MIN</button>
+                <button class="quick-bet-btn" data-amt="half">1/2</button>
+                <button class="quick-bet-btn" data-amt="max">MAX</button>
+            </div>
+        </div>
+        <input type="number" id="bet-amount" value="50" min="1" max="${me.coins}" style="width: 100%; padding: 12px; font-size: 18px; font-weight: bold; margin-top: 8px; background: #fff; color: #1e293b; border: 4px solid #a855f7; border-radius: 12px; box-sizing: border-box; font-family: 'Nunito', sans-serif; text-align: center;" />
       </div>
   
       ${customInputs}
@@ -471,13 +503,25 @@ export function openCasinoUI(activeRoom: any, keys: any, gameType: string) {
       <div id="casino-result" style="margin-top: 20px; font-size: 18px; font-weight: 900; min-height: 24px; color: #fff;"></div>
     `;
 
+    // Hook up Quick Bet logic
+    const betInput = document.getElementById("bet-amount") as HTMLInputElement;
+    document.querySelectorAll(".quick-bet-btn").forEach(btn => {
+        (btn as HTMLElement).onclick = (e) => {
+            const amt = (e.target as HTMLElement).dataset.amt;
+            const currentCoins = parseInt(document.getElementById("casino-balance")?.innerText || "0");
+            if (amt === "min") betInput.value = "10";
+            if (amt === "half") betInput.value = Math.max(1, Math.floor(currentCoins / 2)).toString();
+            if (amt === "max") betInput.value = currentCoins.toString();
+        };
+    });
+
     document.getElementById("close-casino-btn")!.onclick = () => {
         isCasinoUIOpen = false;
         if ((window as any).casinoAnimInterval) clearInterval((window as any).casinoAnimInterval);
         if (document.body.contains(modal!)) document.body.removeChild(modal!);
     };
 
-    const getBet = () => parseInt((document.getElementById("bet-amount") as HTMLInputElement).value) || 0;
+    const getBet = () => parseInt(betInput.value) || 0;
 
     const start2DAnimation = (game: string) => {
         const r = document.getElementById("casino-result");
@@ -530,17 +574,52 @@ export function openCasinoUI(activeRoom: any, keys: any, gameType: string) {
         }
     };
 
+    // Fix Network Payloads to map directly to the specific Colyseus handlers
     if (gameType === "Coin Toss") {
-        document.getElementById("btn-heads")!.onclick = () => { start2DAnimation(gameType); activeRoom.send("playCasino", { game: gameType, bet: getBet(), guess: "heads" }); };
-        document.getElementById("btn-tails")!.onclick = () => { start2DAnimation(gameType); activeRoom.send("playCasino", { game: gameType, bet: getBet(), guess: "tails" }); };
-    } else if (gameType === "Roulette") {
+        document.getElementById("btn-heads")!.onclick = () => { 
+            start2DAnimation(gameType); 
+            activeRoom.send("playCoinToss", { bet: getBet(), guess: "heads" }); 
+        };
+        document.getElementById("btn-tails")!.onclick = () => { 
+            start2DAnimation(gameType); 
+            activeRoom.send("playCoinToss", { bet: getBet(), guess: "tails" }); 
+        };
+    } 
+    else if (gameType === "Roulette") {
         document.getElementById("btn-play")!.onclick = () => {
             start2DAnimation(gameType);
             const guess = (document.getElementById("roulette-guess") as HTMLSelectElement).value;
-            activeRoom.send("playCasino", { game: gameType, bet: getBet(), guess });
+            activeRoom.send("playRoulette", { bet: getBet(), guess });
         };
-    } else {
-        document.getElementById("btn-play")!.onclick = () => { start2DAnimation(gameType); activeRoom.send("playCasino", { game: gameType, bet: getBet() }); };
+    } 
+    else if (gameType === "Slot Machine") {
+        document.getElementById("btn-play")!.onclick = () => { 
+            start2DAnimation(gameType); 
+            activeRoom.send("playSlotMachine", { bet: getBet() }); 
+        };
+    } 
+    else if (gameType === "Blackjack") {
+        document.getElementById("btn-play")!.onclick = () => { 
+            start2DAnimation(gameType); 
+            activeRoom.send("blackjack_start", { bet: getBet() });
+            
+            // Immediately toggle UI to action phase to feel responsive while server spins up
+            document.getElementById("bj-start-controls")!.style.display = "none";
+            document.getElementById("bj-action-controls")!.style.display = "flex";
+            betInput.disabled = true; 
+        };
+        
+        document.getElementById("btn-hit")!.onclick = () => {
+            activeRoom.send("blackjack_action", { action: "hit" });
+        };
+        
+        document.getElementById("btn-stand")!.onclick = () => {
+            activeRoom.send("blackjack_action", { action: "stand" });
+            // Re-enable starting state for next round
+            document.getElementById("bj-action-controls")!.style.display = "none";
+            document.getElementById("bj-start-controls")!.style.display = "block";
+            betInput.disabled = false;
+        };
     }
 }
 

@@ -1912,7 +1912,6 @@ export function refreshInventoryUI(activeRoom: any, playerClass: string) {
     listContainer.scrollTop = currentScroll; 
 }
 
-
 // --- CHEST UI ---
 export function openChestUI(activeRoom: any, keys: any, chestId: string) {
     if (isChestUIOpen || !activeRoom) return;
@@ -2033,7 +2032,6 @@ export function refreshChestUI(activeRoom: any) {
     chestContainer.innerHTML = chHTML;
     chestContainer.scrollTop = chestScroll;
 }
-
 
 // --- SHOP UI ---
 export function openShopUI(activeRoom: any, keys: any, stallType: string) {
@@ -2357,4 +2355,59 @@ export async function showCharacterCreation(): Promise<{ classId: string, pathwa
     renderOptions(classes, 1);
     document.body.appendChild(container);
   });
+}
+
+// --- NEW: EVENT INVITE UI ---
+export function showEventInviteUI(activeRoom: any, eventName: string, targetZone: string) {
+    if (!activeRoom) return;
+    injectGlobalChunkyStyles();
+    
+    let modal = document.getElementById("event-invite-modal");
+    if (!modal) {
+        modal = document.createElement("div");
+        modal.id = "event-invite-modal";
+        modal.className = "modal-chunky";
+        modal.style.position = "fixed"; 
+        modal.style.top = "20%"; // Pop up near the top so it doesn't block the center of action
+        modal.style.left = "50%";
+        modal.style.transform = "translateX(-50%)"; 
+        modal.style.padding = "25px"; 
+        modal.style.zIndex = "4000"; // Above everything
+        modal.style.width = "450px";
+        modal.style.textAlign = "center";
+        modal.style.boxShadow = "0 20px 50px rgba(0,0,0,0.8)";
+        modal.style.animation = "hudPulse 2s infinite"; // Grab their attention
+        document.body.appendChild(modal);
+    }
+
+    modal.innerHTML = `
+      <h2 style="margin:0 0 10px 0; color:#f59e0b; font-weight: 900; font-size: 26px; text-transform: uppercase; letter-spacing: 2px;">
+        <i class="fa-solid fa-khanda"></i> Event Opening!
+      </h2>
+      <p style="color:#cbd5e1; font-size:16px; margin-bottom: 25px; font-weight: 700;">
+        The <b>${eventName}</b> has opened. Do you want to join the fight?
+      </p>
+      
+      <div style="display:flex; justify-content: space-between; gap:15px;">
+        <button id="btn-decline-event" class="btn-chunky btn-slate" style="flex: 1; padding: 15px; font-size: 16px;">
+            <i class="fa-solid fa-xmark"></i> Decline
+        </button>
+        <button id="btn-accept-event" class="btn-chunky btn-gold" style="flex: 1; padding: 15px; font-size: 16px; color: #1e293b;">
+            <i class="fa-solid fa-check"></i> Accept
+        </button>
+      </div>
+    `;
+
+    modal.style.display = "block";
+
+    // Handle Accept
+    document.getElementById("btn-accept-event")!.onclick = () => {
+        activeRoom.send("teleport", { destination: targetZone }); 
+        modal!.style.display = "none";
+    };
+
+    // Handle Decline
+    document.getElementById("btn-decline-event")!.onclick = () => {
+        modal!.style.display = "none";
+    };
 }

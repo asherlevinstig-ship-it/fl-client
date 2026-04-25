@@ -146,6 +146,30 @@ export class EnemyModel {
             this.baseHoverY = 2.0;
         } 
         
+        // 8. DUNGEON GOBLINS (Underworld/Dungeon)
+        else if (safeType.includes("goblin")) {
+            // Bright visible green to contrast with dark dungeon floor
+            const mat = new THREE.MeshStandardMaterial({ color: 0x33aa33, roughness: 0.8 }); 
+            const body = new THREE.Mesh(new THREE.BoxGeometry(0.8, 1.2, 0.8), mat);
+            body.position.y = 0.6;
+            body.castShadow = true;
+            this.bodyParts["mainBody"] = body;
+            bodyGroup.add(body);
+
+            // If it's the boss, scale him up and give him a crown
+            if (safeType.includes("king")) {
+                body.scale.set(1.5, 1.5, 1.5);
+                body.position.y = 0.9;
+                
+                const crownMat = new THREE.MeshStandardMaterial({ color: 0xffaa00, roughness: 0.3, metalness: 0.8 });
+                const crown = new THREE.Mesh(new THREE.ConeGeometry(0.4, 0.5, 4), crownMat);
+                crown.position.y = 0.85;
+                crown.rotation.y = Math.PI / 4;
+                body.add(crown);
+            }
+            this.baseHoverY = 0;
+        }
+
         // FALLBACK
         else {
             const mat = new THREE.MeshStandardMaterial({ color: 0x442255 });
@@ -167,7 +191,7 @@ export class EnemyModel {
         this.mesh.add(shadow);
     }
 
-    // Updated to accept the action parameter from TownScene
+    // Updated to accept the action parameter
     public update(dt: number, isMoving: boolean, action?: string) {
         if (isNaN(this.targetPosition.x)) this.targetPosition.x = 0;
         if (isNaN(this.targetPosition.y)) this.targetPosition.y = 0;
@@ -245,6 +269,19 @@ export class EnemyModel {
                 // Hovering ghost
                 body.position.y = this.baseHoverY + Math.sin(this.animTime * 3) * 0.4;
             }
+            else if (safeType.includes("goblin")) {
+                // Goblins waddle back and forth while running
+                const isKing = safeType.includes("king");
+                const baseY = isKing ? 0.9 : 0.6;
+                if (isMoving) {
+                    const walkSpeed = isKing ? 12 : 18;
+                    body.position.y = baseY + Math.abs(Math.sin(this.animTime * walkSpeed)) * (isKing ? 0.4 : 0.3);
+                    body.rotation.z = Math.sin(this.animTime * walkSpeed * 0.5) * 0.15;
+                } else {
+                    body.position.y = baseY;
+                    body.rotation.z = 0;
+                }
+            }
         }
 
         // --- MOVEMENT LERP ---
@@ -257,8 +294,6 @@ export class EnemyModel {
             const dz = this.targetPosition.z - this.mesh.position.z;
             
             // If they are attacking, they might not be moving coords, but they should face the player
-            // You can rely on targetPosition being set to the player's position during an attack 
-            // (which you handle in TownRoom via `enemy.targetX = nearestPlayer.x`)
             if (Math.abs(dx) > 0.01 || Math.abs(dz) > 0.01) {
                 const targetRotation = Math.atan2(dx, dz);
                 if (!isNaN(targetRotation)) {

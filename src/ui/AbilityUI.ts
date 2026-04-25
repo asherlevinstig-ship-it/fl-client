@@ -34,14 +34,14 @@ export let temporarySkill: { id: string, label: string, icon: string } | null = 
 let uiRoom: any = null;
 
 // --- AUTHORITATIVE COLYSEUS STATE BINDING ---
+// The vital fix: Synchronizes initial state and tracks future network updates safely
 export function setAbilityUIRoom(room: any) {
     if (uiRoom === room) return; 
     uiRoom = room;
 
     const attachListeners = (player: any) => {
         // Safe sync function for initial load
-        const syncLocalHotbar = () => {
-            if (!player.hotbar) return;
+        if (player.hotbar) {
             if (typeof player.hotbar.forEach === "function") {
                 player.hotbar.forEach((value: string, key: string) => {
                     playerHotbar[key] = value;
@@ -52,63 +52,49 @@ export function setAbilityUIRoom(room: any) {
                 }
             }
             renderHotbar();
-        };
 
-        syncLocalHotbar();
-
-        // Safe binding for MapSchema (Colyseus 0.14 vs 0.15+ and onRemove crash fix)
-        if (player.hotbar) {
-            const handleHotbarUpdate = (value: string, key: string) => {
-                playerHotbar[key] = value;
-                renderHotbar();
-            };
-            const handleHotbarRemove = (value: string, key: string) => {
-                playerHotbar[key] = "";
-                renderHotbar();
-            };
-
-            if (typeof player.hotbar.onAdd === "function") {
-                player.hotbar.onAdd(handleHotbarUpdate);
-                if (typeof player.hotbar.onChange === "function") player.hotbar.onChange(handleHotbarUpdate);
-                if (typeof player.hotbar.onRemove === "function") player.hotbar.onRemove(handleHotbarRemove);
-            } else {
-                player.hotbar.onAdd = handleHotbarUpdate;
-                player.hotbar.onChange = handleHotbarUpdate;
-                player.hotbar.onRemove = handleHotbarRemove;
+            // Safely attach modern Colyseus listeners (NO assignments!)
+            try {
+                player.hotbar.onAdd((value: string, key: string) => {
+                    playerHotbar[key] = value;
+                    renderHotbar();
+                });
+                player.hotbar.onChange((value: string, key: string) => {
+                    playerHotbar[key] = value;
+                    renderHotbar();
+                });
+            } catch (e) {
+                console.warn("[UI] Could not bind hotbar dynamic listeners. Fallback required.", e);
             }
         }
 
         if (player.utilityPathway) currentUtilityPathway = player.utilityPathway;
         if (player.familiarPathway) currentFamiliarPathway = player.familiarPathway;
 
-        const handlePlayerChange = (changes: any[]) => {
-            if (!changes) return;
-            changes.forEach((change: any) => {
-                if (change.field === "utilityPathway") currentUtilityPathway = change.value;
-                if (change.field === "familiarPathway") currentFamiliarPathway = change.value;
+        try {
+            player.onChange((changes: any[]) => {
+                if (!changes) return;
+                changes.forEach((change: any) => {
+                    if (change.field === "utilityPathway") currentUtilityPathway = change.value;
+                    if (change.field === "familiarPathway") currentFamiliarPathway = change.value;
+                });
             });
-        };
-
-        if (typeof player.onChange === "function") {
-            player.onChange(handlePlayerChange);
-        } else {
-            player.onChange = handlePlayerChange;
+        } catch (e) {
+            console.warn("[UI] Could not bind player onChange.", e);
         }
     };
 
+    // If the player state is already populated when this binds
     const me = uiRoom.state.players.get(uiRoom.sessionId);
     if (me) attachListeners(me);
 
-    const handlePlayerAdd = (player: any, sessionId: string) => {
-        if (sessionId === uiRoom.sessionId) attachListeners(player);
-    };
-
-    if (uiRoom.state.players) {
-        if (typeof uiRoom.state.players.onAdd === "function") {
-            uiRoom.state.players.onAdd(handlePlayerAdd);
-        } else {
-            uiRoom.state.players.onAdd = handlePlayerAdd;
-        }
+    // Catch the player state arriving slightly later
+    try {
+        uiRoom.state.players.onAdd((player: any, sessionId: string) => {
+            if (sessionId === uiRoom.sessionId) attachListeners(player);
+        });
+    } catch (e) {
+        console.warn("[UI] Could not bind players.onAdd.", e);
     }
 }
 

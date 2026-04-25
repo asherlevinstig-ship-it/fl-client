@@ -11,7 +11,6 @@ export let activeChestId: string | null = null;
 export let activeStallType: string | null = null;
 
 // --- GLOBAL CHUNKY STYLES INJECTION ---
-// --- GLOBAL CHUNKY STYLES INJECTION ---
 function injectGlobalChunkyStyles() {
     if (!document.getElementById("chunky-ui-styles")) {
         const style = document.createElement("style");
@@ -137,13 +136,13 @@ function injectGlobalChunkyStyles() {
             
             /* FIXED: Flipped z-index so the red starvation cap renders OVER the yellow stamina */
             .fill-stamina { background: #eab308; border-right: 2px solid #b45309; z-index: 0;}
-           .fill-hunger-cap { 
-    position: absolute; 
-    right: 0; top: 0; height: 100%; 
-    background: repeating-linear-gradient(45deg, #7f1d1d, #7f1d1d 10px, #991b1b 10px, #991b1b 20px); 
-    z-index: 1;
-    transition: width 0.2s ease-out; /* <-- ADD THIS FOR PERFECT SYNERGY */
-}
+            .fill-hunger-cap { 
+                position: absolute; 
+                right: 0; top: 0; height: 100%; 
+                background: repeating-linear-gradient(45deg, #7f1d1d, #7f1d1d 10px, #991b1b 10px, #991b1b 20px); 
+                z-index: 1;
+                transition: width 0.2s ease-out;
+            }
         `;
         document.head.appendChild(style);
     }
@@ -556,7 +555,6 @@ export function openCasinoUI(activeRoom: any, keys: any, gameType: string) {
         document.getElementById("btn-play")!.onclick = () => { start2DAnimation(gameType); activeRoom.send("playCasino", { game: gameType, bet: getBet() }); };
     }
 }
-
 
 // --- INVENTORY UI ---
 export function openInventoryUI(activeRoom: any, keys: any, playerClass: string) {
@@ -1161,16 +1159,11 @@ import { QUICK_CHATS, currentChatChannel } from "../game/PlayerController";
 // --- EXPORTED STATE ---
 export let isSkillTreeUIOpen = false;
 
-// Load hotbar from local storage so commitments persist across reloads
-export const playerHotbar = JSON.parse(localStorage.getItem("rpg_hotbar") || "{}");
-if (typeof playerHotbar.slot2 !== "string") playerHotbar.slot2 = "";
-if (typeof playerHotbar.slot3 !== "string") playerHotbar.slot3 = "";
-if (typeof playerHotbar.slot4 !== "string") playerHotbar.slot4 = "";
-if (typeof playerHotbar.slot5 !== "string") playerHotbar.slot5 = "";
-if (typeof playerHotbar.slot6 !== "string") playerHotbar.slot6 = ""; 
-if (typeof playerHotbar.slot7 !== "string") playerHotbar.slot7 = ""; 
-if (typeof playerHotbar.slot8 !== "string") playerHotbar.slot8 = ""; 
-if (typeof playerHotbar.slot9 !== "string") playerHotbar.slot9 = ""; 
+// Local hotbar mirror (Synced dynamically with Colyseus Server State)
+export const playerHotbar: Record<string, string> = {
+    slot2: "", slot3: "", slot4: "", slot5: "",
+    slot6: "", slot7: "", slot8: "", slot9: ""
+};
 
 export const abilityCooldowns = { slot2: 0, slot3: 0, slot4: 0, slot5: 0, slot6: 0, slot7: 0, slot8: 0, slot9: 0 };
 
@@ -1186,8 +1179,8 @@ let activeCombatSkillId = "";
 let activeUtilitySkillId = "";
 let activeFamiliarSkillId = "";
 
-let currentUtilityPathway = localStorage.getItem("rpg_utility_pathway") || "wayfinder";
-let currentFamiliarPathway = localStorage.getItem("rpg_familiar_pathway") || "apocalyptic_swarm";
+let currentUtilityPathway = "wayfinder";
+let currentFamiliarPathway = "apocalyptic_swarm";
 
 const localCommittedSlots: Record<string, string> = {}; 
 
@@ -1204,10 +1197,10 @@ export function setTemporarySkill(skill: { id: string, label: string, icon: stri
     renderHotbar();
 }
 
-function saveHotbar() {
-    localStorage.setItem("rpg_hotbar", JSON.stringify(playerHotbar));
-    localStorage.setItem("rpg_utility_pathway", currentUtilityPathway);
-    localStorage.setItem("rpg_familiar_pathway", currentFamiliarPathway);
+function syncLocalStateToServer(activeRoom: any) {
+    if (!activeRoom) return;
+    activeRoom.send("changeUtilityPathway", { pathwayId: currentUtilityPathway });
+    activeRoom.send("changeFamiliarPathway", { pathwayId: currentFamiliarPathway });
 }
 
 // --- ADMIN FUNCTION ---
@@ -1220,7 +1213,12 @@ export function adminResetCommitments() {
     playerHotbar.slot7 = "";
     playerHotbar.slot8 = "";
     playerHotbar.slot9 = "";
-    saveHotbar();
+    
+    if (uiRoom) {
+        for (let i = 2; i <= 9; i++) {
+            uiRoom.send("updateHotbar", { slot: `slot${i}`, abilityId: "" });
+        }
+    }
     
     for (const key in localCommittedSlots) {
         delete localCommittedSlots[key];
@@ -1243,13 +1241,13 @@ export function setIsSkillTreeUIOpen(val: boolean) {
 export function initDefaultHotbar(pathway: string) {
     let needsClear = false;
     [2, 3, 4, 5].forEach(slotNum => {
-        const id = playerHotbar[`slot${slotNum}` as keyof typeof playerHotbar];
+        const id = playerHotbar[`slot${slotNum}`];
         if (id) {
             let foundInCurrentPathway = false;
             const essenceData = SKILL_TREE_DATA[pathway];
             if (essenceData) {
                 for (const category in essenceData) {
-                    if (essenceData[category][id]) {
+                    if (essenceData[category as keyof typeof essenceData][id]) {
                         foundInCurrentPathway = true;
                     }
                 }
@@ -1263,13 +1261,17 @@ export function initDefaultHotbar(pathway: string) {
         playerHotbar.slot3 = "";
         playerHotbar.slot4 = "";
         playerHotbar.slot5 = "";
-        saveHotbar();
+        if (uiRoom) {
+            uiRoom.send("updateHotbar", { slot: "slot2", abilityId: "" });
+            uiRoom.send("updateHotbar", { slot: "slot3", abilityId: "" });
+            uiRoom.send("updateHotbar", { slot: "slot4", abilityId: "" });
+            uiRoom.send("updateHotbar", { slot: "slot5", abilityId: "" });
+        }
     }
 }
 
 // --- CSS INJECTION (Hotbar & Skill Tree) ---
 function injectSkillTreeStyles() {
-    injectGlobalChunkyStyles();
     if (!document.getElementById("skill-tree-css")) {
         const style = document.createElement("style");
         style.id = "skill-tree-css";
@@ -1375,6 +1377,17 @@ function injectSkillTreeStyles() {
 export function renderHotbar() {
     injectSkillTreeStyles(); 
 
+    // Sync our local hotbar mirror with the authoritative server state
+    if (uiRoom) {
+        const me = uiRoom.state.players.get(uiRoom.sessionId);
+        if (me && me.hotbar) {
+            [2, 3, 4, 5, 6, 7, 8, 9].forEach(slotNum => {
+                const key = `slot${slotNum}`;
+                playerHotbar[key] = me.hotbar.get(key) || "";
+            });
+        }
+    }
+
     let hotbar = document.getElementById("action-bar");
     if (!hotbar) {
         hotbar = document.createElement("div");
@@ -1396,7 +1409,7 @@ export function renderHotbar() {
 
     // Render Combat Slots (2-5)
     [2, 3, 4, 5].forEach(slotNum => {
-        const abilityId = playerHotbar[`slot${slotNum}` as keyof typeof playerHotbar];
+        const abilityId = playerHotbar[`slot${slotNum}`];
         const def = getSkillDef(abilityId);
         if (def) {
             html += createSlotHTML(slotNum.toString(), def.icon, def.name, def.color);
@@ -1407,7 +1420,7 @@ export function renderHotbar() {
 
     // Render Utility Slots (6-7)
     [6, 7].forEach(slotNum => {
-        const abilityId = playerHotbar[`slot${slotNum}` as keyof typeof playerHotbar];
+        const abilityId = playerHotbar[`slot${slotNum}`];
         const def = getSkillDef(abilityId);
         if (def) {
             html += createSlotHTML(slotNum.toString(), def.icon, def.name, def.color, slotNum === 6);
@@ -1418,7 +1431,7 @@ export function renderHotbar() {
 
     // Render Familiar Slots (8-9)
     [8, 9].forEach(slotNum => {
-        const abilityId = playerHotbar[`slot${slotNum}` as keyof typeof playerHotbar];
+        const abilityId = playerHotbar[`slot${slotNum}`];
         const def = getSkillDef(abilityId);
         if (def) {
             html += createSlotHTML(slotNum.toString(), def.icon, def.name, def.color, slotNum === 8);
@@ -1452,7 +1465,7 @@ export function renderHotbar() {
     }
 }
 
-// --- ADDED: QUICK CHAT HOTBAR RENDERER ---
+// --- QUICK CHAT HOTBAR RENDERER ---
 (window as any).renderChatHotbar = function(showChat: boolean) {
     const container = document.getElementById("action-bar");
     if (!container) return;
@@ -1536,7 +1549,7 @@ export function tickCooldownsUI(dt: number) {
     };
     
     [2, 3, 4, 5, 6, 7, 8, 9].forEach(slotNum => {
-        const abilityId = playerHotbar[`slot${slotNum}` as keyof typeof playerHotbar];
+        const abilityId = playerHotbar[`slot${slotNum}`];
         if (abilityId) {
             const def = getSkillDef(abilityId);
             const currentCooldown = abilityCooldowns[`slot${slotNum}` as keyof typeof abilityCooldowns];
@@ -1562,11 +1575,22 @@ export function openSkillTreeUI(activeRoom: any, pathway: string, keys: any) {
         document.body.appendChild(modal);
     }
 
+    // Capture initial server state on load so the UI matches the DB
+    const me = activeRoom.state.players.get(activeRoom.sessionId);
+    if (me) {
+        if (me.utilityPathway) currentUtilityPathway = me.utilityPathway;
+        if (me.familiarPathway) currentFamiliarPathway = me.familiarPathway;
+    }
+
     const renderTree = () => {
         if (!activeRoom || !isSkillTreeUIOpen) return;
         const state = activeRoom.state as any;
         const me = state.players.get(activeRoom.sessionId);
         if (!me) return;
+
+        // SYNC local UI pathways to server state on first render
+        if (currentUtilityPathway === "wayfinder" && me.utilityPathway) currentUtilityPathway = me.utilityPathway;
+        if (currentFamiliarPathway === "apocalyptic_swarm" && me.familiarPathway) currentFamiliarPathway = me.familiarPathway;
 
         const activeCategoryTab = currentTreeMode === "familiar" ? activeFamiliarCategoryTab : (currentTreeMode === "utility" ? activeUtilityCategoryTab : activeCombatCategoryTab);
         const activeSkillId = currentTreeMode === "familiar" ? activeFamiliarSkillId : (currentTreeMode === "utility" ? activeUtilitySkillId : activeCombatSkillId);
@@ -1577,7 +1601,7 @@ export function openSkillTreeUI(activeRoom: any, pathway: string, keys: any) {
         else if (currentTreeMode === "utility") treeData = UTILITY_TREE_DATA[currentUtilityPathway] || UTILITY_TREE_DATA["wayfinder"];
         else treeData = SKILL_TREE_DATA[pathway] || SKILL_TREE_DATA["shadow"];
 
-        const pathwayData = treeData[activeCategoryTab] || {};
+        const pathwayData = treeData[activeCategoryTab as keyof typeof treeData] || {};
         const abilityKeys = Object.keys(pathwayData);
 
         let unspentEssence = me.skillTree?.unspentEssencePoints || 0;
@@ -1590,8 +1614,8 @@ export function openSkillTreeUI(activeRoom: any, pathway: string, keys: any) {
         
         // Scan for Utility Commitments
         for (const pKey in UTILITY_TREE_DATA) {
-            for (const cKey in UTILITY_TREE_DATA[pKey]) {
-                for (const sKey in UTILITY_TREE_DATA[pKey][cKey]) {
+            for (const cKey in UTILITY_TREE_DATA[pKey as keyof typeof UTILITY_TREE_DATA]) {
+                for (const sKey in UTILITY_TREE_DATA[pKey as keyof typeof UTILITY_TREE_DATA][cKey as any]) {
                     const skillState = activeAbilities.get(sKey);
                     if (skillState && skillState.upgrades) {
                         let hasPoints = false;
@@ -1606,8 +1630,8 @@ export function openSkillTreeUI(activeRoom: any, pathway: string, keys: any) {
 
         // Scan for Familiar Commitments
         for (const pKey in FAMILIAR_TREE_DATA) {
-            for (const cKey in FAMILIAR_TREE_DATA[pKey]) {
-                for (const sKey in FAMILIAR_TREE_DATA[pKey][cKey]) {
+            for (const cKey in FAMILIAR_TREE_DATA[pKey as keyof typeof FAMILIAR_TREE_DATA]) {
+                for (const sKey in FAMILIAR_TREE_DATA[pKey as keyof typeof FAMILIAR_TREE_DATA][cKey as any]) {
                     const skillState = activeAbilities.get(sKey);
                     if (skillState && skillState.upgrades) {
                         let hasPoints = false;
@@ -1621,7 +1645,7 @@ export function openSkillTreeUI(activeRoom: any, pathway: string, keys: any) {
         }
 
         // --- CURRENT TAB COMMITMENT CHECK ---
-        const targetSlot = activeMap[activeCategoryTab].slot;
+        const targetSlot = activeMap[activeCategoryTab as keyof typeof activeMap].slot;
         let committedAbilityId: string | null = null;
         
         abilityKeys.forEach(key => {
@@ -1638,7 +1662,7 @@ export function openSkillTreeUI(activeRoom: any, pathway: string, keys: any) {
         });
 
         if (!committedAbilityId) {
-            const currentSlotSkill = playerHotbar[`slot${targetSlot}` as keyof typeof playerHotbar];
+            const currentSlotSkill = playerHotbar[`slot${targetSlot}`];
             if (currentSlotSkill && abilityKeys.includes(currentSlotSkill)) {
                 committedAbilityId = currentSlotSkill;
             }
@@ -1647,7 +1671,7 @@ export function openSkillTreeUI(activeRoom: any, pathway: string, keys: any) {
         let newActiveSkillId = activeSkillId;
         if (committedAbilityId && (!activeSkillId || !abilityKeys.includes(activeSkillId))) {
             newActiveSkillId = committedAbilityId;
-        } else if (!activeSkillId || !pathwayData[activeSkillId]) {
+        } else if (!activeSkillId || !pathwayData[newActiveSkillId]) {
             newActiveSkillId = abilityKeys[0] || ""; 
         }
 
@@ -1670,7 +1694,7 @@ export function openSkillTreeUI(activeRoom: any, pathway: string, keys: any) {
         let tabsHtml = `<div style="display:flex; margin-bottom: 0;">`;
         Object.keys(activeMap).forEach(category => {
             const isTabActive = category === activeCategoryTab;
-            const displayName = `${activeMap[category].name} (Slot ${activeMap[category].slot})`;
+            const displayName = `${activeMap[category as keyof typeof activeMap].name} (Slot ${activeMap[category as keyof typeof activeMap].slot})`;
             tabsHtml += `<div id="tab-${category}" class="st-tab ${isTabActive ? 'active' : ''}" style="color: ${isTabActive ? tabColor : '#94a3b8'}; border-color: ${isTabActive ? tabColor : '#475569'};">${displayName}</div>`;
         });
         tabsHtml += `</div>`;
@@ -1720,7 +1744,7 @@ export function openSkillTreeUI(activeRoom: any, pathway: string, keys: any) {
             navHtml += `</div>`;
         }
 
-        // --- 2. Left Pane: Ability Selection (Now Horizontal Chunky Row) ---
+        // --- 2. Left Pane: Ability Selection ---
         let leftPaneHtml = `<div class="st-scrollbar" style="display:flex; flex-wrap:wrap; justify-content:center; gap: 15px; padding: 10px;">`;
         
         if (abilityKeys.length === 0) {
@@ -1752,7 +1776,7 @@ export function openSkillTreeUI(activeRoom: any, pathway: string, keys: any) {
         let rightPaneHtml = "";
 
         if (activeSkillData) {
-            const isEquipped = playerHotbar[`slot${targetSlot}` as keyof typeof playerHotbar] === newActiveSkillId;
+            const isEquipped = playerHotbar[`slot${targetSlot}`] === newActiveSkillId;
             
             let equipBtnClass = "btn-blue";
             let equipBtnText = `SELECT SLOT ${targetSlot}`;
@@ -1957,6 +1981,7 @@ export function openSkillTreeUI(activeRoom: any, pathway: string, keys: any) {
                     btn.onclick = () => {
                         currentUtilityPathway = pathId;
                         activeUtilitySkillId = "";
+                        syncLocalStateToServer(activeRoom); // SYNC TO SERVER
                         renderTree();
                     };
                 }
@@ -1969,6 +1994,7 @@ export function openSkillTreeUI(activeRoom: any, pathway: string, keys: any) {
                     btn.onclick = () => {
                         currentFamiliarPathway = pathId;
                         activeFamiliarSkillId = "";
+                        syncLocalStateToServer(activeRoom); // SYNC TO SERVER
                         renderTree();
                     };
                 }
@@ -2008,12 +2034,15 @@ export function openSkillTreeUI(activeRoom: any, pathway: string, keys: any) {
 
         if (activeSkillData) {
             const equipBtnNode = document.getElementById("btn-equip-pathway");
-            const isEquipped = playerHotbar[`slot${targetSlot}` as keyof typeof playerHotbar] === newActiveSkillId;
+            const isEquipped = playerHotbar[`slot${targetSlot}`] === newActiveSkillId;
             
             if (equipBtnNode && !isEquipped && !isCurrentlyViewedSkillLocked && !isSystemPathwayLockedOut) {
                 equipBtnNode.onclick = () => {
-                    playerHotbar[`slot${targetSlot}` as keyof typeof playerHotbar] = newActiveSkillId;
-                    saveHotbar();
+                    // Send to server to maintain ground truth
+                    activeRoom.send("updateHotbar", { slot: `slot${targetSlot}`, abilityId: newActiveSkillId });
+                    
+                    // Optimistically update the UI mirror
+                    playerHotbar[`slot${targetSlot}`] = newActiveSkillId;
                     renderHotbar();
                     renderTree();
                 };
@@ -2031,10 +2060,14 @@ export function openSkillTreeUI(activeRoom: any, pathway: string, keys: any) {
                             btn.setAttribute("disabled", "true");
 
                             localCommittedSlots[activeCategoryTab] = newActiveSkillId;
+                            
                             activeRoom.send("upgradeSkill", { abilityId: newActiveSkillId, upgradeId: uKey });
                             
-                            playerHotbar[`slot${targetSlot}` as keyof typeof playerHotbar] = newActiveSkillId;
-                            saveHotbar();
+                            // Send to server to ensure it is locked into the hotbar
+                            activeRoom.send("updateHotbar", { slot: `slot${targetSlot}`, abilityId: newActiveSkillId });
+                            
+                            // Optimistically update local UI
+                            playerHotbar[`slot${targetSlot}`] = newActiveSkillId;
                             renderHotbar();
                             
                             setTimeout(renderTree, 150); 

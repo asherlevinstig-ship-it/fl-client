@@ -137,12 +137,13 @@ function injectGlobalChunkyStyles() {
             
             /* FIXED: Flipped z-index so the red starvation cap renders OVER the yellow stamina */
             .fill-stamina { background: #eab308; border-right: 2px solid #b45309; z-index: 0;}
-            .fill-hunger-cap { 
-                position: absolute; 
-                right: 0; top: 0; height: 100%; 
-                background: repeating-linear-gradient(45deg, #7f1d1d, #7f1d1d 10px, #991b1b 10px, #991b1b 20px); 
-                z-index: 1;
-            }
+           .fill-hunger-cap { 
+    position: absolute; 
+    right: 0; top: 0; height: 100%; 
+    background: repeating-linear-gradient(45deg, #7f1d1d, #7f1d1d 10px, #991b1b 10px, #991b1b 20px); 
+    z-index: 1;
+    transition: width 0.2s ease-out; /* <-- ADD THIS FOR PERFECT SYNERGY */
+}
         `;
         document.head.appendChild(style);
     }

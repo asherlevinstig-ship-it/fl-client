@@ -311,7 +311,7 @@ function initAdminPanel() {
     resetBtn.style.borderRadius = "4px";
     resetBtn.style.cursor = "pointer";
     resetBtn.onclick = () => {
-        localStorage.removeItem("rpg_reconnection_token");
+       localStorage.removeItem(`rpg_reconnection_token_${PLAYER_NAME}`);
         window.location.reload();
     };
     panel.appendChild(resetBtn);
@@ -1101,10 +1101,10 @@ async function switchZone(nextZone: ZoneName): Promise<void> {
     }
     currentZone = nextZone; 
     
-    localStorage.setItem("rpg_last_zone", nextZone);
+    localStorage.setItem(`rpg_last_zone_${PLAYER_NAME}`, nextZone);
 
     if (activeRoom && activeScene) {
-      localStorage.setItem("rpg_reconnection_token", activeRoom.reconnectionToken);
+localStorage.setItem(`rpg_reconnection_token_${PLAYER_NAME}`, activeRoom.reconnectionToken);
       activeRoom.send("set_aura_style", { style: PLAYER_AURA_STYLE });
 
       if (typeof (activeScene as any).start === "function") {
@@ -2462,8 +2462,8 @@ async function boot(): Promise<void> {
   
   startHudLoop(); 
 
-  const lastZone = (localStorage.getItem("rpg_last_zone") as ZoneName) || "town";
-  const reconnectionToken = localStorage.getItem("rpg_reconnection_token");
+const lastZone = (localStorage.getItem(`rpg_last_zone_${PLAYER_NAME}`) as ZoneName) || "town";
+  const reconnectionToken = localStorage.getItem(`rpg_reconnection_token_${PLAYER_NAME}`);
 
   let reconnected = false;
 

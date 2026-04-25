@@ -1537,7 +1537,7 @@ function setupInput(): void {
 
     const isOutsideTown = activeScene instanceof TownScene && activeScene.isOutsideTown(localPlayerPos.x, localPlayerPos.y);
 
-    if (event.key === "e" || event.key === "E") {
+    if (event.key === "f" || event.key === "F") {
       let interactionTriggered = false;
       
       if (activeScene instanceof TownScene && !isOutsideTown) {

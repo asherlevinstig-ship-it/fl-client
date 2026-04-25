@@ -35,6 +35,7 @@ let uiRoom: any = null;
 
 // --- AUTHORITATIVE COLYSEUS STATE BINDING ---
 // The vital fix: Synchronizes initial state and tracks future network updates safely
+// The vital fix: Synchronizes initial state and tracks future network updates safely for Colyseus <= 0.14
 export function setAbilityUIRoom(room: any) {
     if (uiRoom === room) return; 
     uiRoom = room;
@@ -44,43 +45,45 @@ export function setAbilityUIRoom(room: any) {
         if (player.hotbar) {
             if (typeof player.hotbar.forEach === "function") {
                 player.hotbar.forEach((value: string, key: string) => {
-                    playerHotbar[key] = value;
+                    playerHotbar[key] = value || "";
                 });
             } else {
                 for (const key in player.hotbar) {
-                    playerHotbar[key] = player.hotbar[key];
+                    playerHotbar[key] = player.hotbar[key] || "";
                 }
             }
             renderHotbar();
 
-            // Safely attach modern Colyseus listeners (NO assignments!)
-            try {
-                player.hotbar.onAdd((value: string, key: string) => {
-                    playerHotbar[key] = value;
-                    renderHotbar();
-                });
-                player.hotbar.onChange((value: string, key: string) => {
-                    playerHotbar[key] = value;
-                    renderHotbar();
-                });
-            } catch (e) {
-                console.warn("[UI] Could not bind hotbar dynamic listeners. Fallback required.", e);
+            const handleHotbarUpdate = (value: string, key: string) => {
+                playerHotbar[key] = value || "";
+                renderHotbar();
+            };
+
+            // Version-agnostic binding (Falls back safely to your Colyseus 0.14 architecture)
+            if (typeof player.hotbar.onAdd === "function") {
+                player.hotbar.onAdd(handleHotbarUpdate);
+                if (typeof player.hotbar.onChange === "function") player.hotbar.onChange(handleHotbarUpdate);
+            } else {
+                player.hotbar.onAdd = handleHotbarUpdate;
+                player.hotbar.onChange = handleHotbarUpdate;
             }
         }
 
         if (player.utilityPathway) currentUtilityPathway = player.utilityPathway;
         if (player.familiarPathway) currentFamiliarPathway = player.familiarPathway;
 
-        try {
-            player.onChange((changes: any[]) => {
-                if (!changes) return;
-                changes.forEach((change: any) => {
-                    if (change.field === "utilityPathway") currentUtilityPathway = change.value;
-                    if (change.field === "familiarPathway") currentFamiliarPathway = change.value;
-                });
+        const handlePlayerChange = (changes: any[]) => {
+            if (!changes) return;
+            changes.forEach((change: any) => {
+                if (change.field === "utilityPathway") currentUtilityPathway = change.value;
+                if (change.field === "familiarPathway") currentFamiliarPathway = change.value;
             });
-        } catch (e) {
-            console.warn("[UI] Could not bind player onChange.", e);
+        };
+
+        if (typeof player.onChange === "function") {
+            player.onChange(handlePlayerChange);
+        } else {
+            player.onChange = handlePlayerChange;
         }
     };
 
@@ -89,12 +92,16 @@ export function setAbilityUIRoom(room: any) {
     if (me) attachListeners(me);
 
     // Catch the player state arriving slightly later
-    try {
-        uiRoom.state.players.onAdd((player: any, sessionId: string) => {
-            if (sessionId === uiRoom.sessionId) attachListeners(player);
-        });
-    } catch (e) {
-        console.warn("[UI] Could not bind players.onAdd.", e);
+    const handlePlayerAdd = (player: any, sessionId: string) => {
+        if (sessionId === uiRoom.sessionId) attachListeners(player);
+    };
+
+    if (uiRoom.state.players) {
+        if (typeof uiRoom.state.players.onAdd === "function") {
+            uiRoom.state.players.onAdd(handlePlayerAdd);
+        } else {
+            uiRoom.state.players.onAdd = handlePlayerAdd;
+        }
     }
 }
 

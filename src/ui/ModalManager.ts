@@ -1272,10 +1272,9 @@ export function openEventInviteUI(activeRoom: any, eventName: string, targetZone
         modal.id = "event-invite-modal";
         modal.className = "modal-chunky";
         modal.style.position = "fixed";
-        // Spawns near the top so it doesn't block the center of the screen during combat
-        modal.style.top = "15%"; 
+        modal.style.top = "50%"; 
         modal.style.left = "50%";
-        modal.style.transform = "translateX(-50%)";
+        modal.style.transform = "translate(-50%, -50%)";
         modal.style.padding = "30px";
         modal.style.zIndex = "4000";
         modal.style.width = "420px";
@@ -1292,8 +1291,8 @@ export function openEventInviteUI(activeRoom: any, eventName: string, targetZone
         The <b style="color: #38bdf8;">${eventName}</b> is now open! Do you want to teleport there immediately?
       </p>
       <div style="display:flex; gap: 15px;">
-          <button id="join-event-btn" class="btn-chunky btn-green" style="flex: 1; padding: 15px;">Yes, Join!</button>
-          <button id="decline-event-btn" class="btn-chunky btn-slate" style="flex: 1; padding: 15px;">Ignore</button>
+          <button id="join-event-btn" class="btn-chunky btn-green" style="flex: 1; padding: 15px;">Join Event</button>
+          <button id="decline-event-btn" class="btn-chunky btn-slate" style="flex: 1; padding: 15px;">Skip</button>
       </div>
     `;
 
@@ -1308,7 +1307,6 @@ export function openEventInviteUI(activeRoom: any, eventName: string, targetZone
     };
 
     document.getElementById("join-event-btn")!.onclick = () => {
-        // Triggers the existing teleport handler on your server
         activeRoom.send("teleport", { destination: targetZone }); 
         isEventInviteOpen = false;
         if (document.body.contains(modal!)) document.body.removeChild(modal!);

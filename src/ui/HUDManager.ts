@@ -1723,6 +1723,7 @@ export function openStoreMenu(activeRoom: any, playerState: any, storeState: any
         modal.className = "modal-chunky";
         modal.style.position = "fixed";
         modal.style.top = "50%";
+        modal.style.left = "50%"; // <-- ADD THIS LINE
         modal.style.transform = "translate(-50%, -50%)";
         modal.style.width = "550px";
         modal.style.maxHeight = "80vh";

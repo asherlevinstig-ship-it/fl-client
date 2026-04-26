@@ -43,6 +43,7 @@ let currentBiomeName = "";
 let zonePopupExpiresAt = 0;
 
 // --- GLOBAL CHUNKY STYLES INJECTION ---
+// --- GLOBAL CHUNKY STYLES INJECTION ---
 export function injectGlobalChunkyStyles() {
     if (!document.getElementById("chunky-ui-styles")) {
         const style = document.createElement("style");
@@ -77,21 +78,15 @@ export function injectGlobalChunkyStyles() {
                 align-items: center;
                 gap: 8px;
             }
-            .btn-chunky:active:not(:disabled) {
-                transform: translateY(6px);
-            }
+            .btn-chunky:active:not(:disabled) { transform: translateY(6px); }
             .btn-green { background: #22c55e; color: white; box-shadow: 0 6px 0 #16a34a; }
             .btn-green:active:not(:disabled) { box-shadow: 0 0px 0 #16a34a; }
-            
             .btn-red { background: #ef4444; color: white; box-shadow: 0 6px 0 #b91c1c; }
             .btn-red:active:not(:disabled) { box-shadow: 0 0px 0 #b91c1c; }
-            
             .btn-blue { background: #3b82f6; color: white; box-shadow: 0 6px 0 #2563eb; }
             .btn-blue:active:not(:disabled) { box-shadow: 0 0px 0 #2563eb; }
-
             .btn-gold { background: #f59e0b; color: white; box-shadow: 0 6px 0 #d97706; }
             .btn-gold:active:not(:disabled) { box-shadow: 0 0px 0 #d97706; }
-
             .btn-slate { background: #475569; color: white; box-shadow: 0 6px 0 #334155; }
             .btn-slate:active:not(:disabled) { box-shadow: 0 0px 0 #334155; }
 
@@ -102,90 +97,45 @@ export function injectGlobalChunkyStyles() {
                 font-size: 20px; transition: transform 0.1s, box-shadow 0.1s;
                 flex-shrink: 0;
             }
-            .btn-close-chunky:active {
-                transform: translateY(4px); box-shadow: 0 0px 0 #b91c1c;
-            }
+            .btn-close-chunky:active { transform: translateY(4px); box-shadow: 0 0px 0 #b91c1c; }
             
             .chunky-panel {
                 background: #334155; border-radius: 16px; padding: 15px; border: 3px solid #475569;
             }
 
-            /* --- HUD STYLES --- */
+            /* --- HUD BARS --- */
             #chunky-hud-container {
-                position: fixed;
-                top: 20px;
-                left: 20px;
-                display: flex;
-                flex-direction: column;
-                gap: 12px;
-                z-index: 50;
-                font-family: 'Nunito', 'Segoe UI Rounded', sans-serif;
-                pointer-events: none; 
+                position: fixed; top: 20px; left: 20px; display: flex; flex-direction: column;
+                gap: 12px; z-index: 50; font-family: 'Nunito', sans-serif; pointer-events: none; 
             }
             .hud-bar-bg {
-                width: 250px;
-                height: 32px;
-                background: #1e293b;
-                border: 4px solid #475569;
-                border-radius: 16px;
-                position: relative;
-                overflow: hidden;
-                box-shadow: 0 8px 15px rgba(0,0,0,0.3);
+                width: 250px; height: 32px; background: #1e293b; border: 4px solid #475569;
+                border-radius: 16px; position: relative; overflow: hidden; box-shadow: 0 8px 15px rgba(0,0,0,0.3);
             }
-            .hud-bar-fill {
-                height: 100%;
-                border-radius: 10px;
-                transition: width 0.2s ease-out;
-                position: relative;
-            }
+            .hud-bar-fill { height: 100%; border-radius: 10px; transition: width 0.2s ease-out; position: relative; }
             .hud-bar-fill::after {
-                content: '';
-                position: absolute;
-                top: 2px;
-                left: 2px;
-                right: 2px;
-                height: 8px;
-                background: rgba(255, 255, 255, 0.3);
-                border-radius: 6px;
+                content: ''; position: absolute; top: 2px; left: 2px; right: 2px; height: 8px;
+                background: rgba(255, 255, 255, 0.3); border-radius: 6px;
             }
-            .hud-icon {
-                position: absolute;
-                left: -15px;
-                top: -10px;
-                font-size: 36px;
-                filter: drop-shadow(0 4px 0 rgba(0,0,0,0.4));
-                z-index: 2;
-            }
-            .hud-text {
-                position: absolute;
-                right: 12px;
-                top: 50%;
-                transform: translateY(-50%);
-                color: white;
-                font-weight: 900;
-                font-size: 14px;
-                text-shadow: 0 2px 0 rgba(0,0,0,0.5);
-                z-index: 2;
-            }
+            .hud-icon { position: absolute; left: -15px; top: -10px; font-size: 36px; filter: drop-shadow(0 4px 0 rgba(0,0,0,0.4)); z-index: 2; }
+            .hud-text { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); color: white; font-weight: 900; font-size: 14px; text-shadow: 0 2px 0 rgba(0,0,0,0.5); z-index: 2; }
             .fill-hp { background: #ef4444; border-right: 2px solid #b91c1c; }
             .fill-mp { background: #3b82f6; border-right: 2px solid #2563eb; }
             .fill-stamina { background: #eab308; border-right: 2px solid #b45309; z-index: 1;}
-            .fill-hunger-cap { 
-                position: absolute; 
-                right: 0; top: 0; height: 100%; 
-                background: repeating-linear-gradient(45deg, #7f1d1d, #7f1d1d 10px, #991b1b 10px, #991b1b 20px); 
-                z-index: 0;
-            }
+            .fill-hunger-cap { position: absolute; right: 0; top: 0; height: 100%; background: repeating-linear-gradient(45deg, #7f1d1d, #7f1d1d 10px, #991b1b 10px, #991b1b 20px); z-index: 0; }
 
-            .hud-input {
-                background: #f8fafc; border: 3px solid #94a3b8; color: #0f172a;
-                padding: 10px; border-radius: 12px; font-family: 'Nunito', sans-serif; font-weight: bold;
-                width: 80px; outline: none; transition: border-color 0.2s;
-            }
-            .hud-input:focus { border-color: #3b82f6; }
-
-            .roster-hp-bg { width: 100%; height: 10px; background: #0f172a; border: 2px solid #334155; border-radius: 5px; overflow: hidden; margin-top: 4px; }
-            .roster-hp-fill { height: 100%; transition: width 0.2s; }
+            /* --- TEXT & CONTROLS STYLING (Restored!) --- */
+            .text-cyan { color: #22d3ee; }
+            .text-blue { color: #38bdf8; }
+            .text-green { color: #22c55e; }
+            .text-amber { color: #f59e0b; }
+            .text-red { color: #ef4444; }
+            .text-magenta { color: #d946ef; }
+            .text-muted { color: #94a3b8; }
+            .text-sm { font-size: 14px; font-weight: 700; }
+            .text-md { font-size: 16px; font-weight: 900; }
+            .text-lg { font-size: 18px; font-weight: 900; }
+            .text-xl { font-size: 22px; font-weight: 900; }
 
             .hud-key {
                 background: #f8fafc;
@@ -201,44 +151,35 @@ export function injectGlobalChunkyStyles() {
                 margin: 0 4px;
             }
             .controls-group { display: flex; flex-direction: column; gap: 10px; align-items: flex-end; }
-            .controls-row { display: flex; align-items: center; gap: 8px; }
+            /* Added a text-shadow so the white/muted text pops clearly over the 3D world */
+            .controls-row { display: flex; align-items: center; gap: 8px; text-shadow: 0 2px 4px rgba(0,0,0,0.8); } 
 
+            .hud-input {
+                background: #f8fafc; border: 3px solid #94a3b8; color: #0f172a;
+                padding: 10px; border-radius: 12px; font-family: 'Nunito', sans-serif; font-weight: bold;
+                width: 80px; outline: none; transition: border-color 0.2s;
+            }
+            .hud-input:focus { border-color: #3b82f6; }
+
+            /* --- POPUPS & EVENTS --- */
             .zone-popup {
                 position: fixed; top: 35%; left: 50%; transform: translate(-50%, -50%);
                 text-align: center; z-index: 2000; pointer-events: none;
                 opacity: 0; transition: opacity 0.5s ease-in-out, transform 0.5s cubic-bezier(0.2, 0.8, 0.2, 1);
-                background: rgba(15, 23, 42, 0.8);
-                border: 4px solid #334155;
-                padding: 30px 60px; border-radius: 30px;
-                box-shadow: 0 20px 40px rgba(0,0,0,0.5);
+                background: rgba(15, 23, 42, 0.8); border: 4px solid #334155;
+                padding: 30px 60px; border-radius: 30px; box-shadow: 0 20px 40px rgba(0,0,0,0.5);
             }
-            .zone-popup.active {
-                opacity: 1;
-                transform: translate(-50%, -45%);
-            }
+            .zone-popup.active { opacity: 1; transform: translate(-50%, -45%); }
 
             #event-log-container {
-                position: fixed;
-                bottom: 20px;
-                left: 20px;
-                width: 350px;
-                display: flex;
-                flex-direction: column;
-                justify-content: flex-end;
-                gap: 8px;
-                pointer-events: none;
-                z-index: 1000;
+                position: fixed; bottom: 20px; left: 20px; width: 350px; display: flex;
+                flex-direction: column; justify-content: flex-end; gap: 8px;
+                pointer-events: none; z-index: 1000;
             }
             .event-message {
-                background: #1e293b;
-                color: white;
-                padding: 10px 15px;
-                border-radius: 12px;
-                font-family: 'Nunito', sans-serif;
-                font-size: 14px;
-                font-weight: 700;
-                box-shadow: 0 4px 10px rgba(0,0,0,0.3);
-                animation: fadeOutEvent 6s forwards;
+                background: #1e293b; color: white; padding: 10px 15px; border-radius: 12px;
+                font-family: 'Nunito', sans-serif; font-size: 14px; font-weight: 700;
+                box-shadow: 0 4px 10px rgba(0,0,0,0.3); animation: fadeOutEvent 6s forwards;
                 border-left: 6px solid #94a3b8;
             }
             .event-join { border-left-color: #22d3ee; }
@@ -257,10 +198,7 @@ export function injectGlobalChunkyStyles() {
             ::-webkit-scrollbar-thumb:hover { background: #64748b; }
 
             /* --- RESPONSIVE MODAL LAYOUTS --- */
-            .responsive-split-container {
-                display: flex;
-                gap: 30px;
-            }
+            .responsive-split-container { display: flex; gap: 30px; }
 
             @media (max-width: 1200px) {
                 #hud-bottom-right { transform: scale(0.85); transform-origin: bottom right; }
@@ -274,29 +212,15 @@ export function injectGlobalChunkyStyles() {
             }
 
             @media (max-width: 800px) {
-                .responsive-split-container {
-                    flex-direction: column;
-                    gap: 15px;
-                }
-                #inv-equip-container {
-                    flex: auto !important;
-                    width: 100%;
-                    grid-template-columns: repeat(3, 1fr) !important;
-                }
-                .chest-panel-half {
-                    flex: auto !important;
-                    width: 100%;
-                }
-                .modal-chunky {
-                    padding: 15px !important;
-                }
+                .responsive-split-container { flex-direction: column; gap: 15px; }
+                #inv-equip-container { flex: auto !important; width: 100%; grid-template-columns: repeat(3, 1fr) !important; }
+                .chest-panel-half { flex: auto !important; width: 100%; }
+                .modal-chunky { padding: 15px !important; }
                 .hud-bar-bg { width: 200px; }
             }
 
             @media (max-width: 500px) {
-                #inv-equip-container {
-                    grid-template-columns: repeat(2, 1fr) !important;
-                }
+                #inv-equip-container { grid-template-columns: repeat(2, 1fr) !important; }
                 .hud-bar-bg { width: 160px; }
                 #hud-text { font-size: 14px !important; }
             }
@@ -304,7 +228,6 @@ export function injectGlobalChunkyStyles() {
         document.head.appendChild(style);
     }
 }
-
 // --- EXPORTED HUD RENDERING ---
 export function renderChunkyHUD(player: any) {
     if (!player) return;

@@ -3,15 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Server Administration</title>
-    
-    <script>
-        window.global = window;
-        window.Buffer = window.Buffer || [];
-    </script>
-    
-    <script src="https://unpkg.com/colyseus.js@0.15.0/dist/colyseus.js"></script>
-    
+    <title>Database Administration</title>
     <style>
         body {
             font-family: system-ui, -apple-system, sans-serif;
@@ -60,114 +52,142 @@
             cursor: pointer;
             transition: background 0.2s;
         }
-        button:hover {
-            background: #004c99;
-        }
+        button:hover { background: #004c99; }
+        .btn-warning { background: #e67e22; }
+        .btn-warning:hover { background: #d35400; }
+        .btn-success { background: #27ae60; }
+        .btn-success:hover { background: #2ecc71; }
+        
         .action-row {
             display: flex;
             gap: 10px;
+            align-items: flex-end;
         }
-        .status-text {
-            font-weight: bold;
-            margin-top: 10px;
+        #logArea {
+            background: #222;
+            color: #00ff00;
+            padding: 15px;
+            border-radius: 4px;
+            font-family: monospace;
+            height: 150px;
+            overflow-y: auto;
+            margin-top: 20px;
         }
-        .connected { color: #2ecc71; }
-        .disconnected { color: #e74c3c; }
+        .warning-text {
+            color: #e74c3c;
+            font-size: 0.85rem;
+            margin-top: -10px;
+            margin-bottom: 15px;
+            font-style: italic;
+        }
     </style>
 </head>
 <body>
 
-    <h1>Server Administration</h1>
+    <h1>Database Administration</h1>
+    <p class="warning-text">⚠️ Note: Players must be offline for database changes to persist. If they are online, the server's auto-save will overwrite these edits.</p>
 
     <div class="panel">
-        <h2>Connection Settings</h2>
+        <h2>Authentication & Target</h2>
         <div class="form-group">
-            <label for="serverUrl">Server URL</label>
-            <input type="text" id="serverUrl" value="ws://localhost:2567">
+            <label for="apiUrl">Backend API URL</label>
+            <input type="text" id="apiUrl" value="http://localhost:2567/api/admin/update-player">
         </div>
         <div class="form-group">
             <label for="adminToken">Admin Password</label>
             <input type="password" id="adminToken" placeholder="Enter security token">
         </div>
-        <button id="connectBtn">Connect to Server</button>
-        <div class="status-text disconnected" id="statusDisplay">Status: Disconnected</div>
+        <div class="form-group">
+            <label for="targetPlayer">Target Player Name (Exact Database ID)</label>
+            <input type="text" id="targetPlayer" placeholder="e.g., Student_Name">
+        </div>
     </div>
 
-    <div class="panel" id="controlsPanel" style="display: none;">
-        <h2>Player Management</h2>
-        <div class="form-group">
-            <label for="targetPlayer">Target Session ID</label>
-            <input type="text" id="targetPlayer" placeholder="Leave blank to target self (if spawned)">
-        </div>
-        <div class="action-row">
-            <button id="giveLevelBtn">Give Level</button>
-            <button id="resetSkillsBtn" style="background: #e67e22;">Reset Skills</button>
-        </div>
+    <div class="panel">
+        <h2>Direct Database Actions</h2>
         
-        <h2 style="margin-top: 30px;">World Events</h2>
+        <div class="action-row" style="margin-bottom: 20px;">
+            <button id="giveLevelBtn">Grant 1 Level</button>
+            <button id="resetSkillsBtn" class="btn-warning">Reset All Skills & Points</button>
+        </div>
+
+        <hr style="border: 1px solid #eee; margin: 20px 0;">
+
         <div class="action-row">
-            <button id="triggerEventBtn" style="background: #9b59b6;">Start Next Event Immediately</button>
+            <div class="form-group" style="flex: 2; margin-bottom: 0;">
+                <label for="itemName">Item Name</label>
+                <input type="text" id="itemName" placeholder="e.g., Iron Sword">
+            </div>
+            <div class="form-group" style="flex: 1; margin-bottom: 0;">
+                <label for="itemAmount">Amount</label>
+                <input type="number" id="itemAmount" value="1" min="1">
+            </div>
+            <button id="giveItemBtn" class="btn-success">Inject Item</button>
         </div>
     </div>
+
+    <div id="logArea">System Ready...</div>
 
     <script>
-        let client;
-        let activeRoom;
+        const logArea = document.getElementById('logArea');
 
-        document.getElementById('connectBtn').addEventListener('click', async () => {
-            const url = document.getElementById('serverUrl').value;
+        function log(message) {
+            const time = new Date().toLocaleTimeString();
+            logArea.innerHTML += `<br>[${time}] ${message}`;
+            logArea.scrollTop = logArea.scrollHeight;
+        }
+
+        async function sendAdminRequest(action, payload = {}) {
+            const url = document.getElementById('apiUrl').value;
             const token = document.getElementById('adminToken').value;
-            const statusEl = document.getElementById('statusDisplay');
+            const playerName = document.getElementById('targetPlayer').value;
 
-            statusEl.innerText = "Status: Connecting...";
-            statusEl.className = "status-text";
-            
-            client = new Colyseus.Client(url);
+            if (!token) return log("❌ Error: Admin Password is required.");
+            if (!playerName) return log("❌ Error: Target Player Name is required.");
+
+            log(`📡 Sending request: ${action}...`);
 
             try {
-                // Connect to your primary room. Passing the token securely in the options payload.
-                activeRoom = await client.joinOrCreate("town", { 
-                    name: "Admin", 
-                    adminToken: token 
-                });
-                
-                statusEl.innerText = "Status: Connected as Admin";
-                statusEl.className = "status-text connected";
-                document.getElementById('controlsPanel').style.display = "block";
-
-                activeRoom.onLeave((code) => {
-                    statusEl.innerText = "Status: Disconnected";
-                    statusEl.className = "status-text disconnected";
-                    document.getElementById('controlsPanel').style.display = "none";
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        adminToken: token,
+                        playerName: playerName,
+                        action: action,
+                        payload: payload
+                    })
                 });
 
-            } catch (error) {
-                statusEl.innerText = "Status: Connection Failed - " + error.message;
-                statusEl.className = "status-text disconnected";
+                const data = await response.json();
+
+                if (response.ok) {
+                    log(`✅ Success: ${data.message}`);
+                } else {
+                    log(`❌ Server Rejected: ${data.error}`);
+                }
+            } catch (err) {
+                log(`❌ Network Error: Could not connect to API.`);
             }
-        });
+        }
 
         document.getElementById('giveLevelBtn').addEventListener('click', () => {
-            const targetId = document.getElementById('targetPlayer').value;
-            if (activeRoom) {
-                activeRoom.send("adminLevelUp", { targetSessionId: targetId });
-                alert("Level command sent.");
-            }
+            sendAdminRequest('give_level');
         });
 
         document.getElementById('resetSkillsBtn').addEventListener('click', () => {
-            const targetId = document.getElementById('targetPlayer').value;
-            if (activeRoom && confirm("Are you sure you want to reset this player's skills?")) {
-                activeRoom.send("adminResetSkills", { targetSessionId: targetId });
-                alert("Skill reset command sent.");
+            if (confirm("Are you sure you want to completely wipe this player's active abilities?")) {
+                sendAdminRequest('reset_skills');
             }
         });
 
-        document.getElementById('triggerEventBtn').addEventListener('click', () => {
-            if (activeRoom) {
-                activeRoom.send("adminTriggerEvent");
-                alert("Event trigger command sent.");
-            }
+        document.getElementById('giveItemBtn').addEventListener('click', () => {
+            const itemName = document.getElementById('itemName').value;
+            const amount = document.getElementById('itemAmount').value;
+            
+            if (!itemName) return log("❌ Error: Item name is required.");
+            
+            sendAdminRequest('give_item', { itemName: itemName, amount: amount });
         });
     </script>
 

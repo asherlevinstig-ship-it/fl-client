@@ -40,6 +40,7 @@ import {
   openChestUI, 
   openShopUI, 
   openBlueprintSelector,
+  openEventInviteUI,
   isQuestUIOpen,
   isTeleportUIOpen,
   isCasinoUIOpen,
@@ -518,6 +519,10 @@ function setupRoomBindings(room: ActiveRoom, sceneObj: ActiveScene): () => void 
 
   room.onMessage("server_event_log", (data: { html: string, type: string }) => {
       addGameEvent(data.html, data.type);
+  });
+
+  room.onMessage("event_invite", (data: { eventName: string, targetZone: string }) => {
+      openEventInviteUI(room, data.eventName, data.targetZone);
   });
 
   room.onMessage("chat_received", (data: { senderId: string, senderName: string, text: string, channel: string, teamId: number }) => {

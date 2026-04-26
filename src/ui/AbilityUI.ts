@@ -34,7 +34,6 @@ export let temporarySkill: { id: string, label: string, icon: string } | null = 
 let uiRoom: any = null;
 
 // --- AUTHORITATIVE COLYSEUS STATE BINDING ---
-// The vital fix: Synchronizes initial state and tracks future network updates safely
 // The vital fix: Synchronizes initial state and tracks future network updates safely for Colyseus <= 0.14
 export function setAbilityUIRoom(room: any) {
     if (uiRoom === room) return; 
@@ -280,6 +279,26 @@ function injectSkillTreeStyles() {
             .st-scrollbar::-webkit-scrollbar-thumb { background: #64748b; border-radius: 4px; }
             
             .progress-fill { transition: width 0.3s ease-out; }
+
+            /* --- RESPONSIVE MEDIA QUERIES FOR SMALLER SCREENS --- */
+            @media (max-width: 1200px) {
+                #action-bar { padding: 10px; gap: 8px; bottom: 15px; }
+                .hotbar-slot { width: 55px; height: 55px; }
+                .hotbar-icon { font-size: 26px; }
+                .hotbar-key { font-size: 10px; padding: 2px 6px; }
+                .hotbar-label { font-size: 10px; bottom: -20px; }
+                #btn-temp-recall { margin-left: 10px !important; }
+                .chat-slot { width: 55px; height: 55px; }
+            }
+
+            @media (max-width: 900px) {
+                #action-bar { gap: 6px; padding: 8px; border-width: 3px; }
+                .hotbar-slot { width: 45px; height: 45px; border-width: 3px !important; }
+                .hotbar-icon { font-size: 20px; }
+                .hotbar-label { display: none; /* Hide labels to save vertical space */ }
+                .hotbar-cd-text { font-size: 20px; }
+                .st-modal { width: 95%; height: 90%; }
+            }
         `;
         document.head.appendChild(style);
     }

@@ -26,6 +26,10 @@ function injectGlobalChunkyStyles() {
                 border-radius: 24px;
                 box-shadow: 0 15px 40px rgba(0,0,0,0.4);
                 color: white;
+                box-sizing: border-box;
+                max-width: 95vw;
+                max-height: 90vh;
+                overflow-y: auto;
             }
             .btn-chunky {
                 border: none;
@@ -65,6 +69,7 @@ function injectGlobalChunkyStyles() {
                 width: 36px; height: 36px; color: white; border: none; font-weight: 900;
                 cursor: pointer; display: flex; align-items: center; justify-content: center;
                 font-size: 20px; transition: transform 0.1s, box-shadow 0.1s;
+                flex-shrink: 0;
             }
             .btn-close-chunky:active {
                 transform: translateY(4px); box-shadow: 0 0px 0 #b91c1c;
@@ -140,6 +145,38 @@ function injectGlobalChunkyStyles() {
                 background: repeating-linear-gradient(45deg, #7f1d1d, #7f1d1d 10px, #991b1b 10px, #991b1b 20px); 
                 z-index: 0;
             }
+
+            /* --- RESPONSIVE MODAL LAYOUTS --- */
+            .responsive-split-container {
+                display: flex;
+                gap: 30px;
+            }
+
+            @media (max-width: 800px) {
+                .responsive-split-container {
+                    flex-direction: column;
+                    gap: 15px;
+                }
+                #inv-equip-container {
+                    flex: auto !important;
+                    width: 100%;
+                    grid-template-columns: repeat(3, 1fr) !important;
+                }
+                .chest-panel-half {
+                    flex: auto !important;
+                    width: 100%;
+                }
+                .modal-chunky {
+                    padding: 15px !important;
+                }
+                .hud-bar-bg { width: 200px; }
+            }
+
+            @media (max-width: 500px) {
+                #inv-equip-container {
+                    grid-template-columns: repeat(2, 1fr) !important;
+                }
+            }
         `;
         document.head.appendChild(style);
     }
@@ -209,7 +246,6 @@ export function renderChunkyHUD(player: any) {
     if (stamFill && hungerFill && stamText) {
         stamFill.style.width = `${staminaPct}%`;
         hungerFill.style.width = `${hungerDeficitPct}%`;
-        // FIXED: Display Stamina / Max Stamina instead of Hunger!
         stamText.innerText = `${Math.ceil(player.stamina)} / ${player.maxStamina}`;
     }
 }
@@ -339,14 +375,10 @@ export function openTeleportUI(activeRoom: any, keys: any) {
 // --- EXPORTED UI STATE ---
 export let isCasinoUIOpen = false;
 
-// If you have a global style injector, ensure it's imported or defined.
-// import { injectGlobalChunkyStyles } from "./ModalManager"; 
-
 export function openCasinoUI(activeRoom: any, keys: any, gameType: string) {
     if (isCasinoUIOpen || !activeRoom) return;
     isCasinoUIOpen = true;
     
-    // Assumes injectGlobalChunkyStyles() is called elsewhere or here
     if (typeof (window as any).injectGlobalChunkyStyles === "function") {
         (window as any).injectGlobalChunkyStyles();
     }
@@ -657,7 +689,7 @@ export function openInventoryUI(activeRoom: any, keys: any, playerClass: string)
                 </div>
                 <button id="close-inv-btn" class="btn-close-chunky">&times;</button>
             </div>
-            <div style="display:flex; gap:30px;">
+            <div class="responsive-split-container">
                 <div id="inv-equip-container" class="chunky-panel" style="flex: 0 0 220px; display:grid; grid-template-columns: 1fr 1fr; gap:15px; justify-items:center;">
                 </div>
                 <div style="flex:1;">
@@ -720,7 +752,7 @@ export function refreshInventoryUI(activeRoom: any, playerClass: string) {
         const borderCol = item ? '#22c55e' : '#475569';
         const bgCol = item ? '#166534' : '#1e293b';
         return `
-            <div style="display:flex; flex-direction:column; align-items:center; gap:5px;">
+            <div style="display:flex; flex-direction:column; align-items:center; gap:5px; width: 100%;">
                 <div class="equip-slot" style="width:64px; height:64px; background:${bgCol}; border:4px solid ${borderCol}; border-radius:16px; display:flex; justify-content:center; align-items:center; font-size:32px; position:relative; box-shadow: inset 0 4px 8px rgba(0,0,0,0.3);">
                     ${item ? item.icon : `<span style="opacity:0.3; filter: grayscale(1);">${placeholder}</span>`}
                 </div>
@@ -736,7 +768,7 @@ export function refreshInventoryUI(activeRoom: any, playerClass: string) {
         ${getEquipSlotHTML(me.equippedItem, "🗡️", "Weapon")}
         ${getEquipSlotHTML(me.equipLegs, "👖", "Legs")}
         ${getEquipSlotHTML(me.equipOffHand, "🛡️", "Off Hand")}
-        <div style="grid-column: span 2; display:flex; justify-content:center;">
+        <div style="grid-column: span 2; display:flex; justify-content:center; width: 100%;" class="feet-equip-slot-wrapper">
             ${getEquipSlotHTML(me.equipFeet, "👞", "Feet")}
         </div>
     `;
@@ -802,12 +834,12 @@ export function openChestUI(activeRoom: any, keys: any, chestId: string) {
                 <h2 style="margin:0; color:#38bdf8; font-size: 26px; font-weight: 900;">Storage Chest</h2>
                 <button id="close-chest-btn" class="btn-close-chunky">&times;</button>
             </div>
-            <div style="display: flex; gap: 20px;">
-                <div class="chunky-panel" style="flex: 1;">
+            <div class="responsive-split-container">
+                <div class="chunky-panel chest-panel-half" style="flex: 1;">
                     <h3 style="color: #38bdf8; margin-top: 0; font-weight: 900;">🎒 Your Backpack</h3>
                     <div id="chest-backpack-container" style="display:flex; flex-direction:column; gap:10px; max-height:300px; overflow-y:auto; padding-right: 5px;"></div>
                 </div>
-                <div class="chunky-panel" style="flex: 1;">
+                <div class="chunky-panel chest-panel-half" style="flex: 1;">
                     <h3 style="color: #f59e0b; margin-top: 0; font-weight: 900;">🧰 Chest Contents</h3>
                     <div id="chest-contents-container" style="display:flex; flex-direction:column; gap:10px; max-height:300px; overflow-y:auto; padding-right: 5px;"></div>
                 </div>
@@ -1134,16 +1166,23 @@ export async function showCharacterCreation(): Promise<{ classId: string, pathwa
     container.style.flexDirection = "column"; container.style.alignItems = "center";
     container.style.justifyContent = "center"; 
     container.style.fontFamily = "'Nunito', 'Segoe UI Rounded', sans-serif";
+    container.style.padding = "20px";
+    container.style.boxSizing = "border-box";
+    container.style.overflowY = "auto";
 
     const title = document.createElement("h1");
     title.innerText = "CHOOSE YOUR CLASS!";
-    title.style.color = "white"; title.style.fontSize = "50px"; title.style.marginBottom = "40px";
+    title.style.color = "white"; title.style.fontSize = "clamp(30px, 5vw, 50px)"; title.style.marginBottom = "40px";
     title.style.fontWeight = "900";
+    title.style.textAlign = "center";
     title.style.textShadow = "0 6px 0 rgba(0,0,0,0.5)";
     container.appendChild(title);
 
     const cardRow = document.createElement("div");
-    cardRow.style.display = "flex"; cardRow.style.gap = "30px";
+    cardRow.style.display = "flex"; 
+    cardRow.style.gap = "30px";
+    cardRow.style.flexWrap = "wrap"; // Added wrap for mobile
+    cardRow.style.justifyContent = "center";
     container.appendChild(cardRow);
 
     const classes = [
@@ -1173,8 +1212,9 @@ export async function showCharacterCreation(): Promise<{ classId: string, pathwa
       cardRow.innerHTML = "";
       items.forEach(item => {
         const card = document.createElement("button");
-        card.style.width = "260px";
-        card.style.height = "360px";
+        card.style.width = "clamp(240px, 80vw, 260px)";
+        card.style.height = "auto";
+        card.style.minHeight = "360px";
         card.style.background = "#1e293b";
         card.style.border = `6px solid ${item.color}`; 
         card.style.borderRadius = "24px";

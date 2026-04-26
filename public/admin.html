@@ -4,7 +4,14 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Server Administration</title>
-    <script src="https://unpkg.com/colyseus.js@^0.15.0/dist/colyseus.js"></script>
+    
+    <script>
+        window.global = window;
+        window.Buffer = window.Buffer || [];
+    </script>
+    
+    <script src="https://unpkg.com/colyseus.js@0.15.0/dist/colyseus.js"></script>
+    
     <style>
         body {
             font-family: system-ui, -apple-system, sans-serif;

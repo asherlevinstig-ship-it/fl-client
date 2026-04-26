@@ -902,7 +902,7 @@ export function ensureOverlay(getActiveRoom: () => any, getActionContext: () => 
     <div class="controls-row" id="ctrl-familiar" style="display: none;"><span class="text-muted text-sm">Familiar Spell</span> <span class="hud-key">9</span></div>
     <div class="controls-row"><span class="text-muted text-sm">Town Recall</span> <span class="hud-key">SHIFT</span></div>
     <div class="controls-row"><span class="text-muted text-sm">Dodge</span> <span class="hud-key">SPACE</span></div>
-    <div class="controls-row"><span class="text-muted text-sm">Class Menu</span> <span class="hud-key">P</span></div>
+    <div class="controls-row"><span class="text-muted text-sm">Power Menu</span> <span class="hud-key">K</span></div>
     <div class="controls-row" id="ctrl-skilltree" style="display: none;"><span class="text-muted text-sm">Skill Tree</span> <span class="hud-key">K</span></div>
 </div>
 
@@ -913,7 +913,7 @@ export function ensureOverlay(getActiveRoom: () => any, getActionContext: () => 
     <div class="controls-row"><span class="text-muted text-sm">Inventory</span> <span class="hud-key">I</span></div>
     <div class="controls-row"><span class="text-muted text-sm">Map</span> <span class="hud-key">M</span></div>
     <div class="controls-row"><span class="text-muted text-sm">Fast Travel</span> <span class="hud-key">T</span></div>
-    <div class="controls-row"><span class="text-muted text-sm">Quick Chat</span> <span class="hud-key">C</span></div> <div class="controls-row"><span class="text-muted text-sm">Toggle Channel</span> <span class="hud-key">⇧+TAB</span></div>
+    <div class="controls-row"><span class="text-muted text-sm">Quick Chat</span> <span class="hud-key">TAB</span></div> <div class="controls-row"><span class="text-muted text-sm">Toggle Channel</span> <span class="hud-key">⇧+TAB</span></div>
     <div class="controls-row" id="ctrl-meditate" style="display: none;"><span class="text-muted text-sm">Meditate</span> <span class="hud-key">Z</span></div>
     <div class="controls-row"><span class="text-muted text-sm">Team Manager</span> <span class="hud-key">ESC</span></div>
 </div>

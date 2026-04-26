@@ -405,6 +405,7 @@ const FAMILIAR_ICONS: Record<string, string> = {
 };
 
 // --- 1. OVERLAY CREATION ---
+// --- 1. OVERLAY CREATION ---
 export function ensureOverlay(getActiveRoom: () => any, getActionContext: () => any): HTMLDivElement {
     
     if (!document.getElementById("hud-external-assets")) {
@@ -413,10 +414,17 @@ export function ensureOverlay(getActiveRoom: () => any, getActionContext: () => 
         assetsContainer.innerHTML = `
             <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
             <style>
-                .hud-header { font-family: 'Nunito', 'Segoe UI Rounded', sans-serif; text-transform: uppercase; font-weight: 900; }
+                :root {
+                    --font-header: 'Nunito', 'Segoe UI Rounded', sans-serif;
+                    --font-body: 'Nunito', 'Segoe UI Rounded', sans-serif;
+                }
+                
+                .hud-header { font-family: var(--font-header); text-transform: uppercase; font-weight: 900; }
                 .hud-absolute-center { position: fixed; left: 50%; transform: translateX(-50%); text-align: center; pointer-events: none; z-index: 2000; }
+                
                 @keyframes hudPulse { 0% { opacity: 1; transform: scale(1); } 50% { opacity: 0.8; transform: scale(1.05); } 100% { opacity: 1; transform: scale(1); } }
                 .animate-pulse { animation: hudPulse 1.5s infinite; }
+
                 .text-cyan { color: #22d3ee; }
                 .text-blue { color: #38bdf8; }
                 .text-green { color: #22c55e; }
@@ -428,6 +436,35 @@ export function ensureOverlay(getActiveRoom: () => any, getActionContext: () => 
                 .text-md { font-size: 16px; font-weight: 900; }
                 .text-lg { font-size: 18px; font-weight: 900; }
                 .text-xl { font-size: 22px; font-weight: 900; }
+
+                /* RESTORED: 3D Keycaps and Controls Font Formatting */
+                .hud-key {
+                    background: #f8fafc;
+                    border: 2px solid #cbd5e1;
+                    border-bottom: 4px solid #94a3b8;
+                    border-radius: 8px;
+                    padding: 4px 10px;
+                    font-family: var(--font-header);
+                    font-size: 12px;
+                    font-weight: 900;
+                    color: #0f172a;
+                    display: inline-block;
+                    margin: 0 4px;
+                }
+                .controls-group { 
+                    display: flex; 
+                    flex-direction: column; 
+                    gap: 10px; 
+                    align-items: flex-end; 
+                    font-family: var(--font-body); /* Fixes the default serif font */
+                }
+                .controls-row { 
+                    display: flex; 
+                    align-items: center; 
+                    gap: 8px; 
+                    text-shadow: 0 2px 4px rgba(0,0,0,0.8); 
+                    color: white; 
+                }
             </style>
         `;
         document.head.appendChild(assetsContainer);
@@ -918,34 +955,33 @@ export function ensureOverlay(getActiveRoom: () => any, getActionContext: () => 
         bottomRightContainer.style.zIndex = "10";
         bottomRightContainer.style.pointerEvents = "auto"; 
         
-        // FULLY UPDATED KEYBINDING LIST WITH NEW SOCIAL/UTILITY KEYS
         bottomRightContainer.innerHTML = `
             <button id="btn-harness-mana" class="btn-chunky btn-blue" style="display: none; padding: 12px 24px;">
                 <i class="fa-solid fa-om"></i> Harness Mana <span class="hud-key">H</span>
             </button>
             <div id="controls-combat" class="controls-group" style="text-align: right;">
-    <div class="controls-row"><span class="text-muted text-sm">Attack / Mine</span> <span class="hud-key">1</span></div>
-    <div class="controls-row"><span class="text-muted text-sm">Combat Skills</span> <span class="hud-key">2-5</span></div>
-    <div class="controls-row"><span class="text-muted text-sm">Utility Skills</span> <span class="hud-key">6-7</span></div>
-    <div class="controls-row"><span class="text-muted text-sm">Familiar Passive</span> <span class="hud-key">8</span></div>
-    <div class="controls-row" id="ctrl-familiar" style="display: none;"><span class="text-muted text-sm">Familiar Spell</span> <span class="hud-key">9</span></div>
-    <div class="controls-row"><span class="text-muted text-sm">Town Recall</span> <span class="hud-key">SHIFT</span></div>
-    <div class="controls-row"><span class="text-muted text-sm">Dodge</span> <span class="hud-key">SPACE</span></div>
-    <div class="controls-row"><span class="text-muted text-sm">Power Menu</span> <span class="hud-key">K</span></div>
-    <div class="controls-row" id="ctrl-skilltree" style="display: none;"><span class="text-muted text-sm">Skill Tree</span> <span class="hud-key">K</span></div>
-</div>
-
-<div id="controls-other" class="controls-group" style="display: none; text-align: right;">
-    <div class="controls-row"><span class="text-muted text-sm">Interact</span> <span class="hud-key">F</span></div>
-    <div class="controls-row" id="ctrl-buy-land" style="display: none;"><span class="text-green text-sm">Buy Land</span> <span class="hud-key">B</span></div>
-    <div class="controls-row" id="ctrl-build-mode" style="display: none;"><span class="text-green text-sm">Build Mode</span> <span class="hud-key">V</span></div>
-    <div class="controls-row"><span class="text-muted text-sm">Inventory</span> <span class="hud-key">I</span></div>
-    <div class="controls-row"><span class="text-muted text-sm">Map</span> <span class="hud-key">M</span></div>
-    <div class="controls-row"><span class="text-muted text-sm">Fast Travel</span> <span class="hud-key">T</span></div>
-    <div class="controls-row"><span class="text-muted text-sm">Quick Chat</span> <span class="hud-key">TAB</span></div> <div class="controls-row"><span class="text-muted text-sm">Toggle Channel</span> <span class="hud-key">⇧+TAB</span></div>
-    <div class="controls-row" id="ctrl-meditate" style="display: none;"><span class="text-muted text-sm">Meditate</span> <span class="hud-key">Z</span></div>
-    <div class="controls-row"><span class="text-muted text-sm">Team Manager</span> <span class="hud-key">ESC</span></div>
-</div>
+                <div class="controls-row"><span class="text-muted text-sm">Attack / Mine</span> <span class="hud-key">1</span></div>
+                <div class="controls-row"><span class="text-muted text-sm">Combat Skills</span> <span class="hud-key">2-5</span></div>
+                <div class="controls-row"><span class="text-muted text-sm">Utility Skills</span> <span class="hud-key">6-7</span></div>
+                <div class="controls-row"><span class="text-muted text-sm">Familiar Passive</span> <span class="hud-key">8</span></div>
+                <div class="controls-row" id="ctrl-familiar" style="display: none;"><span class="text-muted text-sm">Familiar Spell</span> <span class="hud-key">9</span></div>
+                <div class="controls-row"><span class="text-muted text-sm">Town Recall</span> <span class="hud-key">SHIFT</span></div>
+                <div class="controls-row"><span class="text-muted text-sm">Dodge</span> <span class="hud-key">SPACE</span></div>
+                <div class="controls-row"><span class="text-muted text-sm">Class Menu</span> <span class="hud-key">P</span></div>
+                <div class="controls-row" id="ctrl-skilltree" style="display: none;"><span class="text-muted text-sm">Skill Tree</span> <span class="hud-key">K</span></div>
+            </div>
+            <div id="controls-other" class="controls-group" style="display: none; text-align: right;">
+                <div class="controls-row"><span class="text-muted text-sm">Interact</span> <span class="hud-key">F</span></div>
+                <div class="controls-row" id="ctrl-buy-land" style="display: none;"><span class="text-green text-sm">Buy Land</span> <span class="hud-key">B</span></div>
+                <div class="controls-row" id="ctrl-build-mode" style="display: none;"><span class="text-green text-sm">Build Mode</span> <span class="hud-key">V</span></div>
+                <div class="controls-row"><span class="text-muted text-sm">Inventory</span> <span class="hud-key">I</span></div>
+                <div class="controls-row"><span class="text-muted text-sm">Map</span> <span class="hud-key">M</span></div>
+                <div class="controls-row"><span class="text-muted text-sm">Fast Travel</span> <span class="hud-key">T</span></div>
+                <div class="controls-row"><span class="text-muted text-sm">Quick Chat</span> <span class="hud-key">C</span></div>
+                <div class="controls-row"><span class="text-muted text-sm">Toggle Channel</span> <span class="hud-key">⇧+TAB</span></div>
+                <div class="controls-row" id="ctrl-meditate" style="display: none;"><span class="text-muted text-sm">Meditate</span> <span class="hud-key">Z</span></div>
+                <div class="controls-row"><span class="text-muted text-sm">Team Manager</span> <span class="hud-key">ESC</span></div>
+            </div>
             <button id="btn-toggle-controls" class="btn-chunky btn-slate" style="margin-top: 10px; font-size: 12px; padding: 10px 16px;">
                 <i class="fa-solid fa-gears"></i> Show Utility Keys
             </button>
@@ -983,7 +1019,6 @@ export function ensureOverlay(getActiveRoom: () => any, getActionContext: () => 
     
     return overlay;
 }
-
 // --- 2. PER-FRAME HUD UPDATE LOGIC ---
 export function updateHUD(
     dt: number,

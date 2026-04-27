@@ -41,12 +41,14 @@ import {
   openShopUI, 
   openBlueprintSelector,
   openEventInviteUI,
+  openMirrorUI,
   isQuestUIOpen,
   isTeleportUIOpen,
   isCasinoUIOpen,
   isInventoryUIOpen,
   isChestUIOpen,
   isShopUIOpen,
+  isMirrorUIOpen,
   refreshInventoryUI,
   refreshChestUI,
   refreshShopUI,
@@ -219,7 +221,7 @@ function getActionContext(): ActionContext {
     const isAnyUIOpen = isShopUIOpen || isInventoryUIOpen || 
                         isChestUIOpen || isCasinoUIOpen || isTeleportUIOpen || 
                         isQuestUIOpen || isSkillTreeUIOpen || isWorldMapOpen ||
-                        isTradeUIOpen || 
+                        isTradeUIOpen || isMirrorUIOpen ||
                         (document.getElementById("blueprint-modal")?.style.display === "block") ||
                         (document.getElementById("meditation-ui")?.style.display === "block") ||
                         (document.getElementById("crafting-modal")?.style.display === "block") || 
@@ -422,7 +424,14 @@ function initPlayerVisual(player: any, id: string, room: ActiveRoom, sceneObj: A
     }
 
     if (typeof (sceneObj as any).updatePlayer === "function") {
-        (sceneObj as any).updatePlayer(id, safeX, safeY, player.name, player.equippedItem, player.equipBack, player.isSleeping, player.sleepRot, isSwim, th, player.equipHead, player.equipChest, player.equipLegs, player.equipFeet, player.equipOffHand, player.isSpiritAnimal, player.isSprinting, player.isMeditating, player.teamId, player.mountedFamiliarId);
+        (sceneObj as any).updatePlayer(
+            id, safeX, safeY, player.name, player.equippedItem, player.equipBack, 
+            player.isSleeping, player.sleepRot, isSwim, th, player.equipHead, 
+            player.equipChest, player.equipLegs, player.equipFeet, player.equipOffHand, 
+            player.isSpiritAnimal, player.isSprinting, player.isMeditating, player.teamId, 
+            player.mountedFamiliarId, player.gender, player.skinColor, player.hairStyle, 
+            player.hairColor, player.eyeColor
+        );
     }
     
     if (id === room.sessionId) {
@@ -461,7 +470,7 @@ function setupRoomBindings(room: ActiveRoom, sceneObj: ActiveScene): () => void 
       const closeButtons = [
         "close-shop-btn", "close-inv-btn", "close-chest-btn", 
         "close-casino-btn", "close-teleport-btn", "close-quest-btn", 
-        "close-bp-btn"
+        "close-bp-btn", "close-mirror-btn"
       ];
       closeButtons.forEach(id => document.getElementById(id)?.click());
 
@@ -491,7 +500,7 @@ function setupRoomBindings(room: ActiveRoom, sceneObj: ActiveScene): () => void 
       const closeButtons = [
         "close-shop-btn", "close-inv-btn", "close-chest-btn", 
         "close-casino-btn", "close-teleport-btn", "close-quest-btn", 
-        "close-bp-btn"
+        "close-bp-btn", "close-mirror-btn"
       ];
       closeButtons.forEach(id => document.getElementById(id)?.click());
 
@@ -912,7 +921,7 @@ function setupRoomBindings(room: ActiveRoom, sceneObj: ActiveScene): () => void 
   });
 
   // ==========================================
-  // 2. STATE LISTENERS (With Bulletproof Getters)
+  // STATE LISTENERS
   // ==========================================
 
   // PLAYERS
@@ -983,7 +992,6 @@ function setupRoomBindings(room: ActiveRoom, sceneObj: ActiveScene): () => void 
 
   // LOOT ITEMS
   safeBind(() => room.state?.lootItems, (item: any, id: string) => {
-      // Intercept Coins and send them to our custom 3D renderer
       if (item.kind.startsWith("Coin_")) {
           if (sceneObj && typeof (sceneObj as any).spawnCoinMesh === "function") {
               (sceneObj as any).spawnCoinMesh(id, item.x, item.y);
@@ -1061,7 +1069,6 @@ function setupRoomBindings(room: ActiveRoom, sceneObj: ActiveScene): () => void 
       }
   });
 
-  // Initialize Trade Receivers
   setupTradeClient(room);
 
   return () => { 
@@ -1112,7 +1119,7 @@ async function switchZone(nextZone: ZoneName): Promise<void> {
     localStorage.setItem(`rpg_last_zone_${PLAYER_NAME}`, nextZone);
 
     if (activeRoom && activeScene) {
-localStorage.setItem(`rpg_reconnection_token_${PLAYER_NAME}`, activeRoom.reconnectionToken);
+      localStorage.setItem(`rpg_reconnection_token_${PLAYER_NAME}`, activeRoom.reconnectionToken);
       activeRoom.send("set_aura_style", { style: PLAYER_AURA_STYLE });
 
       if (typeof (activeScene as any).start === "function") {
@@ -1122,9 +1129,6 @@ localStorage.setItem(`rpg_reconnection_token_${PLAYER_NAME}`, activeRoom.reconne
     
     cleanupRoomBindings = setupRoomBindings(activeRoom!, activeScene!);
 
-    // ----------------------------------------------------
-    // 🔥 ZONE-SPECIFIC INTRO INSTRUCTIONS 🔥
-    // ----------------------------------------------------
     if (nextZone === "underworld") {
         setTimeout(() => {
             showTransientUI(
@@ -1414,6 +1418,13 @@ function setupInput(): void {
       return; 
     }
 
+    if (isMirrorUIOpen) {
+      if (event.key === "Escape") {
+          document.getElementById("close-mirror-btn")?.click();
+      }
+      return; 
+    }
+
     const state = activeRoom?.state as any;
     const me = state?.players?.get(activeRoom!.sessionId);
     
@@ -1546,6 +1557,15 @@ function setupInput(): void {
         if (distanceSq(localPlayerPos.x, localPlayerPos.y, 35, -35) < 324.0) { // 18^2
             openQuestUI(activeRoom, keys, PLAYER_NAME);
             interactionTriggered = true;
+        }
+
+        // --- NEW: THE MAGIC MIRROR ---
+        if (!interactionTriggered) {
+            // Mirror is placed at X: 8, Z: 2. Radius check is roughly 4 units (16 squared)
+            if (distanceSq(localPlayerPos.x, localPlayerPos.y, 8, 2) < 16.0) {
+                openMirrorUI(activeRoom, keys);
+                interactionTriggered = true;
+            }
         }
 
         if (!interactionTriggered) {
@@ -1992,9 +2012,6 @@ function updateDayNightCycle(dt: number) {
     dirLight.target.position.set(localPlayerPos.x, 0, localPlayerPos.y);
 }
 
-// ==========================================
-// PERFORMANCE: STATE POLLING / BATCHING LOOP
-// ==========================================
 function syncStateToScene(room: ActiveRoom, sceneObj: ActiveScene) {
     if (!room || !room.state || !sceneObj) return;
     
@@ -2020,7 +2037,7 @@ function syncStateToScene(room: ActiveRoom, sceneObj: ActiveScene) {
                     }
 
                     if (typeof (sceneObj as any).updatePlayer === "function") {
-                        (sceneObj as any).updatePlayer(id, safeX, safeY, player.name, player.equippedItem, player.equipBack, player.isSleeping, player.sleepRot, isSwim, th, player.equipHead, player.equipChest, player.equipLegs, player.equipFeet, player.equipOffHand, player.isSpiritAnimal, player.isSprinting, player.isMeditating, player.teamId, player.mountedFamiliarId);
+                        (sceneObj as any).updatePlayer(id, safeX, safeY, player.name, player.equippedItem, player.equipBack, player.isSleeping, player.sleepRot, isSwim, th, player.equipHead, player.equipChest, player.equipLegs, player.equipFeet, player.equipOffHand, player.isSpiritAnimal, player.isSprinting, player.isMeditating, player.teamId, player.mountedFamiliarId, player.gender, player.skinColor, player.hairStyle, player.hairColor, player.eyeColor);
                     }
 
                     if (typeof (sceneObj as any).updatePlayerFishing === "function") {
@@ -2113,350 +2130,350 @@ function syncStateToScene(room: ActiveRoom, sceneObj: ActiveScene) {
 }
 
 function startHudLoop(): void {
-  ensureOverlay(() => activeRoom, getActionContext);
-  renderHotbar();
-  
-  let lastTime = performance.now();
-  let timeSinceLastInput = 0; 
-  let wasInputting = false; 
-  let frameCount = 0; 
+    ensureOverlay(() => activeRoom, getActionContext);
+    renderHotbar();
+    
+    let lastTime = performance.now();
+    let timeSinceLastInput = 0; 
+    let wasInputting = false; 
+    let frameCount = 0; 
 
-  const tick = () => {
-    const now = performance.now(); 
-    const dt = Math.min((now - lastTime) / 1000, 0.1); 
-    lastTime = now;
-    frameCount++;
+    const tick = () => {
+        const now = performance.now(); 
+        const dt = Math.min((now - lastTime) / 1000, 0.1); 
+        lastTime = now;
+        frameCount++;
 
-    tickCooldownsUI(dt);
-    updateDayNightCycle(dt);
+        tickCooldownsUI(dt);
+        updateDayNightCycle(dt);
 
-    if (activeRoom && activeScene) {
-      
-      // Flush the Visual Action Queue cleanly before rendering
-      flushEventQueue();
-
-      const state = activeRoom.state as any;
-      const me = state.players?.get(activeRoom.sessionId) as any;
-
-      // SAFEGUARD: If the server knows we exist, but our local 3D mesh wasn't created, force create it!
-      if (me && !(activeScene as any).playerVisuals?.has(activeRoom.sessionId)) {
-          initPlayerVisual(me, activeRoom.sessionId, activeRoom, activeScene);
-      }
-
-      if (!me) {
-          requestAnimationFrame(tick);
-          return;
-      }
-
-      // --- UI Polling System (Decoupled from Colyseus .onAdd/.onChange events) ---
-      if (frameCount % 30 === 0) {
-          refreshInventoryUI(activeRoom, PLAYER_CLASS);
-          if (isShopUIOpen) refreshShopUI(activeRoom);
-          if (isChestUIOpen) refreshChestUI(activeRoom);
-      }
-
-      // --- CHUNKY HUD & QUEST TRACKER UPDATE ---
-      if (frameCount % 10 === 0) {
-          renderChunkyHUD(me);
-          renderQuestTracker(me);
-      }
-
-      const ctx = getActionContext();
-
-      // Synchronize all Colyseus variables to Three.js models in batch
-      syncStateToScene(activeRoom, activeScene);
-
-      updateHUD(
-        dt, 
-        activeRoom, 
-        activeScene, 
-        me, 
-        localPlayerPos, 
-        lastFacingDx, 
-        lastFacingDy, 
-        clientSceneryGrid, 
-        ctx, 
-        TOWN_COLLIDERS, 
-        MARKET_STALLS, 
-        CASINO_TABLES, 
-        isLocallyWolf
-      );
-
-      if (me && me.skillTree && me.skillTree.activeAbilities) {
-          const shadowStep = me.skillTree.activeAbilities.get("shadow_step");
-          if (shadowStep && shadowStep.upgrades) {
-              const wayUpg = shadowStep.upgrades.get("way_of_the_night");
-              const wayRank = wayUpg ? wayUpg.currentRank : 0;
-              
-              if (wayRank >= 3 && (!temporarySkill || temporarySkill.id !== "town_recall")) {
-                  setTemporarySkill({ id: "town_recall", label: "Recall", icon: "🏛️" });
-              }
-          }
-      }
-
-      let isDecoModeActive = false;
-      if (me && me.equippedItem) {
-          const equippedDef = ITEM_DB[me.equippedItem];
-          if (equippedDef && equippedDef.type === "decoration") {
-              isDecoModeActive = true;
-          }
-      }
-      if (activeScene instanceof TownScene) {
-          activeScene.isDecoMode = isDecoModeActive;
-      }
-
-      if (typeof (activeScene as any).setReticlePosition === "function") {
-          hoverX = localPlayerPos.x + (lastFacingDx * 5);
-          hoverY = localPlayerPos.y + (lastFacingDy * 5);
-          (activeScene as any).setReticlePosition(hoverX, hoverY, true, me ? me.equippedItem : ""); 
-          (activeScene as any).clearHighlights(); 
-      }
-
-      if (me) {
-        if (!localPlayerPos.initialized) { 
-            localPlayerPos.x = me.x; 
-            localPlayerPos.y = me.y; 
-            networkState.lastSentX = me.x;
-            networkState.lastSentY = me.y;
-            localPlayerPos.initialized = true; 
-        }
-
-        // --- CLIENT PREDICTION RECONCILIATION ---
-        if (me.lastProcessedInput !== undefined) {
-            // Remove acknowledged inputs
-            while (pendingInputs.length > 0 && pendingInputs[0].seq <= me.lastProcessedInput) {
-                pendingInputs.shift();
-            }
-        }
-
-        const syncDistSq = distanceSq(localPlayerPos.x, localPlayerPos.y, me.x, me.y);
-        
-        const isInputting = keys.KeyW || keys.KeyA || keys.KeyS || keys.KeyD;
-        
-        const isLocallySprinting = (keys.ShiftLeft || keys.ShiftRight) && isInputting && (me.hunger > 0) && (me.stamina > 0);
-        
-        if ((window as any).lastSprintState !== isLocallySprinting) {
-            activeRoom.send("setSprint", { isSprinting: isLocallySprinting });
-            (window as any).lastSprintState = isLocallySprinting;
-        }
-
-        if (isInputting) {
-            timeSinceLastInput = 0;
-        } else {
-            timeSinceLastInput += dt;
-        }
-
-        // Extremely large desync catch (fallback)
-        if (syncDistSq > 225.0) { // 15^2
-            localPlayerPos.x = me.x;
-            localPlayerPos.y = me.y;
+        if (activeRoom && activeScene) {
             
-            // CRITICAL: Must reset network anchor to prevent ghost trails
-            networkState.lastSentX = me.x;
-            networkState.lastSentY = me.y;
-            pendingInputs.length = 0;
-        } 
+            // Flush the Visual Action Queue cleanly before rendering
+            flushEventQueue();
 
-        // Reset input processing for movement step
-        let inputX = 0; let inputY = 0;
-        let camDx = 0; let camDy = 0;
+            const state = activeRoom.state as any;
+            const me = state.players?.get(activeRoom.sessionId) as any;
 
-        const isMounted = me.mountedFamiliarId && me.mountedFamiliarId !== "";
-        const isFlying = isMounted && me.isFlying;
-
-        if (me.isSleeping || me.isMeditating || Date.now() < me.rootedUntil || isMounted) {
-            localPlayerPos.x = me.x;
-            localPlayerPos.y = me.y;
-            inputX = 0;
-            inputY = 0;
-        } 
-        else if (!ctx.isUIOpen) {
-          if (keys.KeyW) inputY -= 1; 
-          if (keys.KeyS) inputY += 1;
-          if (keys.KeyA) inputX -= 1; 
-          if (keys.KeyD) inputX += 1;
-
-          if (keys.ArrowUp) camDy += 1;
-          if (keys.ArrowDown) camDy -= 1;
-          if (keys.ArrowLeft) camDx -= 1;
-          if (keys.ArrowRight) camDx += 1;
-        }
-
-        if (camDx !== 0 || camDy !== 0) {
-            if (typeof (activeScene as any).panCamera === "function") {
-                (activeScene as any).panCamera(camDx * 35 * dt, camDy * 35 * dt);
+            // SAFEGUARD: If the server knows we exist, but our local 3D mesh wasn't created, force create it!
+            if (me && !(activeScene as any).playerVisuals?.has(activeRoom.sessionId)) {
+                initPlayerVisual(me, activeRoom.sessionId, activeRoom, activeScene);
             }
-        }
 
-        if (inputX !== 0 || inputY !== 0) {
-          const length = Math.sqrt(inputX * inputX + inputY * inputY);
-          const nx = inputX / length;
-          const ny = inputY / length;
+            if (!me) {
+                requestAnimationFrame(tick);
+                return;
+            }
 
-          let angle = 0;
-          if (typeof (activeScene as any).getCameraAngle === "function") {
-              angle = (activeScene as any).getCameraAngle();
-          }
+            // --- UI Polling System (Decoupled from Colyseus .onAdd/.onChange events) ---
+            if (frameCount % 30 === 0) {
+                refreshInventoryUI(activeRoom, PLAYER_CLASS);
+                if (isShopUIOpen) refreshShopUI(activeRoom);
+                if (isChestUIOpen) refreshChestUI(activeRoom);
+            }
 
-          const dx = nx * Math.cos(angle) + ny * Math.sin(angle);
-          const dy = -nx * Math.sin(angle) + ny * Math.cos(angle); 
-          
-          lastFacingDx = dx;
-          lastFacingDy = dy;
+            // --- CHUNKY HUD & QUEST TRACKER UPDATE ---
+            if (frameCount % 10 === 0) {
+                renderChunkyHUD(me);
+                renderQuestTracker(me);
+            }
 
-          const baseSpeed = me.movementSpeed || 12.0;
-          const moveSpeed = isLocallySprinting ? (baseSpeed * 1.6) : baseSpeed; 
-          const moveDist = moveSpeed * dt; 
-          
-          let targetX = localPlayerPos.x + dx * moveDist; 
-          let targetY = localPlayerPos.y + dy * moveDist;
-          
-          if (!me.isSpiritAnimal && !isLocallyWolf) {
-              const isTown = currentZone === "town";
-              const isMaze = currentZone === "maze";
-              const isUnderworld = currentZone === "underworld";
-              
-              // CRITICAL BUG FIX: Local Collision State
-              let collisionState = state;
-              if (isTown) {
-                   collisionState = {
-                       buildings: state.buildings,
-                       decorations: state.decorations,
-                       scenery: clientSceneryGrid.getNearby(localPlayerPos.x, localPlayerPos.y, 15.0)
-                   };
-              }
+            const ctx = getActionContext();
 
-              // X-Axis Sliding
-              const isXBlocked = !isFlying && (
-                  (isTown && checkTownCollision(targetX, localPlayerPos.y)) || 
-                  (isMaze && checkMazeCollision(targetX, localPlayerPos.y)) || 
-                  (isUnderworld && checkUnderworldCollision(targetX, localPlayerPos.y)) ||
-                  checkDynamicCollision(collisionState, targetX, localPlayerPos.y)
-              );
-              
-              if (!isXBlocked) {
-                  localPlayerPos.x = targetX;
-              }
+            // Synchronize all Colyseus variables to Three.js models in batch
+            syncStateToScene(activeRoom, activeScene);
 
-              // Y-Axis Sliding (Evaluates using updated X)
-              const isYBlocked = !isFlying && (
-                  (isTown && checkTownCollision(localPlayerPos.x, targetY)) || 
-                  (isMaze && checkMazeCollision(localPlayerPos.x, targetY)) || 
-                  (isUnderworld && checkUnderworldCollision(localPlayerPos.x, targetY)) ||
-                  checkDynamicCollision(collisionState, localPlayerPos.x, targetY)
-              );
-              
-              if (!isYBlocked) {
-                  localPlayerPos.y = targetY;
-              }
-          } else {
-              localPlayerPos.x = targetX;
-              localPlayerPos.y = targetY;
-          }
-          
-          // Clamp to absolute world limits
-          localPlayerPos.x = Math.max(-2490, Math.min(2490, localPlayerPos.x));
-          localPlayerPos.y = Math.max(-2490, Math.min(2490, localPlayerPos.y));
-        }
+            updateHUD(
+                dt, 
+                activeRoom, 
+                activeScene, 
+                me, 
+                localPlayerPos, 
+                lastFacingDx, 
+                lastFacingDy, 
+                clientSceneryGrid, 
+                ctx, 
+                TOWN_COLLIDERS, 
+                MARKET_STALLS, 
+                CASINO_TABLES, 
+                isLocallyWolf
+            );
 
-        // Even if mounted (inputX=0), we may still need to send WASD inputs to steer the mount on the server
-        // so we check if the user is pressing keys, not just if inputX != 0
-        if (isInputting || (!isInputting && wasInputting)) {
-            if (now - networkState.lastNetworkSend > 40 || (!isInputting && wasInputting)) {
-                
-                // If we are mounted, localPlayerPos doesn't diverge because it's locked.
-                // We just need to calculate the target relative to current based on inputs to send to server.
-                if (isMounted) {
-                    let mX = 0; let mY = 0;
-                    if (keys.KeyW) mY -= 1; 
-                    if (keys.KeyS) mY += 1;
-                    if (keys.KeyA) mX -= 1; 
-                    if (keys.KeyD) mX += 1;
+            if (me && me.skillTree && me.skillTree.activeAbilities) {
+                const shadowStep = me.skillTree.activeAbilities.get("shadow_step");
+                if (shadowStep && shadowStep.upgrades) {
+                    const wayUpg = shadowStep.upgrades.get("way_of_the_night");
+                    const wayRank = wayUpg ? wayUpg.currentRank : 0;
                     
-                    if (mX !== 0 || mY !== 0) {
-                        const length = Math.sqrt(mX * mX + mY * mY);
-                        const nx = mX / length; const ny = mY / length;
-                        let angle = 0;
-                        if (typeof (activeScene as any).getCameraAngle === "function") angle = (activeScene as any).getCameraAngle();
-                        
-                        const dx = nx * Math.cos(angle) + ny * Math.sin(angle);
-                        const dy = -nx * Math.sin(angle) + ny * Math.cos(angle); 
-                        const mountSpeed = isLocallySprinting ? 22.0 : 15.0; // Hardcoded client prediction speed for mounts
-                        const moveDist = mountSpeed * 0.05;
-                        
-                        const targetX = me.x + dx * moveDist;
-                        const targetY = me.y + dy * moveDist;
-                        
-                        sendMove(activeRoom, targetX, targetY);
-                    } else if (!isInputting && wasInputting) {
-                        sendMove(activeRoom, me.x, me.y);
+                    if (wayRank >= 3 && (!temporarySkill || temporarySkill.id !== "town_recall")) {
+                        setTemporarySkill({ id: "town_recall", label: "Recall", icon: "🏛️" });
                     }
+                }
+            }
+
+            let isDecoModeActive = false;
+            if (me && me.equippedItem) {
+                const equippedDef = ITEM_DB[me.equippedItem];
+                if (equippedDef && equippedDef.type === "decoration") {
+                    isDecoModeActive = true;
+                }
+            }
+            if (activeScene instanceof TownScene) {
+                activeScene.isDecoMode = isDecoModeActive;
+            }
+
+            if (typeof (activeScene as any).setReticlePosition === "function") {
+                hoverX = localPlayerPos.x + (lastFacingDx * 5);
+                hoverY = localPlayerPos.y + (lastFacingDy * 5);
+                (activeScene as any).setReticlePosition(hoverX, hoverY, true, me ? me.equippedItem : ""); 
+                (activeScene as any).clearHighlights(); 
+            }
+
+            if (me) {
+                if (!localPlayerPos.initialized) { 
+                    localPlayerPos.x = me.x; 
+                    localPlayerPos.y = me.y; 
+                    networkState.lastSentX = me.x;
+                    networkState.lastSentY = me.y;
+                    localPlayerPos.initialized = true; 
+                }
+
+                // --- CLIENT PREDICTION RECONCILIATION ---
+                if (me.lastProcessedInput !== undefined) {
+                    // Remove acknowledged inputs
+                    while (pendingInputs.length > 0 && pendingInputs[0].seq <= me.lastProcessedInput) {
+                        pendingInputs.shift();
+                    }
+                }
+
+                const syncDistSq = distanceSq(localPlayerPos.x, localPlayerPos.y, me.x, me.y);
+                
+                const isInputting = keys.KeyW || keys.KeyA || keys.KeyS || keys.KeyD;
+                
+                const isLocallySprinting = (keys.ShiftLeft || keys.ShiftRight) && isInputting && (me.hunger > 0) && (me.stamina > 0);
+                
+                if ((window as any).lastSprintState !== isLocallySprinting) {
+                    activeRoom.send("setSprint", { isSprinting: isLocallySprinting });
+                    (window as any).lastSprintState = isLocallySprinting;
+                }
+
+                if (isInputting) {
+                    timeSinceLastInput = 0;
                 } else {
-                    const distSinceLastSendSq = distanceSq(networkState.lastSentX, networkState.lastSentY, localPlayerPos.x, localPlayerPos.y);
+                    timeSinceLastInput += dt;
+                }
+
+                // Extremely large desync catch (fallback)
+                if (syncDistSq > 225.0) { // 15^2
+                    localPlayerPos.x = me.x;
+                    localPlayerPos.y = me.y;
                     
-                    if (distSinceLastSendSq > 1.0) {
-                        const steps = Math.ceil(Math.sqrt(distSinceLastSendSq) / 1.0);
-                        for (let i = 1; i <= steps; i++) {
-                            const lerpX = networkState.lastSentX + (localPlayerPos.x - networkState.lastSentX) * (i / steps);
-                            const lerpY = networkState.lastSentY + (localPlayerPos.y - networkState.lastSentY) * (i / steps);
-                            sendMove(activeRoom, lerpX, lerpY);
+                    // CRITICAL: Must reset network anchor to prevent ghost trails
+                    networkState.lastSentX = me.x;
+                    networkState.lastSentY = me.y;
+                    pendingInputs.length = 0;
+                } 
+
+                // Reset input processing for movement step
+                let inputX = 0; let inputY = 0;
+                let camDx = 0; let camDy = 0;
+
+                const isMounted = me.mountedFamiliarId && me.mountedFamiliarId !== "";
+                const isFlying = isMounted && me.isFlying;
+
+                if (me.isSleeping || me.isMeditating || Date.now() < me.rootedUntil || isMounted) {
+                    localPlayerPos.x = me.x;
+                    localPlayerPos.y = me.y;
+                    inputX = 0;
+                    inputY = 0;
+                } 
+                else if (!ctx.isUIOpen) {
+                    if (keys.KeyW) inputY -= 1; 
+                    if (keys.KeyS) inputY += 1;
+                    if (keys.KeyA) inputX -= 1; 
+                    if (keys.KeyD) inputX += 1;
+
+                    if (keys.ArrowUp) camDy += 1;
+                    if (keys.ArrowDown) camDy -= 1;
+                    if (keys.ArrowLeft) camDx -= 1;
+                    if (keys.ArrowRight) camDx += 1;
+                }
+
+                if (camDx !== 0 || camDy !== 0) {
+                    if (typeof (activeScene as any).panCamera === "function") {
+                        (activeScene as any).panCamera(camDx * 35 * dt, camDy * 35 * dt);
+                    }
+                }
+
+                if (inputX !== 0 || inputY !== 0) {
+                    const length = Math.sqrt(inputX * inputX + inputY * inputY);
+                    const nx = inputX / length;
+                    const ny = inputY / length;
+
+                    let angle = 0;
+                    if (typeof (activeScene as any).getCameraAngle === "function") {
+                        angle = (activeScene as any).getCameraAngle();
+                    }
+
+                    const dx = nx * Math.cos(angle) + ny * Math.sin(angle);
+                    const dy = -nx * Math.sin(angle) + ny * Math.cos(angle); 
+                    
+                    lastFacingDx = dx;
+                    lastFacingDy = dy;
+
+                    const baseSpeed = me.movementSpeed || 12.0;
+                    const moveSpeed = isLocallySprinting ? (baseSpeed * 1.6) : baseSpeed; 
+                    const moveDist = moveSpeed * dt; 
+                    
+                    let targetX = localPlayerPos.x + dx * moveDist; 
+                    let targetY = localPlayerPos.y + dy * moveDist;
+                    
+                    if (!me.isSpiritAnimal && !isLocallyWolf) {
+                        const isTown = currentZone === "town";
+                        const isMaze = currentZone === "maze";
+                        const isUnderworld = currentZone === "underworld";
+                        
+                        // CRITICAL BUG FIX: Local Collision State
+                        let collisionState = state;
+                        if (isTown) {
+                             collisionState = {
+                                 buildings: state.buildings,
+                                 decorations: state.decorations,
+                                 scenery: clientSceneryGrid.getNearby(localPlayerPos.x, localPlayerPos.y, 15.0)
+                             };
+                        }
+
+                        // X-Axis Sliding
+                        const isXBlocked = !isFlying && (
+                            (isTown && checkTownCollision(targetX, localPlayerPos.y)) || 
+                            (isMaze && checkMazeCollision(targetX, localPlayerPos.y)) || 
+                            (isUnderworld && checkUnderworldCollision(targetX, localPlayerPos.y)) ||
+                            checkDynamicCollision(collisionState, targetX, localPlayerPos.y)
+                        );
+                        
+                        if (!isXBlocked) {
+                            localPlayerPos.x = targetX;
+                        }
+
+                        // Y-Axis Sliding (Evaluates using updated X)
+                        const isYBlocked = !isFlying && (
+                            (isTown && checkTownCollision(localPlayerPos.x, targetY)) || 
+                            (isMaze && checkMazeCollision(localPlayerPos.x, targetY)) || 
+                            (isUnderworld && checkUnderworldCollision(localPlayerPos.x, targetY)) ||
+                            checkDynamicCollision(collisionState, localPlayerPos.x, targetY)
+                        );
+                        
+                        if (!isYBlocked) {
+                            localPlayerPos.y = targetY;
                         }
                     } else {
-                        sendMove(activeRoom, localPlayerPos.x, localPlayerPos.y); 
+                        localPlayerPos.x = targetX;
+                        localPlayerPos.y = targetY;
                     }
                     
-                    networkState.lastSentX = localPlayerPos.x;
-                    networkState.lastSentY = localPlayerPos.y;
+                    // Clamp to absolute world limits
+                    localPlayerPos.x = Math.max(-2490, Math.min(2490, localPlayerPos.x));
+                    localPlayerPos.y = Math.max(-2490, Math.min(2490, localPlayerPos.y));
                 }
-                networkState.lastNetworkSend = now; 
+
+                // Even if mounted (inputX=0), we may still need to send WASD inputs to steer the mount on the server
+                // so we check if the user is pressing keys, not just if inputX != 0
+                if (isInputting || (!isInputting && wasInputting)) {
+                    if (now - networkState.lastNetworkSend > 40 || (!isInputting && wasInputting)) {
+                        
+                        // If we are mounted, localPlayerPos doesn't diverge because it's locked.
+                        // We just need to calculate the target relative to current based on inputs to send to server.
+                        if (isMounted) {
+                            let mX = 0; let mY = 0;
+                            if (keys.KeyW) mY -= 1; 
+                            if (keys.KeyS) mY += 1;
+                            if (keys.KeyA) mX -= 1; 
+                            if (keys.KeyD) mX += 1;
+                            
+                            if (mX !== 0 || mY !== 0) {
+                                const length = Math.sqrt(mX * mX + mY * mY);
+                                const nx = mX / length; const ny = mY / length;
+                                let angle = 0;
+                                if (typeof (activeScene as any).getCameraAngle === "function") angle = (activeScene as any).getCameraAngle();
+                                
+                                const dx = nx * Math.cos(angle) + ny * Math.sin(angle);
+                                const dy = -nx * Math.sin(angle) + ny * Math.cos(angle); 
+                                const mountSpeed = isLocallySprinting ? 22.0 : 15.0; // Hardcoded client prediction speed for mounts
+                                const moveDist = mountSpeed * 0.05;
+                                
+                                const targetX = me.x + dx * moveDist;
+                                const targetY = me.y + dy * moveDist;
+                                
+                                sendMove(activeRoom, targetX, targetY);
+                            } else if (!isInputting && wasInputting) {
+                                sendMove(activeRoom, me.x, me.y);
+                            }
+                        } else {
+                            const distSinceLastSendSq = distanceSq(networkState.lastSentX, networkState.lastSentY, localPlayerPos.x, localPlayerPos.y);
+                            
+                            if (distSinceLastSendSq > 1.0) {
+                                const steps = Math.ceil(Math.sqrt(distSinceLastSendSq) / 1.0);
+                                for (let i = 1; i <= steps; i++) {
+                                    const lerpX = networkState.lastSentX + (localPlayerPos.x - networkState.lastSentX) * (i / steps);
+                                    const lerpY = networkState.lastSentY + (localPlayerPos.y - networkState.lastSentY) * (i / steps);
+                                    sendMove(activeRoom, lerpX, lerpY);
+                                }
+                            } else {
+                                sendMove(activeRoom, localPlayerPos.x, localPlayerPos.y); 
+                            }
+                            
+                            networkState.lastSentX = localPlayerPos.x;
+                            networkState.lastSentY = localPlayerPos.y;
+                        }
+                        networkState.lastNetworkSend = now; 
+                    }
+                }
+                wasInputting = isInputting;
+
+                const isSwimmingLocally = distanceSq(localPlayerPos.x, localPlayerPos.y, 1200, 0) <= 1600;
+                let th = 0;
+                if (activeScene instanceof TownScene) {
+                    th = getHeightCached(localPlayerPos.x, localPlayerPos.y);
+                }
+                
+                const isWolfVisual = me.isSpiritAnimal || isLocallyWolf;
+                (activeScene as any).updatePlayer(
+                    activeRoom.sessionId, localPlayerPos.x, localPlayerPos.y, me.name, 
+                    me.equippedItem, me.equipBack, me.isSleeping, me.sleepRot, 
+                    isSwimmingLocally, th, me.equipHead, me.equipChest, me.equipLegs, 
+                    me.equipFeet, me.equipOffHand, isWolfVisual, isLocallySprinting, me.isMeditating,
+                    me.teamId, me.mountedFamiliarId, me.gender, me.skinColor, me.hairStyle, me.hairColor, me.eyeColor
+                );
+
+                if (typeof (activeScene as any).updatePlayerFishing === "function") {
+                    (activeScene as any).updatePlayerFishing(
+                        activeRoom.sessionId, 
+                        me.fishingState || "none", 
+                        me.bobberX || 0, 
+                        me.bobberZ || 0
+                    );
+                }
+
+                if (typeof activeScene.updateCameraFollow === "function") {
+                    activeScene.updateCameraFollow(activeRoom.sessionId, dt);
+                } else {
+                     (activeScene as any).updateCameraFollow(activeRoom.sessionId, dt);
+                }
+
+                if (isShadowMapActive && activeScene) {
+                    const camera = (activeScene as any).camera as THREE.Camera;
+                    if (camera) {
+                        const targetCamPos = new THREE.Vector3(localPlayerPos.x, 60, localPlayerPos.y);
+                        camera.position.lerp(targetCamPos, 0.1);
+                        camera.lookAt(localPlayerPos.x, 0, localPlayerPos.y);
+                    }
+                }
+
             }
         }
-        wasInputting = isInputting;
-
-        const isSwimmingLocally = distanceSq(localPlayerPos.x, localPlayerPos.y, 1200, 0) <= 1600;
-        let th = 0;
-        if (activeScene instanceof TownScene) {
-            th = getHeightCached(localPlayerPos.x, localPlayerPos.y);
-        }
-        
-        const isWolfVisual = me.isSpiritAnimal || isLocallyWolf;
-        (activeScene as any).updatePlayer(
-            activeRoom.sessionId, localPlayerPos.x, localPlayerPos.y, me.name, 
-            me.equippedItem, me.equipBack, me.isSleeping, me.sleepRot, 
-            isSwimmingLocally, th, me.equipHead, me.equipChest, me.equipLegs, 
-            me.equipFeet, me.equipOffHand, isWolfVisual, isLocallySprinting, me.isMeditating,
-            me.teamId, me.mountedFamiliarId
-        );
-
-        if (typeof (activeScene as any).updatePlayerFishing === "function") {
-            (activeScene as any).updatePlayerFishing(
-                activeRoom.sessionId, 
-                me.fishingState || "none", 
-                me.bobberX || 0, 
-                me.bobberZ || 0
-            );
-        }
-
-        if (typeof activeScene.updateCameraFollow === "function") {
-            activeScene.updateCameraFollow(activeRoom.sessionId, dt);
-        } else {
-             (activeScene as any).updateCameraFollow(activeRoom.sessionId, dt);
-        }
-
-        if (isShadowMapActive && activeScene) {
-            const camera = (activeScene as any).camera as THREE.Camera;
-            if (camera) {
-                const targetCamPos = new THREE.Vector3(localPlayerPos.x, 60, localPlayerPos.y);
-                camera.position.lerp(targetCamPos, 0.1);
-                camera.lookAt(localPlayerPos.x, 0, localPlayerPos.y);
-            }
-        }
-
-      }
-    }
-    requestAnimationFrame(tick);
-  };
-  tick();
+        requestAnimationFrame(tick);
+    };
+    tick();
 }
 
 function clearContainer(container: HTMLElement): void { 

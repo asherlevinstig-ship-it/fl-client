@@ -1382,6 +1382,11 @@ export class TownScene extends BaseScene {
         this.createGrass(); 
         environment.createTownWall(); 
         this.createFountain();
+        
+        // --- 🪞 THE MISSING LINK 🪞 ---
+        console.log("✨ SPAWNING MAGIC MIRROR AT X: 8, Z: 2 ✨");
+        environment.createCustomizationMirror(); 
+
         this.createFishingLake();
         environment.createGrandTavern(-12, 0, 0); 
         
@@ -1408,6 +1413,7 @@ export class TownScene extends BaseScene {
         environment.createMarketStall("furniture", 14, -34, -Math.PI / 2);
     }
 
+    
     public addLootItem(id: string, kind: string, x: number, z: number, isOpen: boolean) {
         if (this.lootVisuals.has(id)) return;
 

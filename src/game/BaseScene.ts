@@ -1360,7 +1360,7 @@ public updatePlayer(
           visual.mesh.position.lerp(visual.targetPosition, moveLerp);
 
           const targetAngle = visual.sleepRot || 0;
-          let angleDiff = targetAngle - visual.sleepRot;
+          let angleDiff = targetAngle - visual.mesh.rotation.y;
           while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
           while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
           visual.mesh.rotation.y += angleDiff * rotLerp;

@@ -741,6 +741,7 @@ export class TownEnvironment {
   }
 
   // --- NEW: THE MAGIC MIRROR ---
+  // --- NEW: THE MAGIC MIRROR ---
   public createCustomizationMirror() {
       const mirrorGroup = new THREE.Group();
 
@@ -779,9 +780,11 @@ export class TownEnvironment {
       label.scale.set(4.0, 1.0, 1.0);
       mirrorGroup.add(label);
 
-      // Add to Town Square next to the Fountain
-      mirrorGroup.position.set(8, getTerrainHeight(8, 2), 2);
-      mirrorGroup.rotation.y = -Math.PI / 4;
+      // Moved to the South-East corner (opposite the Quest NPC)
+      mirrorGroup.position.set(40, getTerrainHeight(40, 40), 40);
+      
+      // Rotate it to face inward towards the town center
+      mirrorGroup.rotation.y = -Math.PI * 0.75; 
       
       this.environmentRoot.add(mirrorGroup);
   }

@@ -1559,10 +1559,9 @@ function setupInput(): void {
             interactionTriggered = true;
         }
 
-        // --- NEW: THE MAGIC MIRROR ---
+        // --- NEW: THE MAGIC MIRROR (Moved to 40, 40) ---
         if (!interactionTriggered) {
-            // Mirror is placed at X: 8, Z: 2. Radius check is roughly 4 units (16 squared)
-            if (distanceSq(localPlayerPos.x, localPlayerPos.y, 8, 2) < 16.0) {
+            if (distanceSq(localPlayerPos.x, localPlayerPos.y, 40, 40) < 16.0) {
                 openMirrorUI(activeRoom, keys);
                 interactionTriggered = true;
             }

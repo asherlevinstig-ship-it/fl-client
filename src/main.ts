@@ -318,7 +318,7 @@ function initAdminPanel() {
     resetBtn.style.cursor = "pointer";
     resetBtn.onclick = () => {
        localStorage.removeItem(`rpg_reconnection_token_${PLAYER_NAME}`);
-        window.location.reload();
+       window.location.reload();
     };
     panel.appendChild(resetBtn);
 
@@ -982,7 +982,7 @@ function setupRoomBindings(room: ActiveRoom, sceneObj: ActiveScene): () => void 
   // ENEMIES
   safeBind(() => room.state?.enemies, (enemy: any, id: string) => {
       if (typeof (sceneObj as any).addEnemy === "function") {
-          (sceneObj as any).addEnemy(id, enemy.name);
+          (sceneObj as any).addEnemy(id, enemy.name, enemy.type);
       }
   }, (enemy: any, id: string) => {
       if (typeof (sceneObj as any).removeEnemy === "function") {
@@ -2048,6 +2048,13 @@ function syncStateToScene(room: ActiveRoom, sceneObj: ActiveScene) {
 
         if (state.enemies && typeof state.enemies.forEach === "function" && typeof (sceneObj as any).updateEnemy === "function") {
             state.enemies.forEach((enemy: any, id: string) => {
+                // SAFEGUARD: If the server knows this enemy exists, but they aren't in the 3D scene, FORCE CREATE THEM
+                if ((sceneObj as any).enemyVisuals && !(sceneObj as any).enemyVisuals.has(id)) {
+                    if (typeof (sceneObj as any).addEnemy === "function") {
+                        (sceneObj as any).addEnemy(id, enemy.name, enemy.type);
+                    }
+                }
+
                 const safeX = isNaN(enemy.x) ? 0 : enemy.x;
                 const safeY = isNaN(enemy.y) ? 0 : enemy.y;
 

@@ -369,10 +369,11 @@ export abstract class BaseScene {
     this.camera.lookAt(px, lookAtY, pz);
   }
 
-  public addEnemy(id: string, label: string) {
+  public addEnemy(id: string, label: string, typeKey?: string) {
       if (this.enemyVisuals.has(id)) return;
 
-      const type = label.split(" (")[0]; 
+      // Fix applied here: prioritize the passed in typeKey over parsing the label
+      const type = typeKey || label.split(" (")[0]; 
       const model = new EnemyModel(type); 
       
       model.mesh.castShadow = true;
@@ -1359,7 +1360,7 @@ public updatePlayer(
           visual.mesh.position.lerp(visual.targetPosition, moveLerp);
 
           const targetAngle = visual.sleepRot || 0;
-          let angleDiff = targetAngle - visual.mesh.rotation.y;
+          let angleDiff = targetAngle - visual.sleepRot;
           while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
           while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
           visual.mesh.rotation.y += angleDiff * rotLerp;

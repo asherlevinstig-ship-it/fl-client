@@ -740,6 +740,52 @@ export class TownEnvironment {
     this.environmentRoot.add(stallGroup);
   }
 
+  // --- NEW: THE MAGIC MIRROR ---
+  public createCustomizationMirror() {
+      const mirrorGroup = new THREE.Group();
+
+      // Mirror Base & Stand
+      const frameMat = getMat('mirror_frame', () => new THREE.MeshStandardMaterial({ color: 0xaa8833, metalness: 0.8, roughness: 0.2 }));
+      const baseGeo = getGeo('mirror_base', () => new THREE.BoxGeometry(3.0, 0.4, 1.0));
+      const base = new THREE.Mesh(baseGeo, frameMat);
+      base.position.y = 0.2;
+      base.castShadow = true;
+      base.receiveShadow = true;
+      mirrorGroup.add(base);
+
+      // The Mirror Glass
+      const glassGeo = getGeo('mirror_glass', () => new THREE.PlaneGeometry(2.0, 4.0));
+      const glassMat = getMat('mirror_glass_mat', () => new THREE.MeshStandardMaterial({ color: 0xaaddff, metalness: 1.0, roughness: 0.0 }));
+      const glass = new THREE.Mesh(glassGeo, glassMat);
+      glass.position.set(0, 2.5, 0.1);
+      mirrorGroup.add(glass);
+
+      // Backing and Frame
+      const backGeo = getGeo('mirror_back', () => new THREE.BoxGeometry(2.2, 4.2, 0.2));
+      const back = new THREE.Mesh(backGeo, frameMat);
+      back.position.set(0, 2.5, 0);
+      back.castShadow = true;
+      mirrorGroup.add(back);
+
+      // Glowing Aura
+      const auraGeo = getGeo('mirror_aura', () => new THREE.PlaneGeometry(2.4, 4.4));
+      const auraMat = getMat('mirror_aura_mat', () => new THREE.MeshBasicMaterial({ color: 0x00ffff, transparent: true, opacity: 0.3, blending: THREE.AdditiveBlending, side: THREE.DoubleSide }));
+      const aura = new THREE.Mesh(auraGeo, auraMat);
+      aura.position.set(0, 2.5, 0.12);
+      mirrorGroup.add(aura);
+
+      const label = this.createNameLabel("Mirror of Alteration [F]");
+      label.position.set(0, 5.2, 0);
+      label.scale.set(4.0, 1.0, 1.0);
+      mirrorGroup.add(label);
+
+      // Add to Town Square next to the Fountain
+      mirrorGroup.position.set(8, getTerrainHeight(8, 2), 2);
+      mirrorGroup.rotation.y = -Math.PI / 4;
+      
+      this.environmentRoot.add(mirrorGroup);
+  }
+
   public createFireParticles(parent: THREE.Group, scale: number = 1.0) {
       // PERFORMANCE: Reduced 200 -> 80
       const flameCount = Math.floor(80 * scale);

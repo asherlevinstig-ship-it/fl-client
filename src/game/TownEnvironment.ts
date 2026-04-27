@@ -1,3 +1,31 @@
+import { Schema, type, MapSchema } from "@colyseus/schema";
+import { PlayerState } from "../schema/PlayerState";
+import { SceneryState } from "../schema/SceneryState";
+import { LandPlotState } from "../schema/LandPlotState";
+import { BuildingState } from "../schema/BuildingState";
+import { StoreState } from "../schema/StoreState";
+import { DecorationState } from "../schema/DecorationState";
+import { EnemyState } from "../schema/EnemyState";
+import { LootState } from "../schema/LootState"; 
+import { RealmEventState } from "../schema/RealmEventState"; 
+import { FamiliarState } from "../schema/FamiliarState";
+
+export class TownState extends Schema {
+  // --- ADDED: Authoritative Zone Name ---
+  @type("string") zoneName: string = "The Wilderness";
+
+  @type({ map: PlayerState }) players = new MapSchema<PlayerState>();
+  @type({ map: SceneryState }) scenery = new MapSchema<SceneryState>();
+  @type({ map: LandPlotState }) landPlots = new MapSchema<LandPlotState>();
+  @type({ map: BuildingState }) buildings = new MapSchema<BuildingState>();
+  @type({ map: StoreState }) stores = new MapSchema<StoreState>();
+  @type({ map: DecorationState }) decorations = new MapSchema<DecorationState>();
+  @type({ map: EnemyState }) enemies = new MapSchema<EnemyState>(); 
+  @type({ map: LootState }) lootItems = new MapSchema<LootState>(); 
+  @type({ map: RealmEventState }) realmEvents = new MapSchema<RealmEventState>(); 
+  @type({ map: FamiliarState }) familiars = new MapSchema<FamiliarState>();
+}
+
 import * as THREE from "three";
 import { getTerrainHeight } from "./TownScene";
 
@@ -129,8 +157,6 @@ export class TownEnvironment {
       trunk.receiveShadow = true;
       aethelgardGroup.add(trunk);
 
-      // PERFORMANCE: Removed `trunkUpLight`
-
       const rootGeo = getGeo('aethel_root', () => new THREE.ConeGeometry(3, 15, 6));
       for (let i = 0; i < 8; i++) {
           const root = new THREE.Mesh(rootGeo, barkMat);
@@ -144,7 +170,6 @@ export class TownEnvironment {
 
       const canopyGroup = new THREE.Group();
       canopyGroup.position.y = 60;
-      // PERFORMANCE: Replaced canopy point lights with high emissive leaf clusters
       const glowingLeafMat = getMat('aethel_leaf_glow', () => new THREE.MeshStandardMaterial({ color: 0x44ffaa, emissive: 0x00aa55, emissiveIntensity: 1.5, roughness: 0.8 }));
       
       for (let i = 0; i < 15; i++) {
@@ -178,7 +203,6 @@ export class TownEnvironment {
           if (i % 8 === 0) {
               const crystal = new THREE.Mesh(crystalGeo, crystalMat);
               crystal.position.set(1.5, 1.0, 0);
-              // PERFORMANCE: Removed heavy point lights, relying entirely on emissive intensity
               step.add(crystal);
           }
           aethelgardGroup.add(step);
@@ -186,7 +210,7 @@ export class TownEnvironment {
 
       const pAngles = [0, Math.PI*(2/3), Math.PI*(4/3)];
       const platGeo = getGeo('aethel_plat_geo', () => new THREE.CylinderGeometry(6, 6, 1, 8));
-      const houseMat = getMat('aethel_house', () => new THREE.MeshStandardMaterial({color: 0x221100, emissive: 0x331100, emissiveIntensity: 0.8})); // Emissive fakes the internal lighting
+      const houseMat = getMat('aethel_house', () => new THREE.MeshStandardMaterial({color: 0x221100, emissive: 0x331100, emissiveIntensity: 0.8})); 
       const houseGeo = getGeo('aethel_house_geo', () => new THREE.BoxGeometry(4, 4, 4));
       const roofMat = getMat('aethel_roof', () => new THREE.MeshStandardMaterial({color: 0x448855}));
       const roofGeo = getGeo('aethel_roof_geo', () => new THREE.ConeGeometry(3.5, 3, 4));
@@ -209,7 +233,6 @@ export class TownEnvironment {
           roof.position.set(Math.cos(a)*pRadius, pHeight + 6, Math.sin(a)*pRadius);
           roof.rotation.y = Math.PI / 4;
           
-          // PERFORMANCE: Removed warmLight
           aethelgardGroup.add(house, roof);
           
           const branch = new THREE.Mesh(branchGeo, barkMat);
@@ -243,7 +266,6 @@ export class TownEnvironment {
       const dropHeight = 40;
       const waterfallGeo = getGeo('waterfall_base', () => new THREE.PlaneGeometry(15, dropHeight));
       
-      // We create ONE shader material for all waterfalls
       const wMat = getMat('waterfall_shader', () => new THREE.ShaderMaterial({
           uniforms: {
               time: sharedTimeUniform,
@@ -289,7 +311,7 @@ export class TownEnvironment {
           fallMesh.rotation.y = Math.PI; 
           fallGroup.add(fallMesh);
           
-          const wCount = 120; // PERFORMANCE: 300 -> 120
+          const wCount = 120;
           const wGeo = new THREE.BufferGeometry();
           const wPos = new Float32Array(wCount * 3);
           const wVel = new Float32Array(wCount * 3);
@@ -306,7 +328,6 @@ export class TownEnvironment {
           wGeo.setAttribute('velocity', new THREE.BufferAttribute(wVel, 3));
 
           const wMesh = new THREE.Points(wGeo, wMat);
-          // PERFORMANCE: No onBeforeRender attached to mesh. Time uniform is shared.
           fallGroup.add(wMesh);
           
           this.waterfallParticlesList.push({ mesh: wMesh, positions: new Float32Array(0), velocities: new Float32Array(0) });
@@ -316,7 +337,7 @@ export class TownEnvironment {
       });
 
       // --- FAIRY DUST ---
-      const fCount = 150; // PERFORMANCE: 400 -> 150
+      const fCount = 150;
       const fGeo = new THREE.BufferGeometry();
       const fPos = new Float32Array(fCount * 3);
       const fVel = new Float32Array(fCount * 3);
@@ -370,12 +391,10 @@ export class TownEnvironment {
       elvenGroup.add(fMesh);
       this.fairyParticlesList.push({ mesh: fMesh, positions: new Float32Array(0), velocities: new Float32Array(0) });
 
-      // Main Illumination (Reduced from multiple point lights)
       const kingdomLight = new THREE.PointLight(0x00ffff, 3.0, 150);
       kingdomLight.position.set(0, 20, 0);
       elvenGroup.add(kingdomLight);
       
-      // PERFORMANCE: Create canvas once and cache the resulting material forever
       if (!cachedAuroraMat) {
           const canvas = document.createElement("canvas");
           canvas.width = 512; canvas.height = 128;
@@ -397,7 +416,7 @@ export class TownEnvironment {
 
       const auroraGeo = getGeo('aurora_geo', () => new THREE.PlaneGeometry(800, 100, 64, 1));
       for (let i = 0; i < 3; i++) {
-          const auroraMesh = new THREE.Mesh(auroraGeo, cachedAuroraMat.clone()); // Need individual opacity manipulation
+          const auroraMesh = new THREE.Mesh(auroraGeo, cachedAuroraMat.clone()); 
           auroraMesh.position.set(0, 150, (i - 1) * 200);
           this.auroraMeshes.push(auroraMesh);
           elvenGroup.add(auroraMesh);

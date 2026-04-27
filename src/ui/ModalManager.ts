@@ -8,6 +8,8 @@ export let isInventoryUIOpen = false;
 export let isChestUIOpen = false;
 export let isShopUIOpen = false;
 export let isEventInviteOpen = false;
+export let isMirrorUIOpen = false; // --- ADDED FOR MIRROR ---
+
 export let activeChestId: string | null = null;
 export let activeStallType: string | null = null;
 
@@ -1309,6 +1311,99 @@ export function openEventInviteUI(activeRoom: any, eventName: string, targetZone
     document.getElementById("join-event-btn")!.onclick = () => {
         activeRoom.send("teleport", { destination: targetZone }); 
         isEventInviteOpen = false;
+        if (document.body.contains(modal!)) document.body.removeChild(modal!);
+    };
+}
+
+export function openMirrorUI(activeRoom: any, keys: any) {
+    if (isMirrorUIOpen || !activeRoom) return;
+    isMirrorUIOpen = true;
+    injectGlobalChunkyStyles();
+
+    for (const key in keys) {
+        keys[key as keyof typeof keys] = false;
+    }
+
+    let modal = document.getElementById("mirror-modal");
+    if (!modal) {
+        modal = document.createElement("div");
+        modal.id = "mirror-modal";
+        modal.className = "modal-chunky";
+        modal.style.position = "fixed"; 
+        modal.style.top = "50%"; 
+        modal.style.left = "50%";
+        modal.style.transform = "translate(-50%, -50%)"; 
+        modal.style.padding = "30px"; 
+        modal.style.zIndex = "1000"; 
+        modal.style.width = "400px";
+        document.body.appendChild(modal);
+    }
+
+    const me = activeRoom.state.players.get(activeRoom.sessionId);
+    if (!me) return;
+
+    modal.innerHTML = `
+      <div style="display:flex; justify-content:space-between; align-items:center; border-bottom: 4px solid #334155; padding-bottom: 15px; margin-bottom: 20px;">
+        <h2 style="margin:0; color:#c084fc; font-size: 26px; font-weight: 900;">✨ Alteration</h2>
+        <button id="close-mirror-btn" class="btn-close-chunky" style="background:#db2777; box-shadow: 0 4px 0 #9d174d;">&times;</button>
+      </div>
+      <div style="display:flex; flex-direction:column; gap:15px; text-align: left;">
+        
+        <div class="chunky-panel">
+            <label style="color:#fbcfe8; font-weight:900; display:block; margin-bottom:8px;">Body Type</label>
+            <select id="mirror-gender" style="width:100%; padding:10px; border-radius:8px; border:2px solid #f472b6; background:#1e293b; color:white; font-family:'Nunito', sans-serif; font-weight:bold;">
+                <option value="body1" ${me.gender === 'body1' ? 'selected' : ''}>Standard Frame</option>
+                <option value="body2" ${me.gender === 'body2' ? 'selected' : ''}>Slim Frame</option>
+            </select>
+        </div>
+
+        <div class="chunky-panel">
+            <label style="color:#fbcfe8; font-weight:900; display:block; margin-bottom:8px;">Skin Color</label>
+            <input type="color" id="mirror-skin" value="${me.skinColor || '#ffccaa'}" style="width:100%; height:40px; border-radius:8px; border:2px solid #f472b6; background:#1e293b; cursor:pointer;">
+        </div>
+
+        <div class="chunky-panel">
+            <label style="color:#fbcfe8; font-weight:900; display:block; margin-bottom:8px;">Hair Style</label>
+            <select id="mirror-hairstyle" style="width:100%; padding:10px; border-radius:8px; border:2px solid #f472b6; background:#1e293b; color:white; font-family:'Nunito', sans-serif; font-weight:bold;">
+                <option value="short" ${me.hairStyle === 'short' ? 'selected' : ''}>Short</option>
+                <option value="long" ${me.hairStyle === 'long' ? 'selected' : ''}>Long</option>
+                <option value="spiky" ${me.hairStyle === 'spiky' ? 'selected' : ''}>Spiky</option>
+                <option value="ponytail" ${me.hairStyle === 'ponytail' ? 'selected' : ''}>Ponytail</option>
+                <option value="bald" ${me.hairStyle === 'bald' ? 'selected' : ''}>Bald</option>
+            </select>
+        </div>
+
+        <div class="chunky-panel">
+            <label style="color:#fbcfe8; font-weight:900; display:block; margin-bottom:8px;">Hair Color</label>
+            <input type="color" id="mirror-haircolor" value="${me.hairColor || '#333333'}" style="width:100%; height:40px; border-radius:8px; border:2px solid #f472b6; background:#1e293b; cursor:pointer;">
+        </div>
+
+        <div class="chunky-panel">
+            <label style="color:#fbcfe8; font-weight:900; display:block; margin-bottom:8px;">Eye Color</label>
+            <input type="color" id="mirror-eyecolor" value="${me.eyeColor || '#00aaff'}" style="width:100%; height:40px; border-radius:8px; border:2px solid #f472b6; background:#1e293b; cursor:pointer;">
+        </div>
+
+        <button id="save-mirror-btn" class="btn-chunky btn-green" style="padding:15px; margin-top:10px;">✨ Transform</button>
+      </div>
+    `;
+
+    modal.style.display = "block";
+
+    document.getElementById("close-mirror-btn")!.onclick = () => {
+        isMirrorUIOpen = false;
+        if (document.body.contains(modal!)) document.body.removeChild(modal!);
+    };
+
+    document.getElementById("save-mirror-btn")!.onclick = () => {
+        const gender = (document.getElementById("mirror-gender") as HTMLSelectElement).value;
+        const skinColor = (document.getElementById("mirror-skin") as HTMLInputElement).value;
+        const hairStyle = (document.getElementById("mirror-hairstyle") as HTMLSelectElement).value;
+        const hairColor = (document.getElementById("mirror-haircolor") as HTMLInputElement).value;
+        const eyeColor = (document.getElementById("mirror-eyecolor") as HTMLInputElement).value;
+
+        activeRoom.send("updateAppearance", { gender, skinColor, hairStyle, hairColor, eyeColor });
+
+        isMirrorUIOpen = false;
         if (document.body.contains(modal!)) document.body.removeChild(modal!);
     };
 }

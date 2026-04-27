@@ -310,12 +310,14 @@ export class TownScene extends BaseScene {
         isSleeping: boolean = false, sleepRot: number = 0, isSwimming: boolean = false, height: number = 0,
         equipHead?: string, equipChest?: string, equipLegs?: string, equipFeet?: string, equipOffHand?: string,
         isWolfVisual: boolean = false, isSprinting: boolean = false, isMeditating: boolean = false,
-        teamId: number = 0, mountedFamiliarId: string = "", isAuraActive: boolean = false, auraStyle: string = "tyrant"   
+        teamId: number = 0, mountedFamiliarId: string = "", 
+        gender: string = "body1", skinColor: string = "#ffccaa", hairStyle: string = "short", hairColor: string = "#333333", eyeColor: string = "#00aaff",
+        isAuraActive: boolean = false, auraStyle: string = "tyrant"   
     ) {
         super.updatePlayer(
             id, x, z, name, equippedItem, equipBack, isSleeping, sleepRot, isSwimming, height,
             equipHead, equipChest, equipLegs, equipFeet, equipOffHand, isWolfVisual, isSprinting,
-            isMeditating, teamId, mountedFamiliarId 
+            isMeditating, teamId, mountedFamiliarId, gender, skinColor, hairStyle, hairColor, eyeColor
         );
 
         const visual = this.playerVisuals.get(id);

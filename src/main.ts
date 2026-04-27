@@ -2482,7 +2482,7 @@ async function boot(): Promise<void> {
   
   startHudLoop(); 
 
-const lastZone = (localStorage.getItem(`rpg_last_zone_${PLAYER_NAME}`) as ZoneName) || "town";
+  const lastZone = (localStorage.getItem(`rpg_last_zone_${PLAYER_NAME}`) as ZoneName) || "town";
   const reconnectionToken = localStorage.getItem(`rpg_reconnection_token_${PLAYER_NAME}`);
 
   let reconnected = false;
@@ -2491,12 +2491,17 @@ const lastZone = (localStorage.getItem(`rpg_last_zone_${PLAYER_NAME}`) as ZoneNa
   if (reconnectionToken) {
       try {
           activeRoom = await reconnectToRoom(reconnectionToken);
-          localStorage.setItem("rpg_reconnection_token", activeRoom.reconnectionToken);
+          
+          // FIX: Ensure we save the NEW token with the specific player's name attached.
+          // Colyseus issues a brand new reconnection token every time you successfully reconnect.
+          localStorage.setItem(`rpg_reconnection_token_${PLAYER_NAME}`, activeRoom.reconnectionToken);
           
           // Trust the Server's Room Name, not Local Storage
           const actualZone = activeRoom.name as ZoneName;
           currentZone = actualZone;
-          localStorage.setItem("rpg_last_zone", actualZone);
+          
+          // FIX: Ensure the zone save also uses the specific player's name.
+          localStorage.setItem(`rpg_last_zone_${PLAYER_NAME}`, actualZone);
 
           clearContainer(container);
           
@@ -2515,9 +2520,12 @@ const lastZone = (localStorage.getItem(`rpg_last_zone_${PLAYER_NAME}`) as ZoneNa
 
               cleanupRoomBindings = setupRoomBindings(activeRoom, activeScene);
               reconnected = true;
+              console.log(`Successfully reconnected to ${actualZone} as ${PLAYER_NAME}`);
           }
       } catch (e) {
           console.warn("Session expired or room closed. Falling back to fresh join.");
+          // Optional: Clear the dead token so we don't try to use it again
+          localStorage.removeItem(`rpg_reconnection_token_${PLAYER_NAME}`);
       }
   }
 

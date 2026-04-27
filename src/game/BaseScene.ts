@@ -46,6 +46,20 @@ export type PlayerVisual = {
     rightLeg?: BoneData;
   };
   
+  // --- CUSTOMIZATION MATERIAL REFS ---
+  skinMaterial?: THREE.MeshStandardMaterial;
+  hairMaterial?: THREE.MeshStandardMaterial;
+  eyeMaterial?: THREE.MeshStandardMaterial;
+  headGroup?: THREE.Mesh; 
+  hairGroup?: THREE.Group; 
+  torsoMesh?: THREE.Mesh; 
+
+  gender?: string;
+  skinColor?: string;
+  hairStyle?: string;
+  hairColor?: string;
+  eyeColor?: string;
+
   current_mainhand?: string;
   current_offhand?: string;
   current_head?: string;
@@ -127,7 +141,7 @@ export abstract class BaseScene {
   protected activeEffects: ActiveEffect[] = [];
   protected localCommunionPillars: LocalCommunionPillar[] = [];
   
-  // --- NEW: DIABLO STYLE COINS ---
+  // --- DIABLO STYLE COINS ---
   public activeCoins = new Map<string, { group: THREE.Group, mesh: THREE.Mesh }>();
 
   protected container: HTMLElement;
@@ -415,6 +429,51 @@ export abstract class BaseScene {
       this.enemyVisuals.delete(id);
   }
 
+  // --- DYNAMIC APPEARANCE HELPERS ---
+  private rebuildHair(visual: PlayerVisual, style: string) {
+      if (visual.hairGroup && visual.hairGroup.parent) {
+          visual.hairGroup.parent.remove(visual.hairGroup);
+          visual.hairGroup.traverse((c: any) => {
+              if (c.geometry) c.geometry.dispose();
+          });
+      }
+
+      const hairGroup = new THREE.Group();
+      const mat = visual.hairMaterial!;
+
+      if (style === "short") {
+          const main = new THREE.Mesh(new THREE.BoxGeometry(0.54, 0.2, 0.54), mat);
+          main.position.set(0, 0.25, 0); main.castShadow = true;
+          const bangs = new THREE.Mesh(new THREE.BoxGeometry(0.54, 0.15, 0.15), mat);
+          bangs.position.set(0, 0.15, 0.22); bangs.castShadow = true;
+          hairGroup.add(main, bangs);
+      } else if (style === "long") {
+          const main = new THREE.Mesh(new THREE.BoxGeometry(0.54, 0.2, 0.54), mat);
+          main.position.set(0, 0.25, 0); main.castShadow = true;
+          const back = new THREE.Mesh(new THREE.BoxGeometry(0.54, 0.6, 0.2), mat);
+          back.position.set(0, -0.1, -0.17); back.castShadow = true;
+          hairGroup.add(main, back);
+      } else if (style === "spiky") {
+          const main = new THREE.Mesh(new THREE.ConeGeometry(0.3, 0.4, 4), mat);
+          main.position.set(0, 0.35, 0); main.castShadow = true;
+          hairGroup.add(main);
+      } else if (style === "ponytail") {
+          const main = new THREE.Mesh(new THREE.BoxGeometry(0.54, 0.2, 0.54), mat);
+          main.position.set(0, 0.25, 0); main.castShadow = true;
+          const tail = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.1, 0.4), mat);
+          tail.position.set(0, 0.1, -0.3);
+          tail.rotation.x = -Math.PI / 4;
+          tail.castShadow = true;
+          hairGroup.add(main, tail);
+      }
+      // "bald" just leaves the group empty
+
+      if (visual.headGroup) {
+          visual.headGroup.add(hairGroup);
+      }
+      visual.hairGroup = hairGroup;
+  }
+
   public addPlayer(id: string, isMe: boolean, name = isMe ? "You" : "Player") {
     if (this.playerVisuals.has(id)) return;
     if (isMe) {
@@ -477,55 +536,52 @@ export abstract class BaseScene {
     const model = new THREE.Group();
     model.userData.baseY = 0; 
     
-    const skinMat = new THREE.MeshStandardMaterial({ color: isMe ? 0xfcccb4 : 0xccb4fc, roughness: 0.7 });
+    // Create unique materials for customization tracking
+    const skinMat = new THREE.MeshStandardMaterial({ color: 0xffccaa, roughness: 0.7 });
+    const hairMat = new THREE.MeshStandardMaterial({ color: 0x333333, roughness: 0.8 });
+    const eyeMat = new THREE.MeshStandardMaterial({ color: 0x00aaff, roughness: 0.9 });
+    const mouthMat = new THREE.MeshStandardMaterial({ color: 0x331111 }); 
     const shirtMat = new THREE.MeshStandardMaterial({ color: 0x222222, roughness: 0.7 });
     const pantsMat = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.7 });
+
+    visual.skinMaterial = skinMat;
+    visual.hairMaterial = hairMat;
+    visual.eyeMaterial = eyeMat;
 
     const torsoGeo = new THREE.BoxGeometry(0.8, 0.8, 0.4);
     const torso = new THREE.Mesh(torsoGeo, shirtMat);
     torso.name = "torso"; 
     torso.position.y = 1.2; 
-    torso.castShadow = isMe; 
-    torso.receiveShadow = isMe;
+    torso.castShadow = true; 
+    torso.receiveShadow = true;
+    visual.torsoMesh = torso;
     model.add(torso);
 
     const headGeo = new THREE.BoxGeometry(0.5, 0.5, 0.5);
     const head = new THREE.Mesh(headGeo, skinMat);
     head.name = "head"; 
     head.position.y = 0.65; 
-    head.castShadow = isMe;
+    head.castShadow = true;
+    visual.headGroup = head;
     torso.add(head);
 
-    const hairColor = isMe ? 0x111111 : 0x8b4513; 
-    const hairMat = new THREE.MeshStandardMaterial({ color: hairColor, roughness: 0.8 });
-    
-    const hairMain = new THREE.Mesh(new THREE.BoxGeometry(0.54, 0.2, 0.54), hairMat);
-    hairMain.position.set(0, 0.25, 0); 
-    hairMain.castShadow = isMe;
-    head.add(hairMain);
-    
-    const hairBangs = new THREE.Mesh(new THREE.BoxGeometry(0.54, 0.15, 0.15), hairMat);
-    hairBangs.position.set(0, 0.15, 0.22); 
-    hairBangs.castShadow = isMe;
-    head.add(hairBangs);
-
-    const faceFeatureMat = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.9 });
-    
     const eyeGeo = new THREE.BoxGeometry(0.08, 0.14, 0.05);
     
-    const leftEye = new THREE.Mesh(eyeGeo, faceFeatureMat);
+    const leftEye = new THREE.Mesh(eyeGeo, eyeMat);
     leftEye.position.set(-0.12, 0.02, 0.26); 
     head.add(leftEye);
     
-    const rightEye = new THREE.Mesh(eyeGeo, faceFeatureMat);
+    const rightEye = new THREE.Mesh(eyeGeo, eyeMat);
     rightEye.position.set(0.12, 0.02, 0.26);
     head.add(rightEye);
 
-    const mouthMat = new THREE.MeshStandardMaterial({ color: 0x331111 }); 
     const mouthGeo = new THREE.BoxGeometry(0.12, 0.04, 0.05);
     const mouth = new THREE.Mesh(mouthGeo, mouthMat);
     mouth.position.set(0, -0.08, 0.26);
     head.add(mouth);
+
+    // Initial Hair Build
+    this.rebuildHair(visual, "short");
 
     const armGeo = new THREE.BoxGeometry(0.35, 0.8, 0.4);
     
@@ -533,7 +589,7 @@ export abstract class BaseScene {
     leftArmPivot.position.set(-0.6, 0.4, 0); 
     const leftArm = new THREE.Mesh(armGeo, skinMat);
     leftArm.position.set(0, -0.3, 0); 
-    leftArm.castShadow = isMe;
+    leftArm.castShadow = true;
     leftArmPivot.add(leftArm);
     torso.add(leftArmPivot);
 
@@ -541,7 +597,7 @@ export abstract class BaseScene {
     rightArmPivot.position.set(0.6, 0.4, 0); 
     const rightArm = new THREE.Mesh(armGeo, skinMat);
     rightArm.position.set(0, -0.3, 0); 
-    rightArm.castShadow = isMe;
+    rightArm.castShadow = true;
     rightArmPivot.add(rightArm);
     torso.add(rightArmPivot);
 
@@ -551,7 +607,7 @@ export abstract class BaseScene {
     leftLegPivot.position.set(-0.2, 0.8, 0); 
     const leftLeg = new THREE.Mesh(legGeo, pantsMat);
     leftLeg.position.set(0, -0.4, 0); 
-    leftLeg.castShadow = isMe;
+    leftLeg.castShadow = true;
     leftLegPivot.add(leftLeg);
     model.add(leftLegPivot);
 
@@ -559,7 +615,7 @@ export abstract class BaseScene {
     rightLegPivot.position.set(0.2, 0.8, 0); 
     const rightLeg = new THREE.Mesh(legGeo, pantsMat);
     rightLeg.position.set(0, -0.4, 0); 
-    rightLeg.castShadow = isMe;
+    rightLeg.castShadow = true;
     rightLegPivot.add(rightLeg);
     model.add(rightLegPivot);
 
@@ -598,8 +654,11 @@ public updatePlayer(
     isMeditating: boolean = false,
     teamId: number = 0,
     mountedFamiliarId: string = "",
-    isAuraActive: boolean = false,
-    auraStyle: string = "tyrant"
+    gender: string = "body1",
+    skinColor: string = "#ffccaa",
+    hairStyle: string = "short",
+    hairColor: string = "#333333",
+    eyeColor: string = "#00aaff"
   ) {
     const visual = this.playerVisuals.get(id);
     if (!visual) return;
@@ -611,6 +670,32 @@ public updatePlayer(
     visual.isSprinting = isSprinting;
     visual.isMeditating = isMeditating;
     visual.mountedFamiliarId = mountedFamiliarId;
+
+    // --- APPLY DYNAMIC APPEARANCE ---
+    if (visual.skinColor !== skinColor && visual.skinMaterial) {
+        visual.skinColor = skinColor;
+        visual.skinMaterial.color.set(skinColor);
+    }
+    if (visual.hairColor !== hairColor && visual.hairMaterial) {
+        visual.hairColor = hairColor;
+        visual.hairMaterial.color.set(hairColor);
+    }
+    if (visual.eyeColor !== eyeColor && visual.eyeMaterial) {
+        visual.eyeColor = eyeColor;
+        visual.eyeMaterial.color.set(eyeColor);
+    }
+    if (visual.gender !== gender && visual.torsoMesh) {
+        visual.gender = gender;
+        if (gender === "body2") { 
+            visual.torsoMesh.scale.set(0.85, 1.0, 0.85); // Slimmer silhouette
+        } else {
+            visual.torsoMesh.scale.set(1.0, 1.0, 1.0); // Standard silhouette
+        }
+    }
+    if (visual.hairStyle !== hairStyle) {
+        visual.hairStyle = hairStyle;
+        this.rebuildHair(visual, hairStyle);
+    }
 
     if (name && visual.labelSprite.material instanceof THREE.SpriteMaterial) {
       const subText = teamId > 0 ? `Team ${teamId}` : undefined;
@@ -1046,7 +1131,6 @@ public updatePlayer(
       });
   }
 
-  // --- NEW: ASTRAL COMMUNION LOCAL RENDER ---
   public spawnLocalCommunionPillars(options: string[]) {
       this.clearLocalCommunionPillars();
       if (!this.localPlayerId) return;
@@ -1119,7 +1203,6 @@ public updatePlayer(
       return null;
   }
 
-  // --- NEW: DIABLO-STYLE COIN SPAWNING ---
   public spawnCoinMesh(id: string, x: number, z: number) {
       const group = new THREE.Group();
       group.position.set(x, 0, z); 
@@ -1131,7 +1214,6 @@ public updatePlayer(
       mesh.castShadow = true;
       group.add(mesh);
 
-      // Glowing base
       const glowGeo = new THREE.PlaneGeometry(1.5, 1.5);
       const canvas = document.createElement("canvas");
       canvas.width = 64; canvas.height = 64;
@@ -1144,7 +1226,7 @@ public updatePlayer(
       ctx.fillRect(0, 0, 64, 64);
       
       const glowTex = new THREE.CanvasTexture(canvas);
-      glowTex.generateMipmaps = false; // --- CRITICAL WEBGL CRASH FIX ---
+      glowTex.generateMipmaps = false; 
 
       const glowMat = new THREE.MeshBasicMaterial({ 
           map: glowTex, transparent: true, 
@@ -1188,11 +1270,9 @@ public updatePlayer(
       const isVisible = camDistSq < 4000;
       const isClose = camDistSq < 1500;
 
-      // Skip movement rendering entirely if fishing (fishing lines handled it)
       const lineData = this.fishingLines.get(id);
       if (lineData && lineData.state !== "none") {
           visual.isMoving = false;
-          // Force look at bobber
           const bdx = lineData.targetX - visual.mesh.position.x;
           const bdz = lineData.targetZ - visual.mesh.position.z;
           const targetAngle = Math.atan2(bdx, bdz);
@@ -1201,33 +1281,28 @@ public updatePlayer(
           while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
           while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
           visual.mesh.rotation.y += angleDiff * rotLerp;
-          continue; // Skip the rest of the animation block
+          continue; 
       }
 
-      // --- NEW MOUNT LOGIC ---
       if (visual.mountedFamiliarId && visual.mountedFamiliarId !== "") {
           visual.isMoving = false;
           if (visual.facingIndicator) visual.facingIndicator.visible = false;
           
           const mountVisual = this.familiarRenderer.visuals.get(visual.mountedFamiliarId);
           if (mountVisual) {
-              // Smoothly transition into the saddle
               visual.mesh.position.x = mountVisual.mesh.position.x;
               visual.mesh.position.z = mountVisual.mesh.position.z;
               
-              // Lift them up onto the back
               const saddleHeight = mountVisual.type === "ironclad_behemoth" ? 2.5 : 
                                    mountVisual.type === "storm_gryphon" ? 2.0 : 1.8;
                                    
               visual.mesh.position.y = mountVisual.mesh.position.y + saddleHeight;
               
-              // Match rotation
               let angleDiff = mountVisual.mesh.rotation.y - visual.mesh.rotation.y;
               while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
               while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
               visual.mesh.rotation.y += angleDiff * rotLerp;
 
-              // Force riding pose
               if (isClose && visual.modelMesh) {
                   const baseY = visual.modelMesh.userData.baseY || 0;
                   visual.modelMesh.position.y = THREE.MathUtils.lerp(visual.modelMesh.position.y, baseY, rotLerp);
@@ -1253,7 +1328,7 @@ public updatePlayer(
                       }
                   }
               }
-              continue; // Bypass standard walking logic while mounted
+              continue; 
           }
       } else {
           if (visual.facingIndicator) visual.facingIndicator.visible = true;
@@ -1629,6 +1704,11 @@ public updatePlayer(
           visual.labelSprite.material.dispose(); 
       }
 
+      // Dispose unique customization materials
+      visual.skinMaterial?.dispose();
+      visual.hairMaterial?.dispose();
+      visual.eyeMaterial?.dispose();
+
       const keys: (keyof PlayerVisual)[] = [
           "equipped_mainhand_Mesh", "equipped_offhand_Mesh", 
           "equipped_head_Meshes", "equipped_chest_Meshes", 
@@ -1647,6 +1727,13 @@ public updatePlayer(
 
       if (visual.capeGroup) {
           visual.capeGroup.parent?.remove(visual.capeGroup);
+      }
+
+      if (visual.hairGroup) {
+          visual.hairGroup.parent?.remove(visual.hairGroup);
+          visual.hairGroup.traverse((c: any) => {
+              if (c.geometry) c.geometry.dispose();
+          });
       }
 
       if (visual.mesh.children) {

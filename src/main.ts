@@ -1142,7 +1142,7 @@ async function switchZone(nextZone: ZoneName): Promise<void> {
     if (activeRoom && activeScene) {
       localStorage.setItem(`rpg_reconnection_token_${PLAYER_NAME}`, activeRoom.reconnectionToken);
       activeRoom.send("set_aura_style", { style: PLAYER_AURA_STYLE });
-
+(window as any).debugRoom = activeRoom;
       if (typeof (activeScene as any).start === "function") {
           (activeScene as any).start();
       }

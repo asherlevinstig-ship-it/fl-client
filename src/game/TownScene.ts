@@ -1466,21 +1466,36 @@ export class TownScene extends BaseScene {
         }
     }
 
-    public addScenery(id: string, kind: string, x: number, z: number, scale: number, rotation: number) {
-        if (this.sceneryVisuals.has(id)) return;
+   public addScenery(id: string, kind: string, x: number, z: number, scale: number, rotation: number) {
+        if (this.sceneryVisuals.has(id)) {
+            console.log(`[TownScene] Scenery ${id} already exists, skipping.`);
+            return;
+        }
+
+        console.log(`[TownScene] addScenery called for ${id}. Raw Inputs - kind: ${kind}, x: ${x}, z: ${z}, scale: ${scale}, rot: ${rotation}`);
+
+        // --- SAFE FALLBACKS TO PREVENT WEBGL NaN CRASHES ---
+        const safeKind = kind || "tree";
+        const safeScale = scale || 1.0;
+        const safeX = x || 0;
+        const safeZ = z || 0;
+        const safeRot = rotation || 0;
+
+        console.log(`[TownScene] addScenery Safe Values - kind: ${safeKind}, x: ${safeX}, z: ${safeZ}, scale: ${safeScale}, rot: ${safeRot}`);
 
         let mesh: THREE.Group | THREE.Mesh;
 
-        if (kind.includes("rock")) {
+        if (safeKind.includes("rock")) {
+            console.log(`[TownScene] Generating rock mesh for ${id}`);
             const rockGeo = new THREE.IcosahedronGeometry(1.0, 0);
             let color = 0x777777; 
             let emissive = 0x000000;
             let transparent = false;
             let opacity = 1.0;
             
-            if (kind === "snow_rock") color = 0xddeeff; 
-            else if (kind === "sand_rock") color = 0xccaa77; 
-            else if (kind === "crystal_rock") {
+            if (safeKind === "snow_rock") color = 0xddeeff; 
+            else if (safeKind === "sand_rock") color = 0xccaa77; 
+            else if (safeKind === "crystal_rock") {
                 color = 0x88ffff;
                 emissive = 0x0088aa;
                 transparent = true;
@@ -1492,7 +1507,8 @@ export class TownScene extends BaseScene {
             mesh.castShadow = true;
             mesh.receiveShadow = true;
             
-        } else if (kind === "cactus") {
+        } else if (safeKind === "cactus") {
+            console.log(`[TownScene] Generating cactus mesh for ${id}`);
             mesh = new THREE.Group();
             const trunkMat = new THREE.MeshStandardMaterial({ color: 0x228b22 });
             const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 3, 8), trunkMat);
@@ -1503,7 +1519,8 @@ export class TownScene extends BaseScene {
             arm.rotation.z = Math.PI / 4;
             mesh.add(arm);
             
-        } else if (kind === "pine_tree") {
+        } else if (safeKind === "pine_tree") {
+            console.log(`[TownScene] Generating pine_tree mesh for ${id}`);
             mesh = new THREE.Group();
             const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.5, 2), new THREE.MeshStandardMaterial({ color: 0x3d2817 }));
             trunk.position.y = 1;
@@ -1515,7 +1532,8 @@ export class TownScene extends BaseScene {
                 mesh.add(leaves);
             }
             
-        } else if (kind === "dead_tree") {
+        } else if (safeKind === "dead_tree") {
+            console.log(`[TownScene] Generating dead_tree mesh for ${id}`);
             mesh = new THREE.Group();
             const mat = new THREE.MeshStandardMaterial({ color: 0x2a2a2a });
             const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.6, 4, 5), mat);
@@ -1526,7 +1544,8 @@ export class TownScene extends BaseScene {
             branch.rotation.z = -Math.PI / 4;
             mesh.add(branch);
             
-        } else if (kind === "magic_tree") {
+        } else if (safeKind === "magic_tree") {
+            console.log(`[TownScene] Generating magic_tree mesh for ${id}`);
             mesh = new THREE.Group();
             const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.6, 2.5, 5), new THREE.MeshStandardMaterial({ color: 0xdddddd }));
             trunk.position.y = 1.25;
@@ -1540,6 +1559,7 @@ export class TownScene extends BaseScene {
             mesh.add(leaf2);
             
         } else { 
+            console.log(`[TownScene] Generating default tree mesh for ${id} (kind: ${safeKind})`);
             mesh = new THREE.Group();
             const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.6, 2, 5), new THREE.MeshStandardMaterial({ color: 0x5c4033 }));
             trunk.position.y = 1;
@@ -1558,15 +1578,18 @@ export class TownScene extends BaseScene {
             mesh.add(leaf2);
         }
 
-        mesh.scale.set(scale, scale, scale);
-        mesh.rotation.y = rotation;
-        if (kind.includes("rock")) {
-            mesh.rotation.set(rotation, rotation, rotation);
-            mesh.scale.y = scale * 0.7; 
+        console.log(`[TownScene] Applying scale ${safeScale} to ${id}`);
+        mesh.scale.set(safeScale, safeScale, safeScale);
+        mesh.rotation.y = safeRot;
+        
+        if (safeKind.includes("rock")) {
+            mesh.rotation.set(safeRot, safeRot, safeRot);
+            mesh.scale.y = safeScale * 0.7; 
         }
         
-        const terrainHeight = getTerrainHeight(x, z);
-        mesh.position.set(x, terrainHeight + (kind.includes("rock") ? 0.2 : 0), z);
+        const terrainHeight = getTerrainHeight(safeX, safeZ);
+        console.log(`[TownScene] Terrain height for ${id} calculated as ${terrainHeight}. Setting mesh position...`);
+        mesh.position.set(safeX, terrainHeight + (safeKind.includes("rock") ? 0.2 : 0), safeZ);
         
         this.scene.add(mesh);
         
@@ -1578,8 +1601,11 @@ export class TownScene extends BaseScene {
             hitShakeTimer: 0,
             lastHp: 99999 
         });
+
+        console.log(`[TownScene] Successfully added scenery ${id} to scene and visuals map.`);
     }
 
+    
     public updateSceneryProgress(id: string, hp: number, maxHp: number) {
         const visual = this.sceneryVisuals.get(id);
         if (!visual) return;

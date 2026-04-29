@@ -1031,19 +1031,23 @@ function setupRoomBindings(room: ActiveRoom, sceneObj: ActiveScene): () => void 
   });
 
   // SCENERY
-  safeBind(() => room.state?.scenery, (item: any, id: string) => {
+ safeBind(() => room.state?.scenery, (item: any, id: string) => {
+      console.log(`[NETWORK] Received Scenery: ${id} | Kind: ${item.kind} | X: ${item.x}, Z: ${item.y}`);
+      
       clientSceneryGrid.add(item, item.x, item.y);
       if (sceneObj instanceof TownScene) {
           if (typeof (sceneObj as any).addScenery === "function") {
               (sceneObj as any).addScenery(item.id, item.kind, item.x, item.y, item.scale, item.rotation);
+          } else {
+              console.warn(`[ERROR] addScenery is missing on TownScene!`);
           }
+      } else {
+          console.warn(`[ERROR] sceneObj is not a TownScene! It is: ${sceneObj.constructor.name}`);
       }
   }, (item: any, id: string) => {
       clientSceneryGrid.remove(item, item.x, item.y);
-      if (sceneObj instanceof TownScene) {
-          if (typeof (sceneObj as any).removeScenery === "function") {
-              (sceneObj as any).removeScenery(item.id);
-          }
+      if (sceneObj instanceof TownScene && typeof (sceneObj as any).removeScenery === "function") {
+          (sceneObj as any).removeScenery(item.id);
       }
   });
 

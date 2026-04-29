@@ -1031,18 +1031,29 @@ function setupRoomBindings(room: ActiveRoom, sceneObj: ActiveScene): () => void 
   });
 
   // SCENERY
- safeBind(() => room.state?.scenery, (item: any, id: string) => {
+// SCENERY
+  safeBind(() => room.state?.scenery, (item: any, id: string) => {
+      // 1. Force the network to announce it received the item
       console.log(`[NETWORK] Received Scenery: ${id} | Kind: ${item.kind} | X: ${item.x}, Z: ${item.y}`);
       
-      clientSceneryGrid.add(item, item.x, item.y);
+      // 2. Catch silent grid math errors (Usually caused by NaN coordinates)
+      try {
+          clientSceneryGrid.add(item, item.x, item.y);
+      } catch (e) {
+          console.error(`[ERROR] clientSceneryGrid failed to add ${id}:`, e);
+      }
+
+      // 3. Ensure the scene actually receives the instruction
       if (sceneObj instanceof TownScene) {
           if (typeof (sceneObj as any).addScenery === "function") {
-              (sceneObj as any).addScenery(item.id, item.kind, item.x, item.y, item.scale, item.rotation);
+              try {
+                  (sceneObj as any).addScenery(item.id, item.kind, item.x, item.y, item.scale, item.rotation);
+              } catch (e) {
+                  console.error(`[ERROR] TownScene.addScenery failed for ${id}:`, e);
+              }
           } else {
-              console.warn(`[ERROR] addScenery is missing on TownScene!`);
+              console.warn(`[ERROR] addScenery function is completely missing from TownScene!`);
           }
-      } else {
-          console.warn(`[ERROR] sceneObj is not a TownScene! It is: ${sceneObj.constructor.name}`);
       }
   }, (item: any, id: string) => {
       clientSceneryGrid.remove(item, item.x, item.y);

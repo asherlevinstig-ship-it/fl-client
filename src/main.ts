@@ -42,6 +42,7 @@ import {
   openBlueprintSelector,
   openEventInviteUI,
   openMirrorUI,
+  showQuestCompleteUI,
   isQuestUIOpen,
   isTeleportUIOpen,
   isCasinoUIOpen,
@@ -494,6 +495,11 @@ function setupRoomBindings(room: ActiveRoom, sceneObj: ActiveScene): () => void 
 
   room.onMessage("server_event_teleport", (data: { zone: string }) => {
       switchZone(data.zone as ZoneName).catch(console.error);
+  });
+
+  // --- NEW: Handle quest complete visual feedback ---
+  room.onMessage("quest_completed", (data: { title: string, coins: number, exp: number }) => {
+      showQuestCompleteUI(data.title, data.coins, data.exp);
   });
 
   room.onMessage("close_all_ui", () => {
@@ -1188,6 +1194,11 @@ function setupInput(): void {
         if (typeof (window as any).renderChatHotbar === "function") {
             (window as any).renderChatHotbar(true); 
         }
+
+        // --- NEW: Trigger quest action for using utility keys ---
+        if (activeRoom) {
+            activeRoom.send("quest_action", { actionId: "toggle_utility" });
+        }
         return;
     }
 
@@ -1197,6 +1208,11 @@ function setupInput(): void {
             isHoldingTab = true;
             if (typeof (window as any).renderChatHotbar === "function") {
                 (window as any).renderChatHotbar(true); 
+            }
+
+            // --- NEW: Trigger quest action for using utility keys ---
+            if (activeRoom) {
+                activeRoom.send("quest_action", { actionId: "toggle_utility" });
             }
         }
         return;
@@ -1559,7 +1575,6 @@ function setupInput(): void {
             interactionTriggered = true;
         }
 
-        // --- NEW: THE MAGIC MIRROR (Moved to 40, 40) ---
         if (!interactionTriggered) {
             if (distanceSq(localPlayerPos.x, localPlayerPos.y, 40, 40) < 16.0) {
                 openMirrorUI(activeRoom, keys);

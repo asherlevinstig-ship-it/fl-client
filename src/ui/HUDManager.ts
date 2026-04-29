@@ -43,7 +43,6 @@ let currentBiomeName = "";
 let zonePopupExpiresAt = 0;
 
 // --- GLOBAL CHUNKY STYLES INJECTION ---
-// --- GLOBAL CHUNKY STYLES INJECTION ---
 export function injectGlobalChunkyStyles() {
     if (!document.getElementById("chunky-ui-styles")) {
         const style = document.createElement("style");
@@ -228,6 +227,7 @@ export function injectGlobalChunkyStyles() {
         document.head.appendChild(style);
     }
 }
+
 // --- EXPORTED HUD RENDERING ---
 export function renderChunkyHUD(player: any) {
     if (!player) return;
@@ -404,7 +404,6 @@ const FAMILIAR_ICONS: Record<string, string> = {
     "radiant_seraph": "⚔️"
 };
 
-// --- 1. OVERLAY CREATION ---
 // --- 1. OVERLAY CREATION ---
 export function ensureOverlay(getActiveRoom: () => any, getActionContext: () => any): HTMLDivElement {
     
@@ -1723,7 +1722,7 @@ export function openStoreMenu(activeRoom: any, playerState: any, storeState: any
         modal.className = "modal-chunky";
         modal.style.position = "fixed";
         modal.style.top = "50%";
-        modal.style.left = "50%"; // <-- ADD THIS LINE
+        modal.style.left = "50%"; 
         modal.style.transform = "translate(-50%, -50%)";
         modal.style.width = "550px";
         modal.style.maxHeight = "80vh";
@@ -2889,4 +2888,140 @@ export function openEventInviteUI(activeRoom: any, eventName: string, targetZone
         isEventInviteOpen = false;
         if (document.body.contains(modal!)) document.body.removeChild(modal!);
     };
+}
+
+export function openMirrorUI(activeRoom: any, keys: any) {
+    if (isMirrorUIOpen || !activeRoom) return;
+    isMirrorUIOpen = true;
+    injectGlobalChunkyStyles();
+
+    for (const key in keys) {
+        keys[key as keyof typeof keys] = false;
+    }
+
+    const state = activeRoom.state as any;
+    const me = state.players.get(activeRoom.sessionId);
+    if (!me) return;
+
+    let modal = document.getElementById("mirror-modal");
+    if (!modal) {
+        modal = document.createElement("div");
+        modal.id = "mirror-modal";
+        modal.className = "modal-chunky";
+        modal.style.position = "fixed"; 
+        modal.style.top = "50%"; 
+        modal.style.left = "50%";
+        modal.style.transform = "translate(-50%, -50%)"; 
+        modal.style.padding = "30px"; 
+        modal.style.zIndex = "3000"; 
+        modal.style.width = "450px"; 
+        modal.style.textAlign = "center";
+        document.body.appendChild(modal);
+    }
+
+    modal.innerHTML = `
+      <div style="display:flex; justify-content:space-between; align-items:center; border-bottom: 4px solid #334155; padding-bottom: 15px; margin-bottom: 20px;">
+        <h2 style="margin:0; color:#d946ef; font-size: 26px; font-weight: 900;"><i class="fa-solid fa-wand-magic-sparkles"></i> Magic Mirror</h2>
+        <button id="close-mirror-btn" class="btn-close-chunky">&times;</button>
+      </div>
+      <div style="display:flex; flex-direction:column; gap:15px; text-align: left;">
+          
+          <div>
+              <label style="color:#94a3b8; font-weight:900; font-size:14px; margin-bottom: 5px; display:block;">Body Type</label>
+              <select id="mirror-gender" class="hud-input" style="width: 100%;">
+                  <option value="body1" ${me.gender === "body1" ? "selected" : ""}>Body Type 1 (Standard)</option>
+                  <option value="body2" ${me.gender === "body2" ? "selected" : ""}>Body Type 2 (Slim)</option>
+              </select>
+          </div>
+
+          <div>
+              <label style="color:#94a3b8; font-weight:900; font-size:14px; margin-bottom: 5px; display:block;">Hair Style</label>
+              <select id="mirror-hairstyle" class="hud-input" style="width: 100%;">
+                  <option value="bald" ${me.hairStyle === "bald" ? "selected" : ""}>Bald</option>
+                  <option value="short" ${me.hairStyle === "short" ? "selected" : ""}>Short</option>
+                  <option value="long" ${me.hairStyle === "long" ? "selected" : ""}>Long</option>
+                  <option value="spiky" ${me.hairStyle === "spiky" ? "selected" : ""}>Spiky</option>
+                  <option value="ponytail" ${me.hairStyle === "ponytail" ? "selected" : ""}>Ponytail</option>
+              </select>
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+              <div>
+                  <label style="color:#94a3b8; font-weight:900; font-size:14px; margin-bottom: 5px; display:block;">Hair Color</label>
+                  <input type="color" id="mirror-haircolor" value="${me.hairColor}" style="width: 100%; height: 40px; border: 3px solid #94a3b8; border-radius: 8px; cursor: pointer;">
+              </div>
+              <div>
+                  <label style="color:#94a3b8; font-weight:900; font-size:14px; margin-bottom: 5px; display:block;">Eye Color</label>
+                  <input type="color" id="mirror-eyecolor" value="${me.eyeColor}" style="width: 100%; height: 40px; border: 3px solid #94a3b8; border-radius: 8px; cursor: pointer;">
+              </div>
+              <div style="grid-column: span 2;">
+                  <label style="color:#94a3b8; font-weight:900; font-size:14px; margin-bottom: 5px; display:block;">Skin Tone</label>
+                  <input type="color" id="mirror-skincolor" value="${me.skinColor}" style="width: 100%; height: 40px; border: 3px solid #94a3b8; border-radius: 8px; cursor: pointer;">
+              </div>
+          </div>
+          
+      </div>
+      <button id="btn-save-mirror" class="btn-chunky btn-magenta" style="margin-top: 25px; padding:15px; width:100%; background: #d946ef; color: white; box-shadow: 0 6px 0 #a21caf;">✨ Change Appearance</button>
+    `;
+
+    document.getElementById("close-mirror-btn")!.onclick = () => {
+        isMirrorUIOpen = false;
+        if (document.body.contains(modal!)) document.body.removeChild(modal!);
+    };
+
+    document.getElementById("btn-save-mirror")!.onclick = () => {
+        const gender = (document.getElementById("mirror-gender") as HTMLSelectElement).value;
+        const hairStyle = (document.getElementById("mirror-hairstyle") as HTMLSelectElement).value;
+        const hairColor = (document.getElementById("mirror-haircolor") as HTMLInputElement).value;
+        const eyeColor = (document.getElementById("mirror-eyecolor") as HTMLInputElement).value;
+        const skinColor = (document.getElementById("mirror-skincolor") as HTMLInputElement).value;
+
+        activeRoom.send("updateAppearance", {
+            gender, hairStyle, hairColor, eyeColor, skinColor
+        });
+
+        isMirrorUIOpen = false;
+        if (document.body.contains(modal!)) document.body.removeChild(modal!);
+    };
+}
+
+export function showQuestCompleteUI(questTitle: string, coins: number, exp: number) {
+    let ui = document.getElementById("quest-complete-popup");
+    if (!ui) {
+        ui = document.createElement("div");
+        ui.id = "quest-complete-popup";
+        ui.className = "modal-chunky";
+        ui.style.position = "fixed";
+        ui.style.top = "20%";
+        ui.style.left = "50%";
+        ui.style.transform = "translate(-50%, -50%) scale(0.5)";
+        ui.style.opacity = "0";
+        ui.style.zIndex = "4000";
+        ui.style.textAlign = "center";
+        ui.style.pointerEvents = "none";
+        ui.style.transition = "all 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275)";
+        document.body.appendChild(ui);
+    }
+
+    ui.innerHTML = `
+        <h2 style="margin:0 0 10px 0; color:#fde047; font-weight: 900; font-size: 32px; text-shadow: 0 4px 0 #ca8a04;">QUEST COMPLETE!</h2>
+        <div style="color: #fff; font-size: 20px; font-weight: 900; margin-bottom: 15px;">${questTitle}</div>
+        <div style="background: #0f172a; padding: 15px; border-radius: 16px; border: 3px solid #334155; display: inline-block;">
+            <div style="color: #38bdf8; font-size: 14px; font-weight: 900; margin-bottom: 8px; text-transform: uppercase;">Rewards Earned:</div>
+            <div style="display: flex; gap: 20px; justify-content: center; font-size: 24px; font-weight: 900;">
+                <span style="color: #f59e0b; text-shadow: 0 2px 0 #b45309;">💰 +${coins}</span>
+                <span style="color: #22c55e; text-shadow: 0 2px 0 #16a34a;">⭐ +${exp}</span>
+            </div>
+        </div>
+    `;
+
+    setTimeout(() => {
+        ui!.style.opacity = "1";
+        ui!.style.transform = "translate(-50%, -50%) scale(1)";
+    }, 10);
+
+    setTimeout(() => {
+        ui!.style.opacity = "0";
+        ui!.style.transform = "translate(-50%, -50%) scale(0.8)";
+    }, 4000);
 }

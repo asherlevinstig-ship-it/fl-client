@@ -391,22 +391,25 @@ function safeBind(getCollection: () => any, onAdd: (item: any, id: string) => vo
     const collection = getCollection();
     
     if (!collection) {
-        setTimeout(() => safeBind(getCollection, onAdd, onRemove), 50);
+        setTimeout(() => safeBind(getCollection, onAdd, onRemove), 100);
         return;
     }
-    
-    if (typeof collection.onAdd === "function" && !(collection as any)._isBound) {
-        collection.onAdd(onAdd);
-        if (onRemove) collection.onRemove(onRemove);
-        (collection as any)._isBound = true; 
+
+    if (!(collection as any)._isBound) {
+        (collection as any)._isBound = true;
         
+        // 1. Fire for all existing items immediately
         if (typeof collection.forEach === "function") {
-            collection.forEach((item: any, id: string) => {
-                onAdd(item, id);
-            });
+            collection.forEach((item: any, id: string) => onAdd(item, id));
         }
-    } else if (!(collection as any)._isBound) {
-        setTimeout(() => safeBind(getCollection, onAdd, onRemove), 50);
+
+        // 2. Bind to future events
+        try {
+            collection.onAdd(onAdd);
+            if (onRemove) collection.onRemove(onRemove);
+        } catch (e) {
+            console.warn("[Colyseus] Could not attach listener (might be an older schema version):", e);
+        }
     }
 }
 
@@ -1031,19 +1034,14 @@ function setupRoomBindings(room: ActiveRoom, sceneObj: ActiveScene): () => void 
   });
 
   // SCENERY
-// SCENERY
   safeBind(() => room.state?.scenery, (item: any, id: string) => {
-      // 1. Force the network to announce it received the item
       console.log(`[NETWORK] Received Scenery: ${id} | Kind: ${item.kind} | X: ${item.x}, Z: ${item.y}`);
-      
-      // 2. Catch silent grid math errors (Usually caused by NaN coordinates)
       try {
           clientSceneryGrid.add(item, item.x, item.y);
       } catch (e) {
           console.error(`[ERROR] clientSceneryGrid failed to add ${id}:`, e);
       }
 
-      // 3. Ensure the scene actually receives the instruction
       if (sceneObj instanceof TownScene) {
           if (typeof (sceneObj as any).addScenery === "function") {
               try {
@@ -1054,6 +1052,8 @@ function setupRoomBindings(room: ActiveRoom, sceneObj: ActiveScene): () => void 
           } else {
               console.warn(`[ERROR] addScenery function is completely missing from TownScene!`);
           }
+      } else {
+          console.warn(`[ERROR] sceneObj is not a TownScene! It is: ${sceneObj.constructor.name}`);
       }
   }, (item: any, id: string) => {
       clientSceneryGrid.remove(item, item.x, item.y);
@@ -1142,10 +1142,16 @@ async function switchZone(nextZone: ZoneName): Promise<void> {
     if (activeRoom && activeScene) {
       localStorage.setItem(`rpg_reconnection_token_${PLAYER_NAME}`, activeRoom.reconnectionToken);
       activeRoom.send("set_aura_style", { style: PLAYER_AURA_STYLE });
-(window as any).debugRoom = activeRoom;
+
       if (typeof (activeScene as any).start === "function") {
           (activeScene as any).start();
       }
+      
+      (window as any).debugRoom = activeRoom;
+      
+      activeRoom.onStateChange((state: any) => {
+          console.log("[DIAGNOSTIC] State updated. Trees in memory:", state.scenery ? state.scenery.size : "SCHEMA IS UNDEFINED");
+      });
     }
     
     cleanupRoomBindings = setupRoomBindings(activeRoom!, activeScene!);
@@ -1163,7 +1169,7 @@ async function switchZone(nextZone: ZoneName): Promise<void> {
                     <span style="color:#aaaaaa">Do not fall off the edge...</span>
                  </div>`, 
                 "#ffffff", 
-                6000       
+                6000        
             );
         }, 1000);
     }
@@ -1250,6 +1256,23 @@ function setupInput(): void {
             panel.style.display = panel.style.display === "none" ? "block" : "none";
         }
         return; 
+    }
+
+    if (event.key === "y" || event.key === "Y") {
+        if (activeScene && (activeScene as any).sceneryVisuals) {
+            console.log("=== SCENERY DUMP ===");
+            const sceneryMap = (activeScene as any).sceneryVisuals;
+            console.log(`Total Scenery Loaded: ${sceneryMap.size}`);
+            
+            let count = 0;
+            sceneryMap.forEach((visual: any, id: string) => {
+                if (count < 10) { 
+                    console.log(`ID: ${id} | Pos: X:${visual.mesh.position.x.toFixed(2)}, Y:${visual.mesh.position.y.toFixed(2)}, Z:${visual.mesh.position.z.toFixed(2)} | Visible: ${visual.mesh.visible}`);
+                }
+                count++;
+            });
+        }
+        return;
     }
 
     const medUI = document.getElementById("meditation-ui");
@@ -2572,6 +2595,13 @@ async function boot(): Promise<void> {
               }
 
               cleanupRoomBindings = setupRoomBindings(activeRoom, activeScene);
+
+              (window as any).debugRoom = activeRoom;
+              
+              activeRoom.onStateChange((state: any) => {
+                  console.log("[DIAGNOSTIC] State updated. Trees in memory:", state.scenery ? state.scenery.size : "SCHEMA IS UNDEFINED");
+              });
+
               reconnected = true;
               console.log(`Successfully reconnected to ${actualZone} as ${PLAYER_NAME}`);
           }

@@ -19,6 +19,7 @@ export let isInventoryUIOpen = false;
 export let isChestUIOpen = false;
 export let isShopUIOpen = false;
 export let isEventInviteOpen = false;
+export let isMirrorUIOpen = false; // <--- ADD THIS LINE RIGHT HERE
 export let activeChestId: string | null = null;
 export let activeStallType: string | null = null;
 

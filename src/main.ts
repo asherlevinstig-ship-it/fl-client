@@ -42,7 +42,6 @@ import {
   openBlueprintSelector,
   openEventInviteUI,
   openMirrorUI,
-  showQuestCompleteUI,
   isQuestUIOpen,
   isTeleportUIOpen,
   isCasinoUIOpen,
@@ -71,6 +70,7 @@ import {
   setGlobalEvent,
   addGameEvent,
   openCraftingMenu, 
+  showQuestCompleteUI,
   openStoreMenu     
 } from "./ui/HUDManager";
 

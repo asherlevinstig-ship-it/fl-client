@@ -50,44 +50,62 @@ export type NetworkContext = {
 // UTILITY HELPERS
 // ==========================================
 
-export function safeBind(getCollection: () => any, onAdd: (item: any, id: string) => void, onRemove?: (item: any, id: string) => void) {
+const boundCollections = new WeakSet<object>();
+
+export function safeBind(
+    getCollection: () => any,
+    onAdd: (item: any, id: string) => void,
+    onRemove?: (item: any, id: string) => void
+) {
     const collection = getCollection();
-    
-    // 1. Wait if the collection hasn't synced to the client yet
+
+    // Wait until the collection exists on the client
     if (!collection) {
         setTimeout(() => safeBind(getCollection, onAdd, onRemove), 100);
         return;
     }
 
-    if (!(collection as any)._isBound) {
-        (collection as any)._isBound = true;
-        
-        // 2. Process existing items immediately
-        if (typeof collection.forEach === "function") {
-            // Handles valid MapSchemas and JS Maps
-            collection.forEach((item: any, id: string) => onAdd(item, id));
-        } else if (typeof collection === "object") {
-            // Fallback for when Colyseus syncs a MapSchema as a plain JS object
-            for (const key in collection) {
-                if (collection.hasOwnProperty(key)) {
-                    onAdd(collection[key], key);
-                }
+    if (typeof collection !== "object") return;
+
+    // Do not mutate Colyseus schema objects with custom _isBound flags
+    if (boundCollections.has(collection)) return;
+    boundCollections.add(collection);
+
+    // Process existing items immediately
+    if (typeof collection.forEach === "function") {
+        collection.forEach((item: any, id: string) => {
+            onAdd(item, id);
+        });
+    } else {
+        for (const key in collection) {
+            if (Object.prototype.hasOwnProperty.call(collection, key)) {
+                onAdd(collection[key], key);
             }
+        }
+    }
+
+    // Bind old/direct callback API if this collection supports it
+    try {
+        if (typeof collection.onAdd === "function") {
+            collection.onAdd((item: any, id: string) => {
+                onAdd(item, id);
+            });
         }
 
-        // 3. Safely attach real-time listeners ONLY if it's a valid Schema
-        try {
-            if (typeof collection.onAdd === "function") {
-                collection.onAdd(onAdd);
-                if (onRemove && typeof collection.onRemove === "function") {
-                    collection.onRemove(onRemove);
-                }
-            } else {
-                console.warn("[Colyseus] Cannot bind real-time listener. Data is not a MapSchema:", collection);
-            }
-        } catch (e) {
-            console.warn("[Colyseus] Could not attach listener:", e);
+        if (onRemove && typeof collection.onRemove === "function") {
+            collection.onRemove((item: any, id: string) => {
+                onRemove(item, id);
+            });
         }
+
+        if (typeof collection.onAdd !== "function") {
+            console.debug(
+                "[Colyseus] Collection synced, but direct onAdd/onRemove callbacks are unavailable. Existing items were processed.",
+                collection
+            );
+        }
+    } catch (e) {
+        console.warn("[Colyseus] Could not attach collection listener:", e);
     }
 }
 
@@ -118,11 +136,11 @@ export function initPlayerVisual(player: any, id: string, room: any, sceneObj: a
     if (id === room.sessionId) {
         ctx.rehydrateAbilityUI(room, player);
 
-        if (player.hotbar) {
-            if (typeof player.hotbar.onChange === "function") player.hotbar.onChange(() => ctx.rehydrateAbilityUI(room, player));
-            if (typeof player.hotbar.onAdd === "function") player.hotbar.onAdd(() => ctx.rehydrateAbilityUI(room, player));
-            if (typeof player.hotbar.onRemove === "function") player.hotbar.onRemove(() => ctx.rehydrateAbilityUI(room, player));
-        }
+        safeBind(
+            () => player.hotbar,
+            () => ctx.rehydrateAbilityUI(room, player),
+            () => ctx.rehydrateAbilityUI(room, player)
+        );
 
         if (typeof sceneObj.playerVisuals !== "undefined") {
             const v = sceneObj.playerVisuals.get(id);
@@ -132,7 +150,11 @@ export function initPlayerVisual(player: any, id: string, room: any, sceneObj: a
             } 
         }
 
-        safeBind(() => player.inventory, () => ctx.refreshInventoryUI(room, ctx.playerClass), () => ctx.refreshInventoryUI(room, ctx.playerClass));
+        safeBind(
+            () => player.inventory, 
+            () => ctx.refreshInventoryUI(room, ctx.playerClass), 
+            () => ctx.refreshInventoryUI(room, ctx.playerClass)
+        );
         
         if (typeof player.listen === "function") {
             player.listen("coins", () => {
@@ -341,14 +363,7 @@ function bindMessageListeners(room: any, sceneObj: any, ctx: NetworkContext) {
             else ctx.showTransientUI("fishing-result-ui", `❌ ${data.message || "The fish got away!"}`, "#ff4444", 3000);
         });
     });
-
-    // NOTE: Casino and Meditation UI logic omitted here for brevity, but they bind the exact same way.
-    // Copy the `room.onMessage("meditation_question")` and `room.onMessage("casinoResult")` from main here.
 }
-
-// ==========================================
-// WORLD ENTITY BINDINGS
-// ==========================================
 
 // ==========================================
 // WORLD ENTITY BINDINGS
@@ -371,8 +386,11 @@ function bindWorldEntities(room: any, sceneObj: any, ctx: NetworkContext) {
                 (sceneObj as any).addDecoration(deco.id, deco.type, deco.x, terrainY + 0.05, deco.z, deco.rotation);
             }
         }
-        safeBind(() => deco.inventory, () => ctx.refreshChestUI(room), () => ctx.refreshChestUI(room));
-        if (deco.inventory?.onChange) deco.inventory.onChange(() => ctx.refreshChestUI(room));
+        safeBind(
+            () => deco.inventory, 
+            () => ctx.refreshChestUI(room), 
+            () => ctx.refreshChestUI(room)
+        );
     }, (deco: any) => {
         if (sceneObj instanceof TownScene && typeof (sceneObj as any).removeDecoration === "function") {
             (sceneObj as any).removeDecoration(deco.id);
@@ -385,8 +403,11 @@ function bindWorldEntities(room: any, sceneObj: any, ctx: NetworkContext) {
             store.listen("vault", () => ctx.refreshShopUI(room));
             store.listen("ownerId", () => ctx.refreshShopUI(room));
         }
-        safeBind(() => store.inventory, () => ctx.refreshShopUI(room), () => ctx.refreshShopUI(room));
-        if (store.inventory?.onChange) store.inventory.onChange(() => ctx.refreshShopUI(room));
+        safeBind(
+            () => store.inventory, 
+            () => ctx.refreshShopUI(room), 
+            () => ctx.refreshShopUI(room)
+        );
     });
 
     // FAMILIARS

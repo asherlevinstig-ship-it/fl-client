@@ -1,8 +1,5 @@
-// Colyseus 0.14 Primitive Teardown Bug Patch
-// @ts-ignore
-if (!String.prototype.onRemove) String.prototype.onRemove = function() {};
-// @ts-ignore
-if (!Number.prototype.onRemove) Number.prototype.onRemove = function() {};
+// Removed old Colyseus 0.14 primitive teardown patch.
+// If primitive onRemove crashes return, check package versions instead of patching global prototypes.
 
 import * as THREE from "three";
 import { connectToField, connectToTown, connectToDungeon, connectToMaze, connectToUnderworld, reconnectToRoom } from "./net/colyseus";

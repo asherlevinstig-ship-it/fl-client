@@ -237,6 +237,53 @@ function getActionContext(): ActionContext {
     };
 }
 
+function rehydrateAbilityUI(room: ActiveRoom | null, me?: any) {
+    if (!room) return;
+
+    // Rebind AbilityUI to the current Colyseus room.
+    setAbilityUIRoom(room);
+
+    // Reload local/default hotbar for the current pathway.
+    // This should also restore localStorage-backed hotbar if your AbilityUI uses it.
+    initDefaultHotbar(PLAYER_PATHWAY);
+
+    // If the server stores hotbar data on the player, copy it across.
+    if (me && me.hotbar) {
+        for (let i = 1; i <= 9; i++) {
+            const slotKey = `slot${i}`;
+
+            let value = "";
+
+            if (typeof me.hotbar.get === "function") {
+                value = me.hotbar.get(slotKey) || "";
+            } else if (me.hotbar[slotKey]) {
+                value = me.hotbar[slotKey];
+            }
+
+            if (value) {
+                (playerHotbar as any)[slotKey] = value;
+            }
+        }
+    }
+
+    renderHotbar();
+
+    console.log("[ABILITY UI REHYDRATED]", {
+        zone: currentZone,
+        roomName: (room as any).name,
+        pathway: PLAYER_PATHWAY,
+        slot1: playerHotbar.slot1,
+        slot2: playerHotbar.slot2,
+        slot3: playerHotbar.slot3,
+        slot4: playerHotbar.slot4,
+        slot5: playerHotbar.slot5,
+        slot6: playerHotbar.slot6,
+        slot7: playerHotbar.slot7,
+        slot8: playerHotbar.slot8,
+        slot9: playerHotbar.slot9
+    });
+}
+
 function sendMove(room: ActiveRoom, x: number, y: number): void { 
   const ctx = getActionContext();
   if (room && (room.connection as any).isOpen) {
@@ -439,6 +486,25 @@ function initPlayerVisual(player: any, id: string, room: ActiveRoom, sceneObj: A
     }
     
     if (id === room.sessionId) {
+        // Important when changing rooms/zones.
+        // Maze now uses a freshly created room/state, so AbilityUI must be rebound.
+        rehydrateAbilityUI(room, player);
+
+        // If the server hotbar changes later, refresh the client hotbar.
+        if (player.hotbar) {
+            if (typeof player.hotbar.onChange === "function") {
+                player.hotbar.onChange(() => rehydrateAbilityUI(room, player));
+            }
+
+            if (typeof player.hotbar.onAdd === "function") {
+                player.hotbar.onAdd(() => rehydrateAbilityUI(room, player));
+            }
+
+            if (typeof player.hotbar.onRemove === "function") {
+                player.hotbar.onRemove(() => rehydrateAbilityUI(room, player));
+            }
+        }
+
         if (typeof (sceneObj as any).playerVisuals !== "undefined") {
             const v = (sceneObj as any).playerVisuals.get(id);
             if (v) {
@@ -447,15 +513,27 @@ function initPlayerVisual(player: any, id: string, room: ActiveRoom, sceneObj: A
             } 
         }
 
-        safeBind(() => player.inventory, () => refreshInventoryUI(room, PLAYER_CLASS), () => refreshInventoryUI(room, PLAYER_CLASS));
+        safeBind(
+            () => player.inventory,
+            () => refreshInventoryUI(room, PLAYER_CLASS),
+            () => refreshInventoryUI(room, PLAYER_CLASS)
+        );
         
         if (typeof player.listen === "function") {
             player.listen("coins", () => {
                 refreshInventoryUI(room, PLAYER_CLASS);
                 refreshShopUI(room);
             });
-            player.listen("level", () => refreshInventoryUI(room, PLAYER_CLASS));
-            player.listen("rank", () => refreshInventoryUI(room, PLAYER_CLASS));
+
+            player.listen("level", () => {
+                refreshInventoryUI(room, PLAYER_CLASS);
+                rehydrateAbilityUI(room, player);
+            });
+
+            player.listen("rank", () => {
+                refreshInventoryUI(room, PLAYER_CLASS);
+                rehydrateAbilityUI(room, player);
+            });
         }
     }
 }
@@ -1141,6 +1219,10 @@ async function switchZone(nextZone: ZoneName): Promise<void> {
 
     if (activeRoom && activeScene) {
       localStorage.setItem(`rpg_reconnection_token_${PLAYER_NAME}`, activeRoom.reconnectionToken);
+
+      // Critical: bind AbilityUI to the newly joined room.
+      rehydrateAbilityUI(activeRoom);
+
       activeRoom.send("set_aura_style", { style: PLAYER_AURA_STYLE });
 
       if (typeof (activeScene as any).start === "function") {
@@ -2235,6 +2317,12 @@ function startHudLoop(): void {
                 initPlayerVisual(me, activeRoom.sessionId, activeRoom, activeScene);
             }
 
+            // Backup: after zone changes, make sure AbilityUI is bound to the current room.
+            // Runs lightly every few seconds, not every frame.
+            if (frameCount % 180 === 0) {
+                rehydrateAbilityUI(activeRoom, me);
+            }
+
             if (!me) {
                 requestAnimationFrame(tick);
                 return;
@@ -2612,6 +2700,9 @@ async function boot(): Promise<void> {
           else activeScene = new FieldScene(container);
           
           if (activeRoom && activeScene) {
+              // Critical after reconnecting to any room.
+              rehydrateAbilityUI(activeRoom);
+
               activeRoom.send("set_aura_style", { style: PLAYER_AURA_STYLE });
 
               if (typeof (activeScene as any).start === "function") {

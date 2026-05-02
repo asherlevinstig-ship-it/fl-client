@@ -414,14 +414,16 @@ async function switchZone(nextZone: ZoneName): Promise<void> {
   hoverX = 0;
   hoverY = 0;
 
-  // Clear old prediction state so Underworld movement inputs do not carry into Town.
+  // Clear stale Underworld movement/camera state before joining the next room.
   pendingInputs.length = 0;
   inputSequenceNumber = 0;
   networkState.lastSentX = 0;
   networkState.lastSentY = 0;
   networkState.lastNetworkSend = 0;
 
-  for (const key in keys) keys[key as keyof typeof keys] = false;
+  for (const key in keys) {
+      keys[key as keyof typeof keys] = false;
+  }
 
   try {
     if (cleanupRoomBindings) {
@@ -469,6 +471,11 @@ async function switchZone(nextZone: ZoneName): Promise<void> {
     }
     currentZone = nextZone; 
     
+    console.log("[Town Debug] Canvas count:", container.querySelectorAll("canvas").length);
+    console.log("[Town Debug] Container size:", container.clientWidth, container.clientHeight);
+    console.log("[Town Debug] Scene children:", (activeScene as any).scene?.children?.length);
+    console.log("[Town Debug] Camera:", (activeScene as any).camera?.position);
+
     localStorage.setItem(`rpg_last_zone_${PLAYER_NAME}`, nextZone);
 
     if (activeRoom && activeScene) {
@@ -482,6 +489,15 @@ async function switchZone(nextZone: ZoneName): Promise<void> {
       if (typeof (activeScene as any).start === "function") {
           (activeScene as any).start();
       }
+
+      setTimeout(() => {
+          console.log("[Town Debug after 1s]", {
+              sceneChildren: (activeScene as any)?.scene?.children?.length,
+              camera: (activeScene as any)?.camera?.position,
+              localPlayerPos,
+              hasLocalVisual: (activeScene as any)?.playerVisuals?.has?.(activeRoom?.sessionId)
+          });
+      }, 1000);
 
       (window as any).debugRoom = activeRoom;
 

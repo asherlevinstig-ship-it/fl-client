@@ -1608,7 +1608,7 @@ function setupInput(): void {
       
       if (activeScene instanceof TownScene && !isOutsideTown) {
         
-        if (distanceSq(localPlayerPos.x, localPlayerPos.y, 35, -35) < 324.0) { // 18^2
+        if (distanceSq(localPlayerPos.x, localPlayerPos.y, 35, -35) < 324.0) {
             openQuestUI(activeRoom, keys, PLAYER_NAME);
             interactionTriggered = true;
         }
@@ -1665,11 +1665,28 @@ function setupInput(): void {
                 }
             } 
         }
-      }
 
-      if (!interactionTriggered) {
+        // --- NEW LOOT CHEST DETECTION ---
+        if (!interactionTriggered) {
+            let nearLoot = false;
+            if ((activeRoom.state as any)?.lootItems) {
+                (activeRoom.state as any).lootItems.forEach((loot: any) => {
+                    if (loot.kind === "chest" && !loot.isOpen) {
+                        if (distanceSq(localPlayerPos.x, localPlayerPos.y, loot.x, loot.y) <= 2.25) {
+                            nearLoot = true;
+                        }
+                    }
+                });
+            }
+            if (nearLoot) {
+                activeRoom.send("interact");
+                interactionTriggered = true;
+            }
+        }
+
+        if (!interactionTriggered) {
         let nearestDeco: any = null;
-        let nearestDecoDistSq = 9.0; // 3^2
+        let nearestDecoDistSq = 9.0;
         
         if ((activeRoom.state as any)?.decorations) {
             (activeRoom.state as any).decorations.forEach((deco: any) => {
@@ -1691,6 +1708,99 @@ function setupInput(): void {
       }
       return;
     }
+
+    if (currentZone === "field" || currentZone === "dungeon" || currentZone === "maze" || currentZone === "underworld" || isOutsideTown) {
+      if (event.key === "f" || event.key === "F") {
+        attemptFishing(getActionContext()); 
+        activeRoom.send("interact");
+        return;
+      }
+
+      if (event.code === "Space") {
+        event.preventDefault(); 
+        if (event.repeat) return; 
+
+        const state = activeRoom?.state as any;
+        const me = state?.players?.get(activeRoom!.sessionId);
+
+        if (me && me.mountedFamiliarId && me.mountedFamiliarId !== "") {
+            activeRoom!.send("toggle_flight");
+            return;
+        }
+
+        let dInX = 0; let dInY = 0;
+        if (keys.KeyW) dInY -= 1;
+        if (keys.KeyS) dInY += 1;
+        if (keys.KeyA) dInX -= 1;
+        if (keys.KeyD) dInX += 1;
+
+        let finalDx = 0; let finalDy = 0;
+
+        if (dInX === 0 && dInY === 0) {
+          const mDx = hoverX - localPlayerPos.x;
+          const mDy = hoverY - localPlayerPos.y;
+          if (Math.abs(mDx) > 0.1 || Math.abs(mDy) > 0.1) {
+              if (Math.abs(mDx) > Math.abs(mDy)) finalDx = Math.sign(mDx);
+              else finalDy = Math.sign(mDy);
+          } else { finalDy = 1; }
+        } else {
+          let angle = 0;
+          if (typeof (activeScene as any).getCameraAngle === "function") {
+              angle = (activeScene as any).getCameraAngle();
+          }
+          
+          const rx = dInX * Math.cos(angle) + dInY * Math.sin(angle);
+          const ry = -dInX * Math.sin(angle) + dInY * Math.cos(angle);
+          
+          finalDx = Math.sign(Math.round(rx * 10));
+          finalDy = Math.sign(Math.round(ry * 10));
+        }
+
+        const isWolf = (me && me.isSpiritAnimal) || isLocallyWolf;
+
+        if (me) {
+            if (isWolf && (me.stamina < 10 || me.hunger < 2)) return;
+            if (!isWolf && (me.stamina < 20 || me.hunger < 5)) return;
+        }
+
+        if (isWolf) {
+            const lungeDist = 2.0;
+            localPlayerPos.x += (finalDx * lungeDist);
+            localPlayerPos.y += (finalDy * lungeDist);
+            
+            activeRoom!.send("wolfAttack", { dx: finalDx, dy: finalDy });
+            return; 
+        }
+        
+        const dodgeDist = 4.0;
+        let nextX = localPlayerPos.x + (finalDx * dodgeDist);
+        let nextY = localPlayerPos.y + (finalDy * dodgeDist);
+        
+        const isTown = currentZone === "town";
+        const isMaze = currentZone === "maze";
+        const isUnderworld = currentZone === "underworld";
+
+        let collisionState = state;
+        if (isTown) {
+             collisionState = {
+                 buildings: state.buildings,
+                 decorations: state.decorations,
+                 scenery: clientSceneryGrid.getNearby(localPlayerPos.x, localPlayerPos.y, 15.0)
+             };
+        }
+        
+        if (isWolf || (!((isTown && checkTownCollision(nextX, localPlayerPos.y)) || (isMaze && checkMazeCollision(nextX, localPlayerPos.y)) || (isUnderworld && checkUnderworldCollision(nextX, localPlayerPos.y))) && !checkDynamicCollision(collisionState, nextX, localPlayerPos.y))) {
+            localPlayerPos.x = nextX;
+        }
+        if (isWolf || (!((isTown && checkTownCollision(localPlayerPos.x, nextY)) || (isMaze && checkMazeCollision(localPlayerPos.x, nextY)) || (isUnderworld && checkUnderworldCollision(localPlayerPos.x, nextY))) && !checkDynamicCollision(collisionState, localPlayerPos.x, nextY))) {
+            localPlayerPos.y = nextY;
+        }
+
+        activeRoom!.send("dodge", { dx: finalDx, dy: finalDy });
+        return;
+      }
+    }
+  }
 
     if (isOutsideTown) {
       if (event.key === "b" || event.key === "B") {
@@ -1754,100 +1864,6 @@ function setupInput(): void {
             });
           }
         }
-        return;
-      }
-    }
-
-    if (currentZone === "field" || currentZone === "dungeon" || currentZone === "maze" || currentZone === "underworld" || isOutsideTown) {
-      if (event.key === "f" || event.key === "F") {
-        attemptFishing(getActionContext()); 
-        activeRoom.send("interact");
-        return;
-      }
-
-      if (event.code === "Space") {
-        event.preventDefault(); 
-        if (event.repeat) return; 
-
-        const state = activeRoom?.state as any;
-        const me = state?.players?.get(activeRoom!.sessionId);
-
-        // --- NEW: INTERCEPT FOR FLIGHT ---
-        if (me && me.mountedFamiliarId && me.mountedFamiliarId !== "") {
-            activeRoom!.send("toggle_flight");
-            return; // Block dodge logic while mounted
-        }
-
-        let dInX = 0; let dInY = 0;
-        if (keys.KeyW) dInY -= 1;
-        if (keys.KeyS) dInY += 1;
-        if (keys.KeyA) dInX -= 1;
-        if (keys.KeyD) dInX += 1;
-
-        let finalDx = 0; let finalDy = 0;
-
-        if (dInX === 0 && dInY === 0) {
-          const mDx = hoverX - localPlayerPos.x;
-          const mDy = hoverY - localPlayerPos.y;
-          if (Math.abs(mDx) > 0.1 || Math.abs(mDy) > 0.1) {
-              if (Math.abs(mDx) > Math.abs(mDy)) finalDx = Math.sign(mDx);
-              else finalDy = Math.sign(mDy);
-          } else { finalDy = 1; }
-        } else {
-          let angle = 0;
-          if (typeof (activeScene as any).getCameraAngle === "function") {
-              angle = (activeScene as any).getCameraAngle();
-          }
-          
-          const rx = dInX * Math.cos(angle) + dInY * Math.sin(angle);
-          const ry = -dInX * Math.sin(angle) + dInY * Math.cos(angle);
-          
-          finalDx = Math.sign(Math.round(rx * 10));
-          finalDy = Math.sign(Math.round(ry * 10));
-        }
-
-        const isWolf = (me && me.isSpiritAnimal) || isLocallyWolf;
-
-        if (me) {
-            if (isWolf && (me.stamina < 10 || me.hunger < 2)) return;
-            if (!isWolf && (me.stamina < 20 || me.hunger < 5)) return;
-        }
-
-        if (isWolf) {
-            const lungeDist = 2.0;
-            localPlayerPos.x += (finalDx * lungeDist);
-            localPlayerPos.y += (finalDy * lungeDist);
-            
-            activeRoom!.send("wolfAttack", { dx: finalDx, dy: finalDy });
-            return; 
-        }
-        
-        const dodgeDist = 4.0;
-        let nextX = localPlayerPos.x + (finalDx * dodgeDist);
-        let nextY = localPlayerPos.y + (finalDy * dodgeDist);
-        
-        const isTown = currentZone === "town";
-        const isMaze = currentZone === "maze";
-        const isUnderworld = currentZone === "underworld";
-
-        // CRITICAL BUG FIX: Using a mocked collision state to prevent full-array scenery scanning
-        let collisionState = state;
-        if (isTown) {
-             collisionState = {
-                 buildings: state.buildings,
-                 decorations: state.decorations,
-                 scenery: clientSceneryGrid.getNearby(localPlayerPos.x, localPlayerPos.y, 15.0)
-             };
-        }
-        
-        if (isWolf || (!((isTown && checkTownCollision(nextX, localPlayerPos.y)) || (isMaze && checkMazeCollision(nextX, localPlayerPos.y)) || (isUnderworld && checkUnderworldCollision(nextX, localPlayerPos.y))) && !checkDynamicCollision(collisionState, nextX, localPlayerPos.y))) {
-            localPlayerPos.x = nextX;
-        }
-        if (isWolf || (!((isTown && checkTownCollision(localPlayerPos.x, nextY)) || (isMaze && checkMazeCollision(localPlayerPos.x, nextY)) || (isUnderworld && checkUnderworldCollision(localPlayerPos.x, nextY))) && !checkDynamicCollision(collisionState, localPlayerPos.x, nextY))) {
-            localPlayerPos.y = nextY;
-        }
-
-        activeRoom!.send("dodge", { dx: finalDx, dy: finalDy });
         return;
       }
     }
@@ -2323,15 +2339,23 @@ function startHudLoop(): void {
                 }
 
                 // Extremely large desync catch (fallback)
-                if (syncDistSq > 225.0) { // 15^2
-                    localPlayerPos.x = me.x;
-                    localPlayerPos.y = me.y;
-                    
-                    // CRITICAL: Must reset network anchor to prevent ghost trails
-                    networkState.lastSentX = me.x;
-                    networkState.lastSentY = me.y;
-                    pendingInputs.length = 0;
-                } 
+               if (syncDistSq > 225.0) {
+    console.warn("[CLIENT DESYNC RESET]", {
+        zone: currentZone,
+        local: { x: localPlayerPos.x, y: localPlayerPos.y },
+        server: { x: me.x, y: me.y },
+        syncDistSq,
+        lastProcessedInput: me.lastProcessedInput,
+        pendingInputs: pendingInputs.length
+    });
+
+    localPlayerPos.x = me.x;
+    localPlayerPos.y = me.y;
+
+    networkState.lastSentX = me.x;
+    networkState.lastSentY = me.y;
+    pendingInputs.length = 0;
+}
 
                 // Reset input processing for movement step
                 let inputX = 0; let inputY = 0;

@@ -721,6 +721,37 @@ export class TownScene extends BaseScene {
         this.updateHoverPlot();
         this.updateSceneryAnimations(dt); 
         this.updateCasinoAnimations(dt);
+
+        // --- CHEST OPENING ANIMATIONS ---
+        this.lootVisuals.forEach(chest => {
+            if (chest.userData.isOpen && chest.userData.openProgress !== undefined && chest.userData.openProgress < 1) {
+                chest.userData.openProgress += dt * 6.0; 
+                if (chest.userData.openProgress > 1) chest.userData.openProgress = 1;
+
+                const lid = chest.getObjectByName("chestLid");
+                if (lid) {
+                    const easeOutBack = (x: number) => {
+                        const c1 = 1.70158;
+                        const c3 = c1 + 1;
+                        return 1 + c3 * Math.pow(x - 1, 3) + c1 * Math.pow(x - 1, 2);
+                    };
+                    const p = easeOutBack(chest.userData.openProgress);
+
+                    lid.rotation.x = THREE.MathUtils.lerp(0, -Math.PI / 2.5, p);
+                    lid.position.z = THREE.MathUtils.lerp(0, -0.3, p);
+                    lid.position.y = THREE.MathUtils.lerp(0.9, 1.0, p);
+                }
+                
+                const base = chest.children[0];
+                if (base && chest.userData.openProgress < 0.5) {
+                    base.position.x = (Math.random() - 0.5) * 0.1;
+                    base.position.z = (Math.random() - 0.5) * 0.1;
+                } else if (base) {
+                    base.position.x = 0;
+                    base.position.z = 0;
+                }
+            }
+        });
         
         if (this.lakeMesh) {
             let lakeCenterH = 0.05;
@@ -1434,6 +1465,7 @@ export class TownScene extends BaseScene {
 
         const lidGeo = new THREE.BoxGeometry(1.2, 0.2, 0.8);
         const lid = new THREE.Mesh(lidGeo, woodMat);
+        lid.name = "chestLid";
         lid.castShadow = true;
         
         if (isOpen) {
@@ -1444,7 +1476,8 @@ export class TownScene extends BaseScene {
         }
         chestGroup.add(lid);
 
-        const label = this.createNameLabel(isOpen ? "Empty" : "Loot Chest [Press E]");
+        const label = this.createNameLabel(isOpen ? "Empty" : "Loot Chest [Press F]");
+        label.name = "chestLabel";
         label.position.set(0, 2.0, 0);
         label.scale.set(3.0, 0.8, 1.0);
         chestGroup.add(label);
@@ -1456,13 +1489,25 @@ export class TownScene extends BaseScene {
 
     public updateLootItem(id: string, isOpen: boolean) {
         const chestGroup = this.lootVisuals.get(id);
-        if (chestGroup) {
-            const pos = chestGroup.position;
-            
-            this.scene.remove(chestGroup);
-            this.lootVisuals.delete(id);
-            
-            this.addLootItem(id, "chest", pos.x, pos.z, isOpen);
+        
+        if (chestGroup && isOpen && !chestGroup.userData.isOpen) {
+            chestGroup.userData.isOpen = true;
+            chestGroup.userData.openProgress = 0;
+
+            const label = chestGroup.getObjectByName("chestLabel");
+            if (label) label.visible = false;
+
+            const glow = new THREE.PointLight(0xffd700, 5.0, 8);
+            glow.position.set(0, 1, 0);
+            chestGroup.add(glow);
+
+            let fadeInterval = setInterval(() => {
+                glow.intensity -= 0.25;
+                if (glow.intensity <= 0) {
+                    chestGroup.remove(glow);
+                    clearInterval(fadeInterval);
+                }
+            }, 50);
         }
     }
 

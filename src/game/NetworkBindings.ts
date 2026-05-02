@@ -234,7 +234,12 @@ export function setupRoomBindings(room: any, sceneObj: any, ctx: NetworkContext)
 function bindMessageListeners(room: any, sceneObj: any, ctx: NetworkContext) {
     // UI & System
     room.onMessage("global_event_sync", (data: any) => ctx.setGlobalEvent(data.name, Date.now() + data.remainingMs));
-    room.onMessage("server_event_teleport", (data: any) => ctx.switchZone(data.zone).catch(console.error));
+    
+    room.onMessage("server_event_teleport", (data: any) => {
+        if (!data?.zone) return;
+        ctx.switchZone(data.zone).catch(console.error);
+    });
+
     room.onMessage("quest_completed", (data: any) => ctx.showQuestCompleteUI(data.title, data.coins, data.exp));
     room.onMessage("hud_message", (message: string) => ctx.queueEvent(() => ctx.showTransientUI("general-hud-msg", message, "#ffffff", 3000)));
     room.onMessage("server_event_log", (data: any) => ctx.addGameEvent(data.html, data.type));
@@ -244,10 +249,10 @@ function bindMessageListeners(room: any, sceneObj: any, ctx: NetworkContext) {
     room.onMessage("chat_received", (data: any) => {
         let isTeammate = false;
         
-        const myState = room.state?.players?.get?.(room.sessionId);
-        
-        if (myState) {
-            isTeammate = myState.teamId > 0 && myState.teamId === data.teamId;
+        // Added strong guard against undefined MapSchemas during transition
+        if (room.state?.players && typeof room.state.players.get === "function") {
+            const myState = room.state.players.get(room.sessionId);
+            isTeammate = !!(myState && myState.teamId > 0 && myState.teamId === data.teamId);
         }
         
         ctx.queueEvent(() => {
@@ -274,8 +279,26 @@ function bindMessageListeners(room: any, sceneObj: any, ctx: NetworkContext) {
         ctx.showTransientUI("dungeon-result-ui", data.message, "#ff0000", 3500, () => ctx.switchZone("underworld").catch(console.error));
     });
 
-    room.onMessage("underworld_death", (data: any) => ctx.showTransientUI("underworld-result-ui", data.message, "#ff0000", 3500, () => ctx.switchZone("town").catch(console.error)));
-    room.onMessage("underworld_escape", (data: any) => ctx.showTransientUI("underworld-result-ui", data.message, "#00aaff", 3500, () => ctx.switchZone("town").catch(console.error)));
+    room.onMessage("underworld_death", (data: any) => {
+        ctx.showTransientUI(
+            "underworld-result-ui",
+            data.message || "💀 The Void consumed you.",
+            "#ff0000",
+            data.delayMs ?? 1200,
+            () => ctx.switchZone(data.zone || "town").catch(console.error)
+        );
+    });
+
+    room.onMessage("underworld_escape", (data: any) => {
+        ctx.showTransientUI(
+            "underworld-result-ui",
+            data.message || "🩸 You escape the Underworld.",
+            "#00ffaa",
+            data.delayMs ?? 1200,
+            () => ctx.switchZone(data.zone || "town").catch(console.error)
+        );
+    });
+
     room.onMessage("trigger_void_fall", () => {
         ctx.queueEvent(() => {
             if (typeof sceneObj.triggerPlayerVoidFall === "function") {

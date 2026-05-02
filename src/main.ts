@@ -407,13 +407,43 @@ function buildNetworkContext(): NetworkContext {
 
 async function switchZone(nextZone: ZoneName): Promise<void> {
   if (isTransitioning || currentZone === nextZone) return;
-  isTransitioning = true; localPlayerPos.initialized = false; hoverX = 0; hoverY = 0;
-  for (const key in keys) keys[key as keyof typeof keys] = false; 
+
+  isTransitioning = true;
+
+  localPlayerPos.initialized = false;
+  hoverX = 0;
+  hoverY = 0;
+
+  // Clear old prediction state so Underworld movement inputs do not carry into Town.
+  pendingInputs.length = 0;
+  inputSequenceNumber = 0;
+  networkState.lastSentX = 0;
+  networkState.lastSentY = 0;
+  networkState.lastNetworkSend = 0;
+
+  for (const key in keys) keys[key as keyof typeof keys] = false;
 
   try {
-    if (cleanupRoomBindings) { cleanupRoomBindings(); cleanupRoomBindings = null; }
-    if (activeRoom) { await activeRoom.leave(); activeRoom = null; }
-    if (activeScene) { activeScene.dispose(); activeScene = null; }
+    if (cleanupRoomBindings) {
+      cleanupRoomBindings();
+      cleanupRoomBindings = null;
+    }
+
+    if (activeRoom) {
+      try {
+        await activeRoom.leave();
+      } catch (e) {
+        console.warn("Old room leave failed during zone switch:", e);
+      }
+      activeRoom = null;
+    }
+
+    localStorage.removeItem(`rpg_reconnection_token_${PLAYER_NAME}`);
+
+    if (activeScene) {
+      activeScene.dispose();
+      activeScene = null;
+    }
     unmountMazeUI(); 
     unmountDungeonUI();
 

@@ -443,21 +443,22 @@ async function switchZone(nextZone: ZoneName): Promise<void> {
 
     if (activeRoom && activeScene) {
       localStorage.setItem(`rpg_reconnection_token_${PLAYER_NAME}`, activeRoom.reconnectionToken);
+
+      cleanupRoomBindings = setupRoomBindings(activeRoom, activeScene, buildNetworkContext());
+
       rehydrateAbilityUI(activeRoom);
       activeRoom.send("set_aura_style", { style: PLAYER_AURA_STYLE });
 
       if (typeof (activeScene as any).start === "function") {
           (activeScene as any).start();
       }
-      
+
       (window as any).debugRoom = activeRoom;
-      
+
       activeRoom.onStateChange((state: any) => {
           console.log("[DIAGNOSTIC] State updated. Trees in memory:", state.scenery ? state.scenery.size : "SCHEMA IS UNDEFINED");
       });
     }
-    
-    cleanupRoomBindings = setupRoomBindings(activeRoom!, activeScene!, buildNetworkContext());
 
     if (nextZone === "underworld") {
         setTimeout(() => {
@@ -1021,14 +1022,14 @@ async function boot(): Promise<void> {
           else activeScene = new FieldScene(container);
           
           if (activeRoom && activeScene) {
+              cleanupRoomBindings = setupRoomBindings(activeRoom, activeScene, buildNetworkContext());
+
               rehydrateAbilityUI(activeRoom);
               activeRoom.send("set_aura_style", { style: PLAYER_AURA_STYLE });
 
               if (typeof (activeScene as any).start === "function") {
                   (activeScene as any).start();
               }
-
-              cleanupRoomBindings = setupRoomBindings(activeRoom, activeScene, buildNetworkContext());
 
               (window as any).debugRoom = activeRoom;
               

@@ -53,6 +53,7 @@ export type NetworkContext = {
 export function safeBind(getCollection: () => any, onAdd: (item: any, id: string) => void, onRemove?: (item: any, id: string) => void) {
     const collection = getCollection();
     
+    // 1. Wait if the collection hasn't synced to the client yet
     if (!collection) {
         setTimeout(() => safeBind(getCollection, onAdd, onRemove), 100);
         return;
@@ -61,13 +62,29 @@ export function safeBind(getCollection: () => any, onAdd: (item: any, id: string
     if (!(collection as any)._isBound) {
         (collection as any)._isBound = true;
         
+        // 2. Process existing items immediately
         if (typeof collection.forEach === "function") {
+            // Handles valid MapSchemas and JS Maps
             collection.forEach((item: any, id: string) => onAdd(item, id));
+        } else if (typeof collection === "object") {
+            // Fallback for when Colyseus syncs a MapSchema as a plain JS object
+            for (const key in collection) {
+                if (collection.hasOwnProperty(key)) {
+                    onAdd(collection[key], key);
+                }
+            }
         }
 
+        // 3. Safely attach real-time listeners ONLY if it's a valid Schema
         try {
-            collection.onAdd(onAdd);
-            if (onRemove) collection.onRemove(onRemove);
+            if (typeof collection.onAdd === "function") {
+                collection.onAdd(onAdd);
+                if (onRemove && typeof collection.onRemove === "function") {
+                    collection.onRemove(onRemove);
+                }
+            } else {
+                console.warn("[Colyseus] Cannot bind real-time listener. Data is not a MapSchema:", collection);
+            }
         } catch (e) {
             console.warn("[Colyseus] Could not attach listener:", e);
         }

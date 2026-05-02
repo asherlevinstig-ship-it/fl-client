@@ -740,13 +740,12 @@ export class TownEnvironment {
     this.environmentRoot.add(stallGroup);
   }
 
-  // --- NEW: THE MAGIC MIRROR ---
-  // --- NEW: THE MAGIC MIRROR ---
+  // --- CHANGED: Safely handle missing maps for materials/textures ---
   public createCustomizationMirror() {
       const mirrorGroup = new THREE.Group();
 
-      // Mirror Base & Stand
-      const frameMat = getMat('mirror_frame', () => new THREE.MeshStandardMaterial({ color: 0xaa8833, metalness: 0.8, roughness: 0.2 }));
+      // Ensure optional chaining with a fallback if 'this.materials' doesn't exist yet
+      const frameMat = (this as any).materials?.get?.('mirror_frame') || new THREE.MeshStandardMaterial({ color: 0xaa8833, metalness: 0.8, roughness: 0.2 });
       const baseGeo = getGeo('mirror_base', () => new THREE.BoxGeometry(3.0, 0.4, 1.0));
       const base = new THREE.Mesh(baseGeo, frameMat);
       base.position.y = 0.2;
@@ -756,7 +755,7 @@ export class TownEnvironment {
 
       // The Mirror Glass
       const glassGeo = getGeo('mirror_glass', () => new THREE.PlaneGeometry(2.0, 4.0));
-      const glassMat = getMat('mirror_glass_mat', () => new THREE.MeshStandardMaterial({ color: 0xaaddff, metalness: 1.0, roughness: 0.0 }));
+      const glassMat = (this as any).materials?.get?.('mirror_glass_mat') || new THREE.MeshStandardMaterial({ color: 0xaaddff, metalness: 1.0, roughness: 0.0 });
       const glass = new THREE.Mesh(glassGeo, glassMat);
       glass.position.set(0, 2.5, 0.1);
       mirrorGroup.add(glass);
@@ -770,7 +769,7 @@ export class TownEnvironment {
 
       // Glowing Aura
       const auraGeo = getGeo('mirror_aura', () => new THREE.PlaneGeometry(2.4, 4.4));
-      const auraMat = getMat('mirror_aura_mat', () => new THREE.MeshBasicMaterial({ color: 0x00ffff, transparent: true, opacity: 0.3, blending: THREE.AdditiveBlending, side: THREE.DoubleSide }));
+      const auraMat = (this as any).materials?.get?.('mirror_aura_mat') || new THREE.MeshBasicMaterial({ color: 0x00ffff, transparent: true, opacity: 0.3, blending: THREE.AdditiveBlending, side: THREE.DoubleSide });
       const aura = new THREE.Mesh(auraGeo, auraMat);
       aura.position.set(0, 2.5, 0.12);
       mirrorGroup.add(aura);

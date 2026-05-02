@@ -454,8 +454,24 @@ async function switchZone(nextZone: ZoneName): Promise<void> {
     clearContainer(container);
 
     if (nextZone === "town") {
-      activeRoom = await connectToTown(PLAYER_NAME, PLAYER_CLASS, PLAYER_PATHWAY); 
-      activeScene = new TownScene(container);
+      console.log("[switchZone] Joining town room...");
+      
+      // FIXED: Passed only 3 arguments as expected by the API
+      activeRoom = await connectToTown(
+        PLAYER_NAME,
+        PLAYER_CLASS,
+        PLAYER_PATHWAY
+      );
+
+      console.log("[switchZone] Town room joined. Creating TownScene...");
+
+      try {
+        activeScene = new TownScene(container);
+        console.log("[switchZone] TownScene created successfully.");
+      } catch (sceneErr) {
+        console.error("[switchZone] Town room joined, but TownScene construction failed:", sceneErr);
+        throw sceneErr;
+      }
     } else if (nextZone === "maze") {
       activeRoom = await connectToMaze(PLAYER_NAME, PLAYER_CLASS, PLAYER_PATHWAY); 
       activeScene = new MazeScene(container);
@@ -484,6 +500,8 @@ async function switchZone(nextZone: ZoneName): Promise<void> {
       cleanupRoomBindings = setupRoomBindings(activeRoom, activeScene, buildNetworkContext());
 
       rehydrateAbilityUI(activeRoom);
+      
+      // The aura style is correctly sent here separately
       activeRoom.send("set_aura_style", { style: PLAYER_AURA_STYLE });
 
       if (typeof (activeScene as any).start === "function") {
@@ -731,15 +749,21 @@ function startHudLoop(): void {
                 isLocallyWolf
             );
 
-            if (me && me.skillTree && me.skillTree.activeAbilities) {
-                const shadowStep = me.skillTree.activeAbilities.get("shadow_step");
-                if (shadowStep && shadowStep.upgrades) {
-                    const wayUpg = shadowStep.upgrades.get("way_of_the_night");
-                    const wayRank = wayUpg ? wayUpg.currentRank : 0;
-                    
-                    if (wayRank >= 3 && (!temporarySkill || temporarySkill.id !== "town_recall")) {
-                        setTemporarySkill({ id: "town_recall", label: "Recall", icon: "🏛️" });
-                    }
+            const activeAbilities = me?.skillTree?.activeAbilities;
+
+            if (activeAbilities && typeof activeAbilities.get === "function") {
+                const shadowStep = activeAbilities.get("shadow_step");
+                const upgrades = shadowStep?.upgrades;
+
+                const wayUpg =
+                    upgrades && typeof upgrades.get === "function"
+                        ? upgrades.get("way_of_the_night")
+                        : undefined;
+
+                const wayRank = wayUpg ? wayUpg.currentRank : 0;
+
+                if (wayRank >= 3 && (!temporarySkill || temporarySkill.id !== "town_recall")) {
+                    setTemporarySkill({ id: "town_recall", label: "Recall", icon: "🏛️" });
                 }
             }
 

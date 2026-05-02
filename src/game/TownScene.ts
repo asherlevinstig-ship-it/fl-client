@@ -275,7 +275,6 @@ export class TownScene extends BaseScene {
     
     private frameCount = 0; 
 
-    // --- UPDATED CASINO ANIMS STATE ---
     private casinoAnims: any = {
         rouletteWheel: null,
         rouletteTimer: 0,
@@ -300,7 +299,6 @@ export class TownScene extends BaseScene {
 
         this.createLights();
 
-        // CHANGE 4: Add a visible emergency test cube
         const debugCube = new THREE.Mesh(
             new THREE.BoxGeometry(5, 5, 5),
             new THREE.MeshBasicMaterial({ color: 0xff00ff })
@@ -314,15 +312,11 @@ export class TownScene extends BaseScene {
         this.createHoverPlot();
         this.createBlueprints();
         this.createDecoGhosts();
-        
-        // CHANGE 3: TownScene is not starting twice (no this.start() here)
     }
 
-    // CHANGE 2: check whether the Town render loop is running
     public start() {
         console.log("[TownScene] start() called");
         
-        // Trigger the underlying loop mechanism from BaseScene
         if (typeof (BaseScene.prototype as any).start === "function") {
             (BaseScene.prototype as any).start.call(this);
         } else if (typeof (this as any).animate === "function") {
@@ -733,7 +727,6 @@ export class TownScene extends BaseScene {
     }
 
     protected onUpdate(dt: number): void {
-        // CHANGE 2: temporary one-time render debug inside the animation loop
         if (!(this as any)._renderDebugLogged) {
             (this as any)._renderDebugLogged = true;
             console.log("[TownScene] first render frame", {
@@ -758,7 +751,6 @@ export class TownScene extends BaseScene {
         this.updateSceneryAnimations(dt); 
         this.updateCasinoAnimations(dt);
 
-        // --- CHEST OPENING ANIMATIONS ---
         this.lootVisuals.forEach(chest => {
             if (chest.userData.isOpen && chest.userData.openProgress !== undefined && chest.userData.openProgress < 1) {
                 chest.userData.openProgress += dt * 6.0; 
@@ -812,7 +804,6 @@ export class TownScene extends BaseScene {
             }
         }
 
-        // --- ANIMATE REALM EVENTS ---
         this.realmEventVisuals.forEach((visual) => {
             const distSq = (visual.group.position.x - camX) ** 2 + (visual.group.position.z - camZ) ** 2;
             if (distSq > CULL_DIST_SQ) return;
@@ -830,7 +821,6 @@ export class TownScene extends BaseScene {
             visual.label.quaternion.copy(this.camera.quaternion);
         });
 
-        // --- ANIMATE HAZARDS ---
         this.hazardVisuals.forEach((h, id) => {
             const distSq = (h.mesh.position.x - camX) ** 2 + (h.mesh.position.z - camZ) ** 2;
             if (distSq > CULL_DIST_SQ) return;
@@ -1446,24 +1436,36 @@ export class TownScene extends BaseScene {
         plaza.receiveShadow = true;
         this.scene.add(plaza);
 
-        this.createGrass(); 
-        environment.createTownWall(); 
-        this.createFountain();
-        
-        // --- 🪞 THE MISSING LINK 🪞 ---
-        console.log("✨ SPAWNING MAGIC MIRROR AT X: 8, Z: 2 ✨");
-        environment.createCustomizationMirror(); 
+        const step = (name: string, fn: () => void) => {
+            console.log(`[TownScene build step] START: ${name}`);
+            try {
+                fn();
+                console.log(`[TownScene build step] OK: ${name}`);
+            } catch (err) {
+                console.error(`[TownScene build step] FAILED: ${name}`, err);
+                throw err;
+            }
+        };
 
-        this.createFishingLake();
-        environment.createGrandTavern(-12, 0, 0); 
-        
-        environment.createElvenKingdom(1200, 0);
+        step("createGrass", () => this.createGrass());
+        step("createTownWall", () => environment.createTownWall());
+        step("createFountain", () => this.createFountain());
 
-        environment.createNPCVillage(250, 250);
-        environment.createNPCVillage(-300, 400);
-        environment.createNPCVillage(500, -150);
+        step("createCustomizationMirror", () => {
+            console.log("✨ Magic mirror temporarily disabled while debugging TownScene crash.");
+            // environment.createCustomizationMirror();
+        });
 
-        this.createMegaMansion(-400, -400);
+        step("createFishingLake", () => this.createFishingLake());
+        step("createGrandTavern", () => environment.createGrandTavern(-12, 0, 0));
+
+        step("createElvenKingdom", () => environment.createElvenKingdom(1200, 0));
+
+        step("createNPCVillage 250,250", () => environment.createNPCVillage(250, 250));
+        step("createNPCVillage -300,400", () => environment.createNPCVillage(-300, 400));
+        step("createNPCVillage 500,-150", () => environment.createNPCVillage(500, -150));
+
+        step("createMegaMansion", () => this.createMegaMansion(-400, -400));
 
         this.godNpc = new GiantGodNPC();
         this.scene.add(this.godNpc.mesh);
@@ -1549,25 +1551,18 @@ export class TownScene extends BaseScene {
 
    public addScenery(id: string, kind: string, x: number, z: number, scale: number, rotation: number) {
         if (this.sceneryVisuals.has(id)) {
-            // console.log(`[TownScene] Scenery ${id} already exists, skipping.`);
             return;
         }
 
-        // console.log(`[TownScene] addScenery called for ${id}. Raw Inputs - kind: ${kind}, x: ${x}, z: ${z}, scale: ${scale}, rot: ${rotation}`);
-
-        // --- SAFE FALLBACKS TO PREVENT WEBGL NaN CRASHES ---
         const safeKind = kind || "tree";
         const safeScale = scale || 1.0;
         const safeX = x || 0;
         const safeZ = z || 0;
         const safeRot = rotation || 0;
 
-        // console.log(`[TownScene] addScenery Safe Values - kind: ${safeKind}, x: ${safeX}, z: ${safeZ}, scale: ${safeScale}, rot: ${safeRot}`);
-
         let mesh: THREE.Group | THREE.Mesh;
 
         if (safeKind.includes("rock")) {
-            // console.log(`[TownScene] Generating rock mesh for ${id}`);
             const rockGeo = new THREE.IcosahedronGeometry(1.0, 0);
             let color = 0x777777; 
             let emissive = 0x000000;
@@ -1589,7 +1584,6 @@ export class TownScene extends BaseScene {
             mesh.receiveShadow = true;
             
         } else if (safeKind === "cactus") {
-            // console.log(`[TownScene] Generating cactus mesh for ${id}`);
             mesh = new THREE.Group();
             const trunkMat = new THREE.MeshStandardMaterial({ color: 0x228b22 });
             const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 3, 8), trunkMat);
@@ -1601,7 +1595,6 @@ export class TownScene extends BaseScene {
             mesh.add(arm);
             
         } else if (safeKind === "pine_tree") {
-            // console.log(`[TownScene] Generating pine_tree mesh for ${id}`);
             mesh = new THREE.Group();
             const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.5, 2), new THREE.MeshStandardMaterial({ color: 0x3d2817 }));
             trunk.position.y = 1;
@@ -1614,7 +1607,6 @@ export class TownScene extends BaseScene {
             }
             
         } else if (safeKind === "dead_tree") {
-            // console.log(`[TownScene] Generating dead_tree mesh for ${id}`);
             mesh = new THREE.Group();
             const mat = new THREE.MeshStandardMaterial({ color: 0x2a2a2a });
             const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.6, 4, 5), mat);
@@ -1626,7 +1618,6 @@ export class TownScene extends BaseScene {
             mesh.add(branch);
             
         } else if (safeKind === "magic_tree") {
-            // console.log(`[TownScene] Generating magic_tree mesh for ${id}`);
             mesh = new THREE.Group();
             const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.6, 2.5, 5), new THREE.MeshStandardMaterial({ color: 0xdddddd }));
             trunk.position.y = 1.25;
@@ -1640,7 +1631,6 @@ export class TownScene extends BaseScene {
             mesh.add(leaf2);
             
         } else { 
-            // console.log(`[TownScene] Generating default tree mesh for ${id} (kind: ${safeKind})`);
             mesh = new THREE.Group();
             const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.6, 2, 5), new THREE.MeshStandardMaterial({ color: 0x5c4033 }));
             trunk.position.y = 1;
@@ -1659,7 +1649,6 @@ export class TownScene extends BaseScene {
             mesh.add(leaf2);
         }
 
-        // console.log(`[TownScene] Applying scale ${safeScale} to ${id}`);
         mesh.scale.set(safeScale, safeScale, safeScale);
         mesh.rotation.y = safeRot;
         
@@ -1669,7 +1658,6 @@ export class TownScene extends BaseScene {
         }
         
         const terrainHeight = getTerrainHeight(safeX, safeZ);
-        // console.log(`[TownScene] Terrain height for ${id} calculated as ${terrainHeight}. Setting mesh position...`);
         mesh.position.set(safeX, terrainHeight + (safeKind.includes("rock") ? 0.2 : 0), safeZ);
         
         this.scene.add(mesh);
@@ -1682,8 +1670,6 @@ export class TownScene extends BaseScene {
             hitShakeTimer: 0,
             lastHp: 99999 
         });
-
-        // console.log(`[TownScene] Successfully added scenery ${id} to scene and visuals map.`);
     }
 
     
@@ -1776,7 +1762,6 @@ export class TownScene extends BaseScene {
         this.fountainParticles = { mesh, positions, velocities };
     }
 
-    // --- NEW HOLOGRAPHIC CARD GENERATOR ---
     private generateHoloCard(val: number | string, isHidden: boolean = false): THREE.Mesh {
         const canvas = document.createElement("canvas");
         canvas.width = 128;
@@ -1832,7 +1817,6 @@ export class TownScene extends BaseScene {
         return mesh;
     }
 
-    // --- UPDATED CASINO VISUAL HANDLER ---
     public playCasinoVisual(data: any) {
         let game = typeof data === "string" ? data : data.game;
         let action = data.action;
@@ -1909,7 +1893,6 @@ export class TownScene extends BaseScene {
         }
     }
 
-    // --- UPDATED CASINO ANIMATION LOOP ---
     private updateCasinoAnimations(dt: number) {
         const time = performance.now();
 
@@ -2474,7 +2457,6 @@ export class TownScene extends BaseScene {
             if (this.mansionRoof.material instanceof THREE.Material) this.mansionRoof.material.dispose();
         }
 
-        // --- DISPOSE OF HAZARDS ---
         for (const h of this.hazardVisuals.values()) {
             this.scene.remove(h.mesh);
             h.mesh.traverse((c) => {
@@ -2489,7 +2471,6 @@ export class TownScene extends BaseScene {
         }
         this.hazardVisuals.clear();
 
-        // --- DISPOSE OF REALM EVENTS ---
         for (const visual of this.realmEventVisuals.values()) {
             this.scene.remove(visual.group);
             visual.group.traverse((c) => {

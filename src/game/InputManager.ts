@@ -187,7 +187,6 @@ export function initInputManager(deps: InputDependencies): void {
 
         // --- ABILITIES & COMBAT ---
         if (!isHoldingTab) {
-            if (event.key === "1") return attemptAttack(ctx, false);
             
             if (event.key === "2") {
                 const isWolf = (me && me.isSpiritAnimal) || deps.getIsLocallyWolf();
@@ -295,8 +294,11 @@ export function initInputManager(deps: InputDependencies): void {
             const isOutsideTown = scene instanceof TownScene && scene.isOutsideTown(ctx.localPos.x, ctx.localPos.y);
 
             if (deps.getCurrentZone() !== "town" || isOutsideTown) {
-                attemptFishing(ctx); 
+                const startedFishing = attemptFishing(ctx); 
                 room.send("interact");
+                if (!startedFishing) {
+                    attemptAttack(ctx, false);
+                }
                 return;
             }
 
@@ -337,12 +339,16 @@ export function initInputManager(deps: InputDependencies): void {
             if (nearestDeco) {
                 if ((nearestDeco as any).type === "Storage Chest") return openChestUI(room, keys, (nearestDeco as any).id);
                 if ((nearestDeco as any).type === "Oak Bed") return room.send("interactDecoration", { id: (nearestDeco as any).id });
+                return;
             }
+
+            // Fallthrough: No interaction targets found, swing weapon!
+            attemptAttack(ctx, false);
         }
 
         // --- BUILD / BUY MODE (Outside Town) ---
-        const isOutsideTown = scene instanceof TownScene && scene.isOutsideTown(ctx.localPos.x, ctx.localPos.y);
-        if (isOutsideTown) {
+        const isOutsideTownCheck = scene instanceof TownScene && scene.isOutsideTown(ctx.localPos.x, ctx.localPos.y);
+        if (isOutsideTownCheck) {
             if (event.key.toLowerCase() === "b" && scene instanceof TownScene) {
                 scene.isBuyMode = !scene.isBuyMode;
                 if (scene.isBuyMode) scene.isBuildMode = false;

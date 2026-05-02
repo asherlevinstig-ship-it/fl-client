@@ -299,16 +299,7 @@ export class TownScene extends BaseScene {
 
         this.createLights();
 
-        const debugCube = new THREE.Mesh(
-            new THREE.BoxGeometry(5, 5, 5),
-            new THREE.MeshBasicMaterial({ color: 0xff00ff })
-        );
-        debugCube.position.set(0, 5, 20);
-        debugCube.name = "DEBUG_TOWN_CUBE";
-        this.scene.add(debugCube);
-        console.log("[TownScene] Debug cube added at town spawn");
-
-        this.buildTownOfBeginnings();
+               this.buildTownOfBeginnings();
         this.createHoverPlot();
         this.createBlueprints();
         this.createDecoGhosts();

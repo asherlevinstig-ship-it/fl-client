@@ -208,21 +208,21 @@ export function attemptAbility(slotNum: number, ctx: ActionContext) {
  * Checks if the player is near a water source and initiates fishing.
  * Call this from your interaction hotkey (e.g., "F" or "E").
  */
-export function attemptFishing(ctx: ActionContext) {
-    if (!ctx.room || ctx.isUIOpen) return;
+export function attemptFishing(ctx: ActionContext): boolean {
+    if (!ctx.room || ctx.isUIOpen) return false;
 
     const state = ctx.room.state;
-    if (!state || !state.players) return;
+    if (!state || !state.players) return false;
 
     const me = state.players.get(ctx.room.sessionId);
     
     // Validate we are alive, awake, and not already currently fishing
-    if (!me || me.isSleeping || me.isMeditating || me.fishingState !== "none") return;
+    if (!me || me.isSleeping || me.isMeditating || me.fishingState !== "none") return false;
 
     // Local mana check before casting
     if (me.mp < 5) {
         console.log("Not enough mana to cast the line!"); 
-        return;
+        return false;
     }
 
     // The center coordinates of the massive lake defined in TownScene
@@ -236,5 +236,7 @@ export function attemptFishing(ctx: ActionContext) {
     if (distSq <= 3025.0) {
         // Send request to server, passing the facing vector to calculate the bobber throw arc!
         ctx.room.send("startFishing", { dx: ctx.facing.dx, dy: ctx.facing.dy });
+        return true;
     }
+    return false;
 }

@@ -243,10 +243,13 @@ function bindMessageListeners(room: any, sceneObj: any, ctx: NetworkContext) {
     // Chat
     room.onMessage("chat_received", (data: any) => {
         let isTeammate = false;
-        if (room.state && room.state.players) {
-            const myState = room.state.players.get(room.sessionId);
-            isTeammate = myState && myState.teamId > 0 && myState.teamId === data.teamId;
+        
+        const myState = room.state?.players?.get?.(room.sessionId);
+        
+        if (myState) {
+            isTeammate = myState.teamId > 0 && myState.teamId === data.teamId;
         }
+        
         ctx.queueEvent(() => {
             if (sceneObj && typeof sceneObj.showChatBubble === "function") sceneObj.showChatBubble(data.senderId, data.text, isTeammate);
         });

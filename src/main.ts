@@ -232,12 +232,14 @@ function sendMove(room: ActiveRoom, x: number, y: number): void {
 
 (window as any).triggerCommunion = () => {
   const ctx = getActionContext();
-  if (activeRoom && !ctx.isUIOpen) {
-    const state = activeRoom.state as any;
-    const me = state.players.get(activeRoom.sessionId);
-    if (me && !me.isSleeping && !me.isMeditating) {
-        activeRoom.send("requestCommunion");
-    }
+
+  if (!activeRoom || ctx.isUIOpen) return;
+
+  const state = activeRoom.state as any;
+  const me = state?.players?.get?.(activeRoom.sessionId);
+
+  if (me && !me.isSleeping && !me.isMeditating) {
+    activeRoom.send("requestCommunion");
   }
 };
 

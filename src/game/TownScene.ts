@@ -299,10 +299,35 @@ export class TownScene extends BaseScene {
         this.scene.background = this.dayBgColor.clone();
 
         this.createLights();
+
+        // CHANGE 4: Add a visible emergency test cube
+        const debugCube = new THREE.Mesh(
+            new THREE.BoxGeometry(5, 5, 5),
+            new THREE.MeshBasicMaterial({ color: 0xff00ff })
+        );
+        debugCube.position.set(0, 5, 20);
+        debugCube.name = "DEBUG_TOWN_CUBE";
+        this.scene.add(debugCube);
+        console.log("[TownScene] Debug cube added at town spawn");
+
         this.buildTownOfBeginnings();
         this.createHoverPlot();
         this.createBlueprints();
         this.createDecoGhosts();
+        
+        // CHANGE 3: TownScene is not starting twice (no this.start() here)
+    }
+
+    // CHANGE 2: check whether the Town render loop is running
+    public start() {
+        console.log("[TownScene] start() called");
+        
+        // Trigger the underlying loop mechanism from BaseScene
+        if (typeof (BaseScene.prototype as any).start === "function") {
+            (BaseScene.prototype as any).start.call(this);
+        } else if (typeof (this as any).animate === "function") {
+            (this as any).animate();
+        }
     }
 
     public override updatePlayer(
@@ -708,7 +733,18 @@ export class TownScene extends BaseScene {
     }
 
     protected onUpdate(dt: number): void {
-        this.frameCount++;
+        // CHANGE 2: temporary one-time render debug inside the animation loop
+        if (!(this as any)._renderDebugLogged) {
+            (this as any)._renderDebugLogged = true;
+            console.log("[TownScene] first render frame", {
+                children: this.scene.children.length,
+                camera: this.camera.position,
+                rendererSize: (this as any).renderer ? (this as any).renderer.getSize(new THREE.Vector2()) : "Unknown",
+                canvasConnected: (this as any).renderer ? (this as any).renderer.domElement.isConnected : false
+            });
+        }
+
+        this.frameCount++; 
         const time = performance.now();
         const timeSec = time * 0.001;
 

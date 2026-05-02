@@ -133,53 +133,67 @@ export function initPlayerVisual(player: any, id: string, room: any, sceneObj: a
         );
     }
     
-   if (id === room.sessionId) {
-    // CRITICAL: reset local prediction/camera position to the server's real Town position.
-    ctx.localPlayerPos.x = safeX;
-    ctx.localPlayerPos.y = safeY;
-    ctx.localPlayerPos.initialized = true;
+    if (id === room.sessionId) {
+        const firstLocalInit = !ctx.localPlayerPos.initialized;
 
-    ctx.networkState.lastSentX = safeX;
-    ctx.networkState.lastSentY = safeY;
-    ctx.networkState.lastNetworkSend = 0;
-    ctx.pendingInputs.length = 0;
+        if (firstLocalInit) {
+            ctx.localPlayerPos.x = safeX;
+            ctx.localPlayerPos.y = safeY;
+            ctx.localPlayerPos.initialized = true;
 
-    ctx.rehydrateAbilityUI(room, player);
+            ctx.networkState.lastSentX = safeX;
+            ctx.networkState.lastSentY = safeY;
+            ctx.networkState.lastNetworkSend = 0;
+            ctx.pendingInputs.length = 0;
 
-    if (player.hotbar) {
-        if (typeof player.hotbar.onChange === "function") {
-            player.hotbar.onChange(() => ctx.rehydrateAbilityUI(room, player));
+            console.log("[NetworkBindings] Local player initialized:", {
+                id,
+                x: safeX,
+                y: safeY,
+                height: th,
+                zone: ctx.currentZone
+            });
         }
-        if (typeof player.hotbar.onAdd === "function") {
-            player.hotbar.onAdd(() => ctx.rehydrateAbilityUI(room, player));
+
+        ctx.rehydrateAbilityUI(room, player);
+
+        if (player.hotbar) {
+            if (typeof player.hotbar.onChange === "function") {
+                player.hotbar.onChange(() => ctx.rehydrateAbilityUI(room, player));
+            }
+            if (typeof player.hotbar.onAdd === "function") {
+                player.hotbar.onAdd(() => ctx.rehydrateAbilityUI(room, player));
+            }
+            if (typeof player.hotbar.onRemove === "function") {
+                player.hotbar.onRemove(() => ctx.rehydrateAbilityUI(room, player));
+            }
         }
-        if (typeof player.hotbar.onRemove === "function") {
-            player.hotbar.onRemove(() => ctx.rehydrateAbilityUI(room, player));
+
+        if (typeof sceneObj.playerVisuals !== "undefined") {
+            const v = sceneObj.playerVisuals.get(id);
+            if (v) {
+                v.mesh.visible = true;
+                v.mesh.position.set(safeX, th, safeY);
+                v.targetPosition.set(safeX, th, safeY);
+            }
         }
+
+        if (sceneObj.camera) {
+            sceneObj.camera.position.set(safeX, th + 25, safeY + 25);
+            sceneObj.camera.lookAt(safeX, th + 2, safeY);
+        }
+
+        // Removed duplicate log to prevent spam on every update
+        /*
+        console.log("[NetworkBindings] Local player initialized:", {
+            id,
+            x: safeX,
+            y: safeY,
+            height: th,
+            zone: ctx.currentZone
+        });
+        */
     }
-
-    if (typeof sceneObj.playerVisuals !== "undefined") {
-        const v = sceneObj.playerVisuals.get(id);
-        if (v) {
-            v.mesh.visible = true;
-            v.mesh.position.set(safeX, th, safeY);
-            v.targetPosition.set(safeX, th, safeY);
-        }
-    }
-
-    if (sceneObj.camera) {
-        sceneObj.camera.position.set(safeX, th + 25, safeY + 25);
-        sceneObj.camera.lookAt(safeX, th + 2, safeY);
-    }
-
-    console.log("[NetworkBindings] Local player initialized:", {
-        id,
-        x: safeX,
-        y: safeY,
-        height: th,
-        zone: ctx.currentZone
-    });
-}
 }
 
 // ==========================================
@@ -540,6 +554,10 @@ function bindWorldEntities(room: any, sceneObj: any, ctx: NetworkContext) {
 // STATE SYNCHRONIZATION LOOP
 // ==========================================
 
+// ==========================================
+// STATE SYNCHRONIZATION LOOP
+// ==========================================
+
 export function syncStateToScene(room: any, sceneObj: any, ctx: NetworkContext) {
     if (!room || !room.state || !sceneObj) return;
     const state = room.state;
@@ -556,6 +574,7 @@ export function syncStateToScene(room: any, sceneObj: any, ctx: NetworkContext) 
                     const isSwim = (safeX - 1200) ** 2 + (safeY - 0) ** 2 <= 1600;
                     const th = sceneObj instanceof TownScene ? ctx.getHeightCached(safeX, safeY) : 0;
 
+                    // FIXED: player.isSprinting (removed the accidental space)
                     sceneObj.updatePlayer?.(id, safeX, safeY, player.name, player.equippedItem, player.equipBack, player.isSleeping, player.sleepRot, isSwim, th, player.equipHead, player.equipChest, player.equipLegs, player.equipFeet, player.equipOffHand, player.isSpiritAnimal, player.isSprinting, player.isMeditating, player.teamId, player.mountedFamiliarId, player.gender, player.skinColor, player.hairStyle, player.hairColor, player.eyeColor);
                     sceneObj.updatePlayerFishing?.(id, player.fishingState || "none", player.bobberX || 0, player.bobberZ || 0);
                 }

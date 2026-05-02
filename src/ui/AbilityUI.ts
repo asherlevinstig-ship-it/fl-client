@@ -86,8 +86,10 @@ export function setAbilityUIRoom(room: any) {
         }
     };
 
-    // If the player state is already populated when this binds
-    const me = uiRoom.state.players.get(uiRoom.sessionId);
+    // CHANGE A: Safe local player lookup
+    const players = uiRoom?.state?.players;
+    const me = players && typeof players.get === "function" ? players.get(uiRoom.sessionId) : undefined;
+    
     if (me) attachListeners(me);
 
     // Catch the player state arriving slightly later
@@ -308,11 +310,19 @@ export function renderHotbar() {
     injectSkillTreeStyles(); 
 
     if (uiRoom) {
-        const me = uiRoom.state.players.get(uiRoom.sessionId);
+        // CHANGE A: Guard hotbar render lookups
+        const players = uiRoom?.state?.players;
+        const me = players && typeof players.get === "function" ? players.get(uiRoom.sessionId) : undefined;
+        
         if (me && me.hotbar) {
             [2, 3, 4, 5, 6, 7, 8, 9].forEach(slotNum => {
                 const key = `slot${slotNum}`;
-                playerHotbar[key] = me.hotbar.get(key) || "";
+                
+                // CHANGE B: Guard hotbar lookups
+                const hotbar = me.hotbar;
+                const value = hotbar && typeof hotbar.get === "function" ? hotbar.get(key) : "";
+                
+                playerHotbar[key] = value || "";
             });
         }
     }
@@ -504,7 +514,10 @@ export function openSkillTreeUI(activeRoom: any, pathway: string, keys: any) {
         document.body.appendChild(modal);
     }
 
-    const me = activeRoom.state.players.get(activeRoom.sessionId);
+    // CHANGE A: Safe local player lookup
+    const players = activeRoom.state.players;
+    const me = players && typeof players.get === "function" ? players.get(activeRoom.sessionId) : undefined;
+    
     if (me) {
         if (me.utilityPathway) currentUtilityPathway = me.utilityPathway;
         if (me.familiarPathway) currentFamiliarPathway = me.familiarPathway;
@@ -513,11 +526,15 @@ export function openSkillTreeUI(activeRoom: any, pathway: string, keys: any) {
     const renderTree = () => {
         if (!activeRoom || !isSkillTreeUIOpen) return;
         const state = activeRoom.state as any;
-        const me = state.players.get(activeRoom.sessionId);
-        if (!me) return;
+        
+        // CHANGE A: Safe local player lookup inside render loop
+        const currentPlayers = state?.players;
+        const currentMe = currentPlayers && typeof currentPlayers.get === "function" ? currentPlayers.get(activeRoom.sessionId) : undefined;
+        
+        if (!currentMe) return;
 
-        if (currentUtilityPathway === "wayfinder" && me.utilityPathway) currentUtilityPathway = me.utilityPathway;
-        if (currentFamiliarPathway === "apocalyptic_swarm" && me.familiarPathway) currentFamiliarPathway = me.familiarPathway;
+        if (currentUtilityPathway === "wayfinder" && currentMe.utilityPathway) currentUtilityPathway = currentMe.utilityPathway;
+        if (currentFamiliarPathway === "apocalyptic_swarm" && currentMe.familiarPathway) currentFamiliarPathway = currentMe.familiarPathway;
 
         const activeCategoryTab = currentTreeMode === "familiar" ? activeFamiliarCategoryTab : (currentTreeMode === "utility" ? activeUtilityCategoryTab : activeCombatCategoryTab);
         const activeSkillId = currentTreeMode === "familiar" ? activeFamiliarSkillId : (currentTreeMode === "utility" ? activeUtilitySkillId : activeCombatSkillId);
@@ -531,37 +548,41 @@ export function openSkillTreeUI(activeRoom: any, pathway: string, keys: any) {
         const pathwayData = treeData[activeCategoryTab as keyof typeof treeData] || {};
         const abilityKeys = Object.keys(pathwayData);
 
-        let unspentEssence = me.skillTree?.unspentEssencePoints || 0;
-        let unspentAwakening = me.skillTree?.unspentAwakeningPoints || 0;
-        let activeAbilities = me.skillTree?.activeAbilities || new Map();
+        let unspentEssence = currentMe.skillTree?.unspentEssencePoints || 0;
+        let unspentAwakening = currentMe.skillTree?.unspentAwakeningPoints || 0;
+        
+        // CHANGE C: Safe active abilities extraction
+        const activeAbilities = currentMe.skillTree?.activeAbilities;
 
         let committedUtilityPathway: string | null = null;
         let committedFamiliarPathway: string | null = null;
         
-        for (const pKey in UTILITY_TREE_DATA) {
-            for (const cKey in UTILITY_TREE_DATA[pKey as keyof typeof UTILITY_TREE_DATA]) {
-                for (const sKey in UTILITY_TREE_DATA[pKey as keyof typeof UTILITY_TREE_DATA][cKey as any]) {
-                    const skillState = activeAbilities.get(sKey);
-                    if (skillState && skillState.upgrades) {
-                        let hasPoints = false;
-                        skillState.upgrades.forEach((u: any) => { if (u.currentRank > 0) hasPoints = true; });
-                        if (hasPoints) {
-                            committedUtilityPathway = pKey;
+        if (activeAbilities && typeof activeAbilities.get === "function") {
+            for (const pKey in UTILITY_TREE_DATA) {
+                for (const cKey in UTILITY_TREE_DATA[pKey as keyof typeof UTILITY_TREE_DATA]) {
+                    for (const sKey in UTILITY_TREE_DATA[pKey as keyof typeof UTILITY_TREE_DATA][cKey as any]) {
+                        const skillState = activeAbilities.get(sKey);
+                        if (skillState && skillState.upgrades) {
+                            let hasPoints = false;
+                            skillState.upgrades.forEach((u: any) => { if (u.currentRank > 0) hasPoints = true; });
+                            if (hasPoints) {
+                                committedUtilityPathway = pKey;
+                            }
                         }
                     }
                 }
             }
-        }
 
-        for (const pKey in FAMILIAR_TREE_DATA) {
-            for (const cKey in FAMILIAR_TREE_DATA[pKey as keyof typeof FAMILIAR_TREE_DATA]) {
-                for (const sKey in FAMILIAR_TREE_DATA[pKey as keyof typeof FAMILIAR_TREE_DATA][cKey as any]) {
-                    const skillState = activeAbilities.get(sKey);
-                    if (skillState && skillState.upgrades) {
-                        let hasPoints = false;
-                        skillState.upgrades.forEach((u: any) => { if (u.currentRank > 0) hasPoints = true; });
-                        if (hasPoints) {
-                            committedFamiliarPathway = pKey;
+            for (const pKey in FAMILIAR_TREE_DATA) {
+                for (const cKey in FAMILIAR_TREE_DATA[pKey as keyof typeof FAMILIAR_TREE_DATA]) {
+                    for (const sKey in FAMILIAR_TREE_DATA[pKey as keyof typeof FAMILIAR_TREE_DATA][cKey as any]) {
+                        const skillState = activeAbilities.get(sKey);
+                        if (skillState && skillState.upgrades) {
+                            let hasPoints = false;
+                            skillState.upgrades.forEach((u: any) => { if (u.currentRank > 0) hasPoints = true; });
+                            if (hasPoints) {
+                                committedFamiliarPathway = pKey;
+                            }
                         }
                     }
                 }
@@ -571,18 +592,20 @@ export function openSkillTreeUI(activeRoom: any, pathway: string, keys: any) {
         const targetSlot = activeMap[activeCategoryTab as keyof typeof activeMap].slot;
         let committedAbilityId: string | null = null;
         
-        abilityKeys.forEach(key => {
-            const state = activeAbilities.get(key);
-            if (state && state.upgrades) {
-                let hasPoints = false;
-                state.upgrades.forEach((u: any) => {
-                    if (u.currentRank > 0) hasPoints = true;
-                });
-                if (hasPoints) {
-                    committedAbilityId = key;
+        if (activeAbilities && typeof activeAbilities.get === "function") {
+            abilityKeys.forEach(key => {
+                const state = activeAbilities.get(key);
+                if (state && state.upgrades) {
+                    let hasPoints = false;
+                    state.upgrades.forEach((u: any) => {
+                        if (u.currentRank > 0) hasPoints = true;
+                    });
+                    if (hasPoints) {
+                        committedAbilityId = key;
+                    }
                 }
-            }
-        });
+            });
+        }
 
         if (!committedAbilityId) {
             const currentSlotSkill = playerHotbar[`slot${targetSlot}`];
@@ -603,7 +626,9 @@ export function openSkillTreeUI(activeRoom: any, pathway: string, keys: any) {
         else activeCombatSkillId = newActiveSkillId;
 
         const activeSkillData = pathwayData[newActiveSkillId] || null;
-        const abilityState = activeAbilities.get(newActiveSkillId);
+        
+        // CHANGE C: Guard skill lookup
+        const abilityState = activeAbilities && typeof activeAbilities.get === "function" ? activeAbilities.get(newActiveSkillId) : undefined;
         const serverUpgrades = abilityState ? abilityState.upgrades : new Map();
 
         const isCurrentlyViewedSkillLocked = committedAbilityId !== null && committedAbilityId !== newActiveSkillId;
@@ -767,11 +792,12 @@ export function openSkillTreeUI(activeRoom: any, pathway: string, keys: any) {
                 const rankHierarchy: Record<string, number> = {
                     "Iron": 1, "Bronze": 2, "Silver": 3, "Gold": 4, "Diamond": 5
                 };
-                const playerRankNum = rankHierarchy[me.rank] || 1;
+                const playerRankNum = rankHierarchy[currentMe.rank] || 1;
 
                 upgradeKeys.forEach((uKey) => {
                     const uData = activeSkillData.upgrades[uKey];
-                    const sUpg = serverUpgrades.get(uKey);
+                    // CHANGE D: Safe upgrades lookup
+                    const sUpg = serverUpgrades && typeof serverUpgrades.get === "function" ? serverUpgrades.get(uKey) : undefined;
                     
                     const cRank = sUpg ? sUpg.currentRank : 0;
                     const mRank = uData.maxRank;

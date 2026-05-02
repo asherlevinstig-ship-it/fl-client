@@ -456,7 +456,6 @@ async function switchZone(nextZone: ZoneName): Promise<void> {
     if (nextZone === "town") {
       console.log("[switchZone] Joining town room...");
       
-      // FIXED: Passed only 3 arguments as expected by the API
       activeRoom = await connectToTown(
         PLAYER_NAME,
         PLAYER_CLASS,
@@ -497,30 +496,39 @@ async function switchZone(nextZone: ZoneName): Promise<void> {
     if (activeRoom && activeScene) {
       localStorage.setItem(`rpg_reconnection_token_${PLAYER_NAME}`, activeRoom.reconnectionToken);
 
+      console.log("[switchZone] post-setup START: setupRoomBindings");
       cleanupRoomBindings = setupRoomBindings(activeRoom, activeScene, buildNetworkContext());
+      console.log("[switchZone] post-setup OK: setupRoomBindings");
 
-      rehydrateAbilityUI(activeRoom);
-      
-      // The aura style is correctly sent here separately
+      console.log("[switchZone] post-setup START: rehydrateAbilityUI");
+      try {
+        rehydrateAbilityUI(activeRoom);
+        console.log("[switchZone] post-setup OK: rehydrateAbilityUI");
+      } catch (err) {
+        console.error("[switchZone] post-setup FAILED: rehydrateAbilityUI", err);
+      }
+
+      console.log("[switchZone] post-setup START: set_aura_style");
       activeRoom.send("set_aura_style", { style: PLAYER_AURA_STYLE });
+      console.log("[switchZone] post-setup OK: set_aura_style");
 
+      console.log("[switchZone] post-setup START: scene.start");
       if (typeof (activeScene as any).start === "function") {
           (activeScene as any).start();
       }
-
-      setTimeout(() => {
-          console.log("[Town Debug after 1s]", {
-              sceneChildren: (activeScene as any)?.scene?.children?.length,
-              camera: (activeScene as any)?.camera?.position,
-              localPlayerPos,
-              hasLocalVisual: (activeScene as any)?.playerVisuals?.has?.(activeRoom?.sessionId)
-          });
-      }, 1000);
+      console.log("[switchZone] post-setup OK: scene.start");
 
       (window as any).debugRoom = activeRoom;
 
       activeRoom.onStateChange((state: any) => {
-          console.log("[DIAGNOSTIC] State updated. Trees in memory:", state.scenery ? state.scenery.size : "SCHEMA IS UNDEFINED");
+          const scenery = state?.scenery;
+
+          console.log(
+              "[DIAGNOSTIC] State updated. Trees in memory:",
+              scenery && typeof scenery.size !== "undefined"
+                  ? scenery.size
+                  : "SCHEMA IS UNDEFINED"
+          );
       });
     }
 
@@ -702,11 +710,32 @@ function startHudLoop(): void {
             flushEventQueue();
 
             const state = activeRoom.state as any;
-            const me = state.players?.get(activeRoom.sessionId) as any;
+            const players = state?.players;
 
-            if (me && !(activeScene as any).playerVisuals?.has(activeRoom.sessionId)) {
-                // Failsafe: Re-initialize visual if missing
-                import("./game/NetworkBindings").then(m => m.initPlayerVisual(me, activeRoom!.sessionId, activeRoom, activeScene, buildNetworkContext()));
+            const me =
+                players && typeof players.get === "function"
+                    ? players.get(activeRoom.sessionId)
+                    : undefined;
+
+            const playerVisuals = (activeScene as any).playerVisuals;
+
+            if (
+                me &&
+                playerVisuals &&
+                typeof playerVisuals.has === "function" &&
+                !playerVisuals.has(activeRoom.sessionId)
+            ) {
+                import("./game/NetworkBindings").then(m => {
+                    if (activeRoom && activeScene) {
+                        m.initPlayerVisual(
+                            me,
+                            activeRoom.sessionId,
+                            activeRoom,
+                            activeScene,
+                            buildNetworkContext()
+                        );
+                    }
+                });
             }
 
             if (frameCount % 180 === 0) {
@@ -763,7 +792,11 @@ function startHudLoop(): void {
                 const wayRank = wayUpg ? wayUpg.currentRank : 0;
 
                 if (wayRank >= 3 && (!temporarySkill || temporarySkill.id !== "town_recall")) {
-                    setTemporarySkill({ id: "town_recall", label: "Recall", icon: "🏛️" });
+                    setTemporarySkill({
+                        id: "town_recall",
+                        label: "Recall",
+                        icon: "🏛️"
+                    });
                 }
             }
 
@@ -1104,7 +1137,13 @@ async function boot(): Promise<void> {
               (window as any).debugRoom = activeRoom;
               
               activeRoom.onStateChange((state: any) => {
-                  console.log("[DIAGNOSTIC] State updated. Trees in memory:", state.scenery ? state.scenery.size : "SCHEMA IS UNDEFINED");
+                  const scenery = state?.scenery;
+                  console.log(
+                      "[DIAGNOSTIC] State updated. Trees in memory:",
+                      scenery && typeof scenery.size !== "undefined"
+                          ? scenery.size
+                          : "SCHEMA IS UNDEFINED"
+                  );
               });
 
               reconnected = true;

@@ -10,7 +10,8 @@ export type NetworkContext = {
     currentZone: string;
     localPlayerPos: { x: number, y: number, initialized: boolean };
     networkState: { lastSentX: number, lastSentY: number, lastNetworkSend: number };
-    pendingInputs: { seq: number, x: number, y: number }[];
+    // --- FIXED: Updated to the new directional prediction format ---
+    pendingInputs: { seq: number, inputX: number, inputZ: number, dt: number }[];
     activeAttackIndicators: { x: number, z: number, timer: number }[];
     clientSceneryGrid: any; // SpatialGrid
     
@@ -320,6 +321,45 @@ function bindMessageListeners(room: any, sceneObj: any, ctx: NetworkContext) {
         });
     });
 
+    // --- NEW: TIERED RECONCILIATION ---
+    room.onMessage("positionCorrection", (data: any) => {
+        ctx.localPlayerPos.x = data.x;
+        ctx.localPlayerPos.y = data.z !== undefined ? data.z : data.y;
+        
+        // Remove processed inputs from the shared array (mutates in place to preserve reference)
+        if (data.lastProcessedInput > 0) {
+            const keepIndex = ctx.pendingInputs.findIndex(i => i.seq > data.lastProcessedInput);
+            if (keepIndex === -1) {
+                // All pending inputs have been processed
+                ctx.pendingInputs.length = 0;
+            } else if (keepIndex > 0) {
+                // Remove elements that have already been acknowledged
+                ctx.pendingInputs.splice(0, keepIndex);
+            }
+        }
+
+        // Re-apply remaining inputs the server hasn't seen yet
+        const me = room.state?.players?.get(room.sessionId);
+        const speed = me?.movementSpeed || 12.0;
+
+        for (const pending of ctx.pendingInputs) {
+            const len = Math.hypot(pending.inputX, pending.inputZ) || 1;
+            const nx = pending.inputX / len;
+            const nz = pending.inputZ / len;
+
+            ctx.localPlayerPos.x += nx * speed * pending.dt;
+            ctx.localPlayerPos.y += nz * speed * pending.dt;
+        }
+
+        if (sceneObj?.playerVisuals) {
+            const visual = sceneObj.playerVisuals.get(room.sessionId);
+            if (visual) {
+                visual.targetPosition.x = ctx.localPlayerPos.x;
+                visual.targetPosition.z = ctx.localPlayerPos.y;
+            }
+        }
+    });
+
     // Positioning & Hazards
     room.onMessage("forcePosition", (data: any) => {
         ctx.localPlayerPos.x = data.x;
@@ -327,7 +367,7 @@ function bindMessageListeners(room: any, sceneObj: any, ctx: NetworkContext) {
         ctx.localPlayerPos.initialized = true; 
         ctx.networkState.lastSentX = ctx.localPlayerPos.x;
         ctx.networkState.lastSentY = ctx.localPlayerPos.y;
-        ctx.pendingInputs.length = 0;
+        ctx.pendingInputs.length = 0; // Absolute snap, clear queue
 
         if (sceneObj?.playerVisuals) {
             const visual = sceneObj.playerVisuals.get(room.sessionId);
@@ -609,7 +649,6 @@ export function syncStateToScene(room: any, sceneObj: any, ctx: NetworkContext) 
                     const isSwim = (safeX - 1200) ** 2 + (safeY - 0) ** 2 <= 1600;
                     const th = sceneObj instanceof TownScene ? ctx.getHeightCached(safeX, safeY) : 0;
 
-                    // FIXED: player.isSprinting (removed the accidental space)
                     sceneObj.updatePlayer?.(id, safeX, safeY, player.name, player.equippedItem, player.equipBack, player.isSleeping, player.sleepRot, isSwim, th, player.equipHead, player.equipChest, player.equipLegs, player.equipFeet, player.equipOffHand, player.isSpiritAnimal, player.isSprinting, player.isMeditating, player.teamId, player.mountedFamiliarId, player.gender, player.skinColor, player.hairStyle, player.hairColor, player.eyeColor);
                     sceneObj.updatePlayerFishing?.(id, player.fishingState || "none", player.bobberX || 0, player.bobberZ || 0);
                 }

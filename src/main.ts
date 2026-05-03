@@ -104,7 +104,7 @@ const localPlayerPos = { x: 0, y: 0, initialized: false };
 
 // --- CLIENT PREDICTION STATE ---
 let inputSequenceNumber = 0;
-const pendingInputs: { seq: number, x: number, y: number }[] = [];
+const pendingInputs: { seq: number, inputX: number, inputZ: number, dt: number }[] = [];
 const networkState = { lastSentX: 0, lastSentY: 0, lastNetworkSend: 0 };
 
 const MARKET_STALLS = [
@@ -220,17 +220,6 @@ function rehydrateAbilityUI(room: ActiveRoom | null, me?: any) {
         }
     }
     renderHotbar();
-}
-
-function sendMove(room: ActiveRoom, x: number, y: number): void { 
-  const ctx = getActionContext();
-  if (room && (room.connection as any).isOpen) {
-      if (!isTransitioning && !ctx.isUIOpen) {
-        inputSequenceNumber++;
-        pendingInputs.push({ seq: inputSequenceNumber, x, y });
-        (room as any).send("move", { x, y, seq: inputSequenceNumber }); 
-      }
-  }
 }
 
 (window as any).triggerCommunion = () => {
@@ -421,7 +410,7 @@ async function switchZone(nextZone: ZoneName): Promise<void> {
   hoverX = 0;
   hoverY = 0;
 
-  // Clear stale Underworld movement/camera state before joining the next room.
+  // Clear stale movement/camera state before joining the next room.
   pendingInputs.length = 0;
   inputSequenceNumber = 0;
   networkState.lastSentX = 0;
@@ -461,23 +450,8 @@ async function switchZone(nextZone: ZoneName): Promise<void> {
     clearContainer(container);
 
     if (nextZone === "town") {
-      console.log("[switchZone] Joining town room...");
-      
-      activeRoom = await connectToTown(
-        PLAYER_NAME,
-        PLAYER_CLASS,
-        PLAYER_PATHWAY
-      );
-
-      console.log("[switchZone] Town room joined. Creating TownScene...");
-
-      try {
-        activeScene = new TownScene(container);
-        console.log("[switchZone] TownScene created successfully.");
-      } catch (sceneErr) {
-        console.error("[switchZone] Town room joined, but TownScene construction failed:", sceneErr);
-        throw sceneErr;
-      }
+      activeRoom = await connectToTown(PLAYER_NAME, PLAYER_CLASS, PLAYER_PATHWAY);
+      activeScene = new TownScene(container);
     } else if (nextZone === "maze") {
       activeRoom = await connectToMaze(PLAYER_NAME, PLAYER_CLASS, PLAYER_PATHWAY); 
       activeScene = new MazeScene(container);
@@ -493,52 +467,27 @@ async function switchZone(nextZone: ZoneName): Promise<void> {
     }
     currentZone = nextZone; 
     
-    console.log("[Town Debug] Canvas count:", container.querySelectorAll("canvas").length);
-    console.log("[Town Debug] Container size:", container.clientWidth, container.clientHeight);
-    console.log("[Town Debug] Scene children:", (activeScene as any).scene?.children?.length);
-    console.log("[Town Debug] Camera:", (activeScene as any).camera?.position);
-
     localStorage.setItem(`rpg_last_zone_${PLAYER_NAME}`, nextZone);
-
     refreshNetworkContext();
 
     if (activeRoom && activeScene) {
       localStorage.setItem(`rpg_reconnection_token_${PLAYER_NAME}`, activeRoom.reconnectionToken);
 
-      console.log("[switchZone] post-setup START: setupRoomBindings");
       if(cachedNetworkContext) cleanupRoomBindings = setupRoomBindings(activeRoom, activeScene, cachedNetworkContext);
-      console.log("[switchZone] post-setup OK: setupRoomBindings");
-
-      console.log("[switchZone] post-setup START: rehydrateAbilityUI");
+      
       try {
         rehydrateAbilityUI(activeRoom);
-        console.log("[switchZone] post-setup OK: rehydrateAbilityUI");
       } catch (err) {
         console.error("[switchZone] post-setup FAILED: rehydrateAbilityUI", err);
       }
 
-      console.log("[switchZone] post-setup START: set_aura_style");
       activeRoom.send("set_aura_style", { style: PLAYER_AURA_STYLE });
-      console.log("[switchZone] post-setup OK: set_aura_style");
 
-      console.log("[switchZone] post-setup START: scene.start");
       if (typeof (activeScene as any).start === "function") {
           (activeScene as any).start();
       }
-      console.log("[switchZone] post-setup OK: scene.start");
 
       (window as any).debugRoom = activeRoom;
-
-      activeRoom.onStateChange((state: any) => {
-          const scenery = state?.scenery;
-
-          console.log(
-              "[DIAGNOSTIC] State updated. Trees in memory:",
-              scenery && typeof scenery.size !== "undefined"
-                  ? scenery.size
-                  : "SCHEMA IS UNDEFINED"
-          );
-      });
     }
 
     if (nextZone === "underworld") {
@@ -702,8 +651,6 @@ function startHudLoop(): void {
     renderHotbar();
     
     let lastTime = performance.now();
-    let timeSinceLastInput = 0; 
-    let wasInputting = false; 
     let frameCount = 0; 
 
     const tick = () => {
@@ -838,13 +785,6 @@ function startHudLoop(): void {
                     localPlayerPos.initialized = true; 
                 }
 
-                if (me.lastProcessedInput !== undefined) {
-                    while (pendingInputs.length > 0 && pendingInputs[0].seq <= me.lastProcessedInput) {
-                        pendingInputs.shift();
-                    }
-                }
-
-                const syncDistSq = distanceSq(localPlayerPos.x, localPlayerPos.y, me.x, me.y);
                 const isInputting = keys.KeyW || keys.KeyA || keys.KeyS || keys.KeyD;
                 const isLocallySprinting = (keys.ShiftLeft || keys.ShiftRight) && isInputting && (me.hunger > 0) && (me.stamina > 0);
                 
@@ -853,28 +793,6 @@ function startHudLoop(): void {
                     (window as any).lastSprintState = isLocallySprinting;
                 }
 
-                if (isInputting) {
-                    timeSinceLastInput = 0;
-                } else {
-                    timeSinceLastInput += dt;
-                }
-
-               if (syncDistSq > 225.0) {
-                   console.warn("[CLIENT DESYNC RESET]", {
-                       zone: currentZone,
-                       local: { x: localPlayerPos.x, y: localPlayerPos.y },
-                       server: { x: me.x, y: me.y },
-                       syncDistSq,
-                       lastProcessedInput: me.lastProcessedInput,
-                       pendingInputs: pendingInputs.length
-                   });
-                   localPlayerPos.x = me.x;
-                   localPlayerPos.y = me.y;
-                   networkState.lastSentX = me.x;
-                   networkState.lastSentY = me.y;
-                   pendingInputs.length = 0;
-               }
-
                 let inputX = 0; let inputY = 0;
                 let camDx = 0; let camDy = 0;
 
@@ -882,10 +800,7 @@ function startHudLoop(): void {
                 const isFlying = isMounted && me.isFlying;
 
                 if (me.isSleeping || me.isMeditating || Date.now() < me.rootedUntil || isMounted) {
-                    localPlayerPos.x = me.x;
-                    localPlayerPos.y = me.y;
-                    inputX = 0;
-                    inputY = 0;
+                    // Do nothing local
                 } 
                 else if (!ctx.isUIOpen) {
                     if (keys.KeyW) inputY -= 1; 
@@ -924,11 +839,12 @@ function startHudLoop(): void {
                     const baseSpeed = me.movementSpeed || 12.0;
                     const moveSpeed = isLocallySprinting ? (baseSpeed * 1.6) : baseSpeed; 
                     const moveDist = moveSpeed * dt; 
-                    
+
                     let targetX = localPlayerPos.x + dx * moveDist; 
                     let targetY = localPlayerPos.y + dy * moveDist;
-                    
-                    if (!me.isSpiritAnimal && !isLocallyWolf) {
+
+                    // Instantly apply local prediction
+                    if (!isFlying) {
                         const isTown = currentZone === "town";
                         const isMaze = currentZone === "maze";
                         const isUnderworld = currentZone === "underworld";
@@ -942,7 +858,7 @@ function startHudLoop(): void {
                              };
                         }
 
-                        const isXBlocked = !isFlying && (
+                        const isXBlocked = (
                             (isTown && checkTownCollision(targetX, localPlayerPos.y)) || 
                             (isMaze && checkMazeCollision(targetX, localPlayerPos.y)) || 
                             (isUnderworld && checkUnderworldCollision(targetX, localPlayerPos.y)) ||
@@ -953,7 +869,7 @@ function startHudLoop(): void {
                             localPlayerPos.x = targetX;
                         }
 
-                        const isYBlocked = !isFlying && (
+                        const isYBlocked = (
                             (isTown && checkTownCollision(localPlayerPos.x, targetY)) || 
                             (isMaze && checkMazeCollision(localPlayerPos.x, targetY)) || 
                             (isUnderworld && checkUnderworldCollision(localPlayerPos.x, targetY)) ||
@@ -967,60 +883,28 @@ function startHudLoop(): void {
                         localPlayerPos.x = targetX;
                         localPlayerPos.y = targetY;
                     }
-                    
+
                     localPlayerPos.x = Math.max(-2490, Math.min(2490, localPlayerPos.x));
                     localPlayerPos.y = Math.max(-2490, Math.min(2490, localPlayerPos.y));
-                }
 
-                if (isInputting || (!isInputting && wasInputting)) {
-                    if (now - networkState.lastNetworkSend > 40 || (!isInputting && wasInputting)) {
-                        
-                        if (isMounted) {
-                            let mX = 0; let mY = 0;
-                            if (keys.KeyW) mY -= 1; 
-                            if (keys.KeyS) mY += 1;
-                            if (keys.KeyA) mX -= 1; 
-                            if (keys.KeyD) mX += 1;
-                            
-                            if (mX !== 0 || mY !== 0) {
-                                const length = Math.sqrt(mX * mX + mY * mY);
-                                const nx = mX / length; const ny = mY / length;
-                                let angle = 0;
-                                if (typeof (activeScene as any).getCameraAngle === "function") angle = (activeScene as any).getCameraAngle();
-                                
-                                const dx = nx * Math.cos(angle) + ny * Math.sin(angle);
-                                const dy = -nx * Math.sin(angle) + ny * Math.cos(angle); 
-                                const mountSpeed = isLocallySprinting ? 22.0 : 15.0; 
-                                const moveDist = mountSpeed * 0.05;
-                                
-                                const targetX = me.x + dx * moveDist;
-                                const targetY = me.y + dy * moveDist;
-                                
-                                sendMove(activeRoom, targetX, targetY);
-                            } else if (!isInputting && wasInputting) {
-                                sendMove(activeRoom, me.x, me.y);
-                            }
-                        } else {
-                            const distSinceLastSendSq = distanceSq(networkState.lastSentX, networkState.lastSentY, localPlayerPos.x, localPlayerPos.y);
-                            
-                            if (distSinceLastSendSq > 1.0) {
-                                const steps = Math.ceil(Math.sqrt(distSinceLastSendSq) / 1.0);
-                                for (let i = 1; i <= steps; i++) {
-                                    const lerpX = networkState.lastSentX + (localPlayerPos.x - networkState.lastSentX) * (i / steps);
-                                    const lerpY = networkState.lastSentY + (localPlayerPos.y - networkState.lastSentY) * (i / steps);
-                                    sendMove(activeRoom, lerpX, lerpY);
-                                }
-                            } else {
-                                sendMove(activeRoom, localPlayerPos.x, localPlayerPos.y); 
-                            }
-                            
-                            networkState.lastSentX = localPlayerPos.x;
-                            networkState.lastSentY = localPlayerPos.y;
-                        }
-                        networkState.lastNetworkSend = now; 
-                    }
+                    inputSequenceNumber++;
+
+                    // Save for reconciliation
+                    pendingInputs.push({
+                        seq: inputSequenceNumber,
+                        inputX: dx, // Send world-space direction so the server doesn't need the camera angle
+                        inputZ: dy,
+                        dt
+                    });
+
+                    // Send the sequence number to the server
+                    activeRoom.send("move", {
+                        inputX: dx,
+                        inputZ: dy,
+                        sprint: isLocallySprinting,
+                        seq: inputSequenceNumber 
+                    });
                 }
-                wasInputting = isInputting;
 
                 const isSwimmingLocally = distanceSq(localPlayerPos.x, localPlayerPos.y, 1200, 0) <= 1600;
                 let th = 0;
@@ -1149,16 +1033,6 @@ async function boot(): Promise<void> {
 
               (window as any).debugRoom = activeRoom;
               
-              activeRoom.onStateChange((state: any) => {
-                  const scenery = state?.scenery;
-                  console.log(
-                      "[DIAGNOSTIC] State updated. Trees in memory:",
-                      scenery && typeof scenery.size !== "undefined"
-                          ? scenery.size
-                          : "SCHEMA IS UNDEFINED"
-                  );
-              });
-
               reconnected = true;
               console.log(`Successfully reconnected to ${actualZone} as ${PLAYER_NAME}`);
           }

@@ -88,15 +88,75 @@ export function attemptQuickChat(ctx: ActionContext, hotkeyStr: string) {
 }
 
 // ==========================================
+// TARGETING HELPERS
+// ==========================================
+
+function getForwardTarget(ctx: ActionContext, distance: number) {
+    return {
+        targetX: ctx.localPos.x + ctx.facing.dx * distance,
+        targetZ: ctx.localPos.y + ctx.facing.dy * distance
+    };
+}
+
+function getAssistedTarget(ctx: ActionContext, range: number, coneAngle: number) {
+    if (ctx.scene && typeof ctx.scene.findBestKeyboardTarget === "function") {
+        const target = ctx.scene.findBestKeyboardTarget(
+            ctx.localPos.x,
+            ctx.localPos.y,
+            ctx.facing.dx,
+            ctx.facing.dy,
+            range,
+            coneAngle
+        );
+
+        if (target) {
+            return { targetX: target.x, targetZ: target.z };
+        }
+    }
+
+    return getForwardTarget(ctx, range);
+}
+
+// ==========================================
 // COMBAT & ABILITIES
 // ==========================================
 
 let lastLocalAttack = 0;
 
+// Buffer state for input queueing
+export let queuedAbility: {
+    slotNum: number;
+    abilityId: string;
+    expiresAt: number;
+} | null = null;
+
 /**
- * Handles basic melee and resource gathering attacks (Hotbar Slot 1 or Left Click)
+ * Call this function from your main input/update loop to process buffered actions
  */
-export function attemptAttack(ctx: ActionContext, isLeftClick: boolean = false) {
+export function processQueuedAbilities(ctx: ActionContext) {
+    if (!queuedAbility) return;
+    
+    const now = Date.now();
+    if (now > queuedAbility.expiresAt) {
+        queuedAbility = null; // Expired buffer
+        return;
+    }
+
+    const slotKey = SLOT_KEYS[queuedAbility.slotNum] as keyof typeof abilityCooldowns;
+    const currentCd = abilityCooldowns[slotKey];
+    
+    // If cooldown is finally clear, execute and clear buffer
+    if (!currentCd || currentCd <= 0) {
+        const abilityToCast = queuedAbility.slotNum;
+        queuedAbility = null;
+        attemptAbility(abilityToCast, ctx);
+    }
+}
+
+/**
+ * Handles basic melee and resource gathering attacks (Keyboard Only)
+ */
+export function attemptAttack(ctx: ActionContext) {
     if (!ctx.room || ctx.isUIOpen) return;
 
     const state = ctx.room.state;
@@ -117,18 +177,17 @@ export function attemptAttack(ctx: ActionContext, isLeftClick: boolean = false) 
     if (now - lastLocalAttack < cooldownMs) return;
     lastLocalAttack = now;
 
-    // 2. Calculate Target Position
+    // 2. Calculate Target Position (Forward Assist)
     const attackDistance = 2.5; 
-    const targetX = ctx.localPos.x + (ctx.facing.dx * attackDistance);
-    const targetZ = ctx.localPos.y + (ctx.facing.dy * attackDistance);
+    const target = getForwardTarget(ctx, attackDistance);
 
     // 3. INSTANT CLIENT-SIDE PREDICTION
     if (ctx.scene && typeof ctx.scene.playAttackVisual === "function") {
-        ctx.scene.playAttackVisual(ctx.room.sessionId, targetX, targetZ);
+        ctx.scene.playAttackVisual(ctx.room.sessionId, target.targetX, target.targetZ);
     }
 
     // 4. Send to Server for Damage Math
-    ctx.room.send("attack", { targetX, targetZ });
+    ctx.room.send("attack", { targetX: target.targetX, targetZ: target.targetZ });
 }
 
 /**
@@ -153,9 +212,16 @@ export function attemptAbility(slotNum: number, ctx: ActionContext) {
     // 2. Core Slots (6 and 8) are System Passives. They cannot be "cast".
     if (slotNum === 6 || slotNum === 8) return; 
 
-    // 3. Check local cooldown to prevent spamming the server
+    // 3. Check local cooldown to prevent spamming the server (Add Buffering)
     const currentCd = abilityCooldowns[slotKey as keyof typeof abilityCooldowns];
-    if (currentCd && currentCd > 0) return; // Still on cooldown
+    if (currentCd && currentCd > 0) {
+        queuedAbility = {
+            slotNum,
+            abilityId,
+            expiresAt: now + 180
+        };
+        return; 
+    }
 
     // 4. Retrieve the skill definition from the master database
     const def = getSkillDef(abilityId);
@@ -166,19 +232,30 @@ export function attemptAbility(slotNum: number, ctx: ActionContext) {
 
     // 5. Targeting Logic
     if (REQUIRES_TARGETING.has(abilityId)) {
-        // Hand off to the THREE.js scene to render a reticle and wait for a mouse click
-        if (typeof ctx.scene.enterTargetingMode === "function") {
-            ctx.scene.enterTargetingMode(abilityId, slotNum);
+        if (typeof ctx.scene.enterKeyboardTargetingMode === "function") {
+            ctx.scene.enterKeyboardTargetingMode({
+                abilityId,
+                slotNum,
+                originX: ctx.localPos.x,
+                originZ: ctx.localPos.y,
+                facingX: ctx.facing.dx,
+                facingZ: ctx.facing.dy,
+                range: def.range || 12,
+                radius: def.radius || 3
+            });
         }
+        return;
     } else {
         // 6. Instant Cast
         let targetX = ctx.localPos.x;
         let targetZ = ctx.localPos.y;
 
         if (!SELF_CAST_SKILLS.has(abilityId)) {
-            const targetDistance = 5.0; // Shoot forward
-            targetX += (ctx.facing.dx * targetDistance);
-            targetZ += (ctx.facing.dy * targetDistance);
+            const targetDistance = def.range || 5.0;
+            // Provide a 45 degree (PI/4) cone angle for assisted targeting logic
+            const target = getAssistedTarget(ctx, targetDistance, Math.PI / 4);
+            targetX = target.targetX;
+            targetZ = target.targetZ;
         }
 
         // Map Slot 9 Branch IDs to actual VFX IDs for instant client prediction

@@ -282,25 +282,33 @@ export class TownScene extends BaseScene {
         return h;
     }
 
-    public getSurfaceHeight(x: number, z: number): number {
-        const terrainY = getTerrainHeight(x, z);
+   public getSurfaceHeight(x: number, z: number): number {
+    const terrainY = getTerrainHeight(x, z);
+    
+    for (const bldg of this.buildingMeshes.values()) {
+        const bx = bldg.mesh.position.x;
+        const bz = bldg.mesh.position.z;
         
-        for (const bldg of this.buildingMeshes.values()) {
-            if (bldg.type === "farm") continue;
-            
-            const bx = bldg.mesh.position.x;
-            const bz = bldg.mesh.position.z;
-            
-            let hw = 0; let hd = 0;
-            if (bldg.type === "house") { hw = 6; hd = 6; }
-            else if (bldg.type === "shop") { hw = 5; hd = 4; }
-            
-            if (x > bx - hw && x < bx + hw && z > bz - hd && z < bz + hd) {
-                return bldg.mesh.position.y + 0.4; // Force everything up to the 0.4 thick floor slab
-            }
+        let hw = 0; 
+        let hd = 0;
+        let floorThickness = 0;
+        
+        if (bldg.type === "house") { 
+            hw = 6.0; hd = 6.0; floorThickness = 0.4; 
+        } else if (bldg.type === "shop") { 
+            hw = 5.0; hd = 4.0; floorThickness = 0.4; 
+        } else if (bldg.type === "farm") { 
+            hw = 7.2; hd = 7.2; floorThickness = 2.0; // The dirt pad is 2.0 units thick
         }
-        return terrainY;
+        
+        // Check if the player coordinates fall inside the building footprint
+        if (x > bx - hw && x < bx + hw && z > bz - hd && z < bz + hd) {
+            return bldg.mesh.position.y + floorThickness;
+        }
     }
+    
+    return terrainY;
+}
 
     // ==========================================
     // TARGETING OVERRIDES

@@ -90,10 +90,11 @@ export function initInputManager(deps: InputDependencies): void {
         // --- QUICK CHAT SYSTEM ---
         if (event.key === "Tab" && event.shiftKey) {
             event.preventDefault(); 
-            toggleChatChannel();
-            addGameEvent(`Switched chat to: <b>${currentChatChannel.toUpperCase()}</b>`, "event-info");
-            if (typeof (window as any).renderChatHotbar === "function") (window as any).renderChatHotbar(true); 
-            if (room) room.send("quest_action", { actionId: "toggle_utility" });
+            if (!event.repeat) { 
+                toggleChatChannel();
+                addGameEvent(`Switched chat to: <b>${currentChatChannel.toUpperCase()}</b>`, "event-info");
+                if (typeof (window as any).renderChatHotbar === "function") (window as any).renderChatHotbar(true); 
+            }
             return;
         }
 
@@ -102,7 +103,6 @@ export function initInputManager(deps: InputDependencies): void {
             if (!isHoldingTab) {
                 isHoldingTab = true;
                 if (typeof (window as any).renderChatHotbar === "function") (window as any).renderChatHotbar(true); 
-                if (room) room.send("quest_action", { actionId: "toggle_utility" });
             }
             return;
         }
@@ -311,7 +311,12 @@ export function initInputManager(deps: InputDependencies): void {
             if (activeStall) {
                 if (activeStall.type === "⚒️ Blacksmith") return openCraftingMenu(room, me);
                 
-                const targetStoreState = room.state.stores?.find((s: any) => s.type === activeStall.type);
+                let targetStoreState = null;
+                if (room.state.stores) {
+                    // Convert MapSchema to Array so we can safely use .find()
+                    targetStoreState = Array.from(room.state.stores.values()).find((s: any) => s.type === activeStall.type);
+                }
+                
                 if (targetStoreState) return openStoreMenu(room, me, targetStoreState);
             }
 
@@ -321,20 +326,24 @@ export function initInputManager(deps: InputDependencies): void {
 
             // Loot Chests
             let nearLoot = false;
-            room.state.lootItems?.forEach((loot: any) => {
-                if (loot.kind === "chest" && !loot.isOpen && distanceSq(ctx.localPos.x, ctx.localPos.y, loot.x, loot.y) <= 2.25) {
-                    nearLoot = true;
-                }
-            });
+            if (room.state.lootItems) {
+                room.state.lootItems.forEach((loot: any) => {
+                    if (loot.kind === "chest" && !loot.isOpen && distanceSq(ctx.localPos.x, ctx.localPos.y, loot.x, loot.y) <= 2.25) {
+                        nearLoot = true;
+                    }
+                });
+            }
             if (nearLoot) return room.send("interact");
 
             // Decorations
             let nearestDeco = null;
             let minDist = 9.0;
-            room.state.decorations?.forEach((deco: any) => {
-                const dSq = distanceSq(ctx.localPos.x, ctx.localPos.y, deco.x, deco.z);
-                if (dSq < minDist) { nearestDeco = deco; minDist = dSq; }
-            });
+            if (room.state.decorations) {
+                room.state.decorations.forEach((deco: any) => {
+                    const dSq = distanceSq(ctx.localPos.x, ctx.localPos.y, deco.x, deco.z);
+                    if (dSq < minDist) { nearestDeco = deco; minDist = dSq; }
+                });
+            }
 
             if (nearestDeco) {
                 if ((nearestDeco as any).type === "Storage Chest") return openChestUI(room, keys, (nearestDeco as any).id);
@@ -363,11 +372,13 @@ export function initInputManager(deps: InputDependencies): void {
 
             if (event.key.toLowerCase() === "r") {
                 let activeBuildingId = null;
-                room?.state.buildings?.forEach((bldg: any) => {
-                    if (distanceSq(ctx.localPos.x, ctx.localPos.y, bldg.x, bldg.z) < 25.0 && !bldg.isConstructed) {
-                        activeBuildingId = bldg.id;
-                    }
-                });
+                if (room?.state.buildings) {
+                    room.state.buildings.forEach((bldg: any) => {
+                        if (distanceSq(ctx.localPos.x, ctx.localPos.y, bldg.x, bldg.z) < 25.0 && !bldg.isConstructed) {
+                            activeBuildingId = bldg.id;
+                        }
+                    });
+                }
                 if (activeBuildingId) room?.send("contributeResource", { buildingId: activeBuildingId });
                 return;
             }

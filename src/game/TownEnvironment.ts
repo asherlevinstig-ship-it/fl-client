@@ -28,6 +28,16 @@ export type NPCBuilding = {
 };
 
 // ==========================================
+// ENVIRONMENT CONFIGURATION
+// ==========================================
+export const ENV_QUALITY = {
+    grassCount: 4000, 
+    fairyCount: 75,
+    waterfallParticleCount: 60,
+    shadows: true
+};
+
+// ==========================================
 // PERFORMANCE: GLOBAL CACHES & UNIFORMS
 // ==========================================
 export const sharedTimeUniform = { value: 0 };
@@ -103,8 +113,12 @@ export class TownEnvironment {
         const platformGeo = getGeo('elven_plat', () => new THREE.CylinderGeometry(50, 52, 2, 32));
         const platform = new THREE.Mesh(platformGeo, marbleMat);
         platform.position.y = 1;
-        platform.receiveShadow = true;
-        platform.castShadow = true;
+        
+        if (ENV_QUALITY.shadows) {
+            platform.receiveShadow = true;
+            platform.castShadow = true;
+        }
+        
         elvenGroup.add(platform);
 
         const poolGeo = getGeo('elven_pool', () => new THREE.CylinderGeometry(40, 40, 2.2, 32));
@@ -122,8 +136,12 @@ export class TownEnvironment {
         const trunkGeo = getGeo('aethel_trunk', () => new THREE.CylinderGeometry(6, 12, 60, 12));
         const trunk = new THREE.Mesh(trunkGeo, barkMat);
         trunk.position.y = 30;
-        trunk.castShadow = true;
-        trunk.receiveShadow = true;
+        
+        if (ENV_QUALITY.shadows) {
+            trunk.castShadow = true;
+            trunk.receiveShadow = true;
+        }
+        
         aethelgardGroup.add(trunk);
 
         const rootGeo = getGeo('aethel_root', () => new THREE.ConeGeometry(3, 15, 6));
@@ -133,7 +151,7 @@ export class TownEnvironment {
             root.position.set(Math.cos(angle) * 10, 5, Math.sin(angle) * 10);
             root.rotation.x = Math.PI / 4;
             root.rotation.y = -angle + Math.PI/2;
-            root.castShadow = true;
+            if (ENV_QUALITY.shadows) root.castShadow = true;
             aethelgardGroup.add(root);
         }
 
@@ -171,7 +189,7 @@ export class TownEnvironment {
             const radius = 12 - (height / 60) * 6 + 1; 
             step.position.set(Math.cos(angle) * radius, height, Math.sin(angle) * radius);
             step.rotation.y = -angle;
-            step.castShadow = true;
+            if (ENV_QUALITY.shadows) step.castShadow = true;
             
             if (i % 8 === 0) {
                 const crystal = new THREE.Mesh(crystalGeo, crystalMat);
@@ -195,12 +213,12 @@ export class TownEnvironment {
             
             const platform = new THREE.Mesh(platGeo, platMat);
             platform.position.set(Math.cos(a)*pRadius, pHeight, Math.sin(a)*pRadius);
-            platform.castShadow = true;
+            if (ENV_QUALITY.shadows) platform.castShadow = true;
             aethelgardGroup.add(platform);
 
             const house = new THREE.Mesh(houseGeo, houseMat);
             house.position.set(Math.cos(a)*pRadius, pHeight + 2.5, Math.sin(a)*pRadius);
-            house.castShadow = true;
+            if (ENV_QUALITY.shadows) house.castShadow = true;
             
             const roof = new THREE.Mesh(roofGeo, roofMat);
             roof.position.set(Math.cos(a)*pRadius, pHeight + 6, Math.sin(a)*pRadius);
@@ -284,7 +302,7 @@ export class TownEnvironment {
             fallMesh.rotation.y = Math.PI; 
             fallGroup.add(fallMesh);
             
-            const wCount = 120;
+            const wCount = ENV_QUALITY.waterfallParticleCount;
             const wGeo = new THREE.BufferGeometry();
             const wPos = new Float32Array(wCount * 3);
             const wVel = new Float32Array(wCount * 3);
@@ -310,7 +328,7 @@ export class TownEnvironment {
         });
 
         // --- FAIRY DUST ---
-        const fCount = 150;
+        const fCount = ENV_QUALITY.fairyCount;
         const fGeo = new THREE.BufferGeometry();
         const fPos = new Float32Array(fCount * 3);
         const fVel = new Float32Array(fCount * 3);
@@ -407,11 +425,20 @@ export class TownEnvironment {
     public createNPCVillage(cx: number, cz: number) {
         const villageGroup = new THREE.Group();
 
+        const DEBUG_VILLAGE_BEACON = false;
+        if (DEBUG_VILLAGE_BEACON) {
+            const beaconGeo = new THREE.CylinderGeometry(2, 2, 200, 16);
+            const beaconMat = new THREE.MeshBasicMaterial({ color: 0xff0000, wireframe: true, transparent: true, opacity: 0.5 });
+            const beacon = new THREE.Mesh(beaconGeo, beaconMat);
+            beacon.position.set(0, 100, 0); // Position relative to group
+            villageGroup.add(beacon);
+        }
+
         const dirtMat = getMat('village_dirt', () => new THREE.MeshStandardMaterial({ color: 0x3d2b1f, roughness: 1.0 }));
         const floor = new THREE.Mesh(getGeo('village_floor', () => new THREE.PlaneGeometry(35, 35)), dirtMat);
         floor.rotation.x = -Math.PI / 2;
         floor.position.y = 0.05; 
-        floor.receiveShadow = true;
+        if (ENV_QUALITY.shadows) floor.receiveShadow = true;
         villageGroup.add(floor);
 
         const wallMat = getMat('npc_wall', () => new THREE.MeshStandardMaterial({ color: 0x735b44, roughness: 0.9, side: THREE.DoubleSide }));
@@ -429,25 +456,39 @@ export class TownEnvironment {
             houseGroup.rotation.y = rot;
 
             const back = new THREE.Mesh(geoBack, wallMat);
-            back.position.set(0, 3, -4.75); back.castShadow = true; back.receiveShadow = true; houseGroup.add(back);
+            back.position.set(0, 3, -4.75); 
+            if (ENV_QUALITY.shadows) { back.castShadow = true; back.receiveShadow = true; }
+            houseGroup.add(back);
             
             const left = new THREE.Mesh(geoSide, wallMat);
-            left.position.set(-4.75, 3, 0); left.castShadow = true; left.receiveShadow = true; houseGroup.add(left);
+            left.position.set(-4.75, 3, 0); 
+            if (ENV_QUALITY.shadows) { left.castShadow = true; left.receiveShadow = true; }
+            houseGroup.add(left);
             
             const right = new THREE.Mesh(geoSide, wallMat);
-            right.position.set(4.75, 3, 0); right.castShadow = true; right.receiveShadow = true; houseGroup.add(right);
+            right.position.set(4.75, 3, 0); 
+            if (ENV_QUALITY.shadows) { right.castShadow = true; right.receiveShadow = true; }
+            houseGroup.add(right);
 
             const frontL = new THREE.Mesh(geoFront, wallMat);
-            frontL.position.set(-3.25, 3, 4.75); frontL.castShadow = true; frontL.receiveShadow = true; houseGroup.add(frontL);
+            frontL.position.set(-3.25, 3, 4.75); 
+            if (ENV_QUALITY.shadows) { frontL.castShadow = true; frontL.receiveShadow = true; }
+            houseGroup.add(frontL);
             
             const frontR = new THREE.Mesh(geoFront, wallMat);
-            frontR.position.set(3.25, 3, 4.75); frontR.castShadow = true; frontR.receiveShadow = true; houseGroup.add(frontR);
+            frontR.position.set(3.25, 3, 4.75); 
+            if (ENV_QUALITY.shadows) { frontR.castShadow = true; frontR.receiveShadow = true; }
+            houseGroup.add(frontR);
 
             const frontTop = new THREE.Mesh(geoTop, wallMat);
-            frontTop.position.set(0, 5, 4.75); frontTop.castShadow = true; frontTop.receiveShadow = true; houseGroup.add(frontTop);
+            frontTop.position.set(0, 5, 4.75); 
+            if (ENV_QUALITY.shadows) { frontTop.castShadow = true; frontTop.receiveShadow = true; }
+            houseGroup.add(frontTop);
 
             const roof = new THREE.Mesh(geoRoof, roofMat);
-            roof.rotation.y = Math.PI / 4; roof.position.y = 8.5; roof.castShadow = true; houseGroup.add(roof);
+            roof.rotation.y = Math.PI / 4; roof.position.y = 8.5; 
+            if (ENV_QUALITY.shadows) roof.castShadow = true; 
+            houseGroup.add(roof);
 
             this.npcVillageBuildings.push({ x: cx + hx, z: cz + hz, width: 10, depth: 10, roof: roof });
 
@@ -472,19 +513,23 @@ export class TownEnvironment {
         const eGeoZ = getGeo('perim_geoZ', () => new THREE.BoxGeometry(wallThickness, wallHeight, mapSize));
 
         const nWall = new THREE.Mesh(eGeoX, wallMat);
-        nWall.position.set(0, wallHeight / 2, -mapSize / 2 - wallThickness / 2); nWall.receiveShadow = true;
+        nWall.position.set(0, wallHeight / 2, -mapSize / 2 - wallThickness / 2); 
+        if (ENV_QUALITY.shadows) nWall.receiveShadow = true;
         this.environmentRoot.add(nWall);
 
         const sWall = new THREE.Mesh(eGeoX, wallMat);
-        sWall.position.set(0, wallHeight / 2, mapSize / 2 + wallThickness / 2); sWall.receiveShadow = true;
+        sWall.position.set(0, wallHeight / 2, mapSize / 2 + wallThickness / 2); 
+        if (ENV_QUALITY.shadows) sWall.receiveShadow = true;
         this.environmentRoot.add(sWall);
 
         const eWall = new THREE.Mesh(eGeoZ, wallMat);
-        eWall.position.set(mapSize / 2 + wallThickness / 2, wallHeight / 2, 0); eWall.receiveShadow = true;
+        eWall.position.set(mapSize / 2 + wallThickness / 2, wallHeight / 2, 0); 
+        if (ENV_QUALITY.shadows) eWall.receiveShadow = true;
         this.environmentRoot.add(eWall);
 
         const wWall = new THREE.Mesh(eGeoZ, wallMat);
-        wWall.position.set(-mapSize / 2 - wallThickness / 2, wallHeight / 2, 0); wWall.receiveShadow = true;
+        wWall.position.set(-mapSize / 2 - wallThickness / 2, wallHeight / 2, 0); 
+        if (ENV_QUALITY.shadows) wWall.receiveShadow = true;
         this.environmentRoot.add(wWall);
 
         const pillarGeo = getGeo('perim_pillar', () => new THREE.CylinderGeometry(12, 12, wallHeight, 16));
@@ -494,7 +539,10 @@ export class TownEnvironment {
         for (const [px, pz] of cornerPositions) {
             const pillar = new THREE.Mesh(pillarGeo, pillarMat);
             pillar.position.set(px, wallHeight/2, pz);
-            pillar.receiveShadow = true; pillar.castShadow = true;
+            if (ENV_QUALITY.shadows) {
+                pillar.receiveShadow = true; 
+                pillar.castShadow = true;
+            }
             this.environmentRoot.add(pillar);
         }
 
@@ -517,11 +565,13 @@ export class TownEnvironment {
         const sideWallGeo = getGeo('tw_side', () => new THREE.BoxGeometry(wallThickness, wallHeight, radius * 2));
         
         const eastWall = new THREE.Mesh(sideWallGeo, stoneMat);
-        eastWall.position.set(radius, wallHeight / 2, 0); eastWall.castShadow = true; eastWall.receiveShadow = true;
+        eastWall.position.set(radius, wallHeight / 2, 0); 
+        if (ENV_QUALITY.shadows) { eastWall.castShadow = true; eastWall.receiveShadow = true; }
         this.environmentRoot.add(eastWall);
 
         const westWall = new THREE.Mesh(sideWallGeo, stoneMat);
-        westWall.position.set(-radius, wallHeight / 2, 0); westWall.castShadow = true; westWall.receiveShadow = true;
+        westWall.position.set(-radius, wallHeight / 2, 0); 
+        if (ENV_QUALITY.shadows) { westWall.castShadow = true; westWall.receiveShadow = true; }
         this.environmentRoot.add(westWall);
 
         const frontWallLen = (radius * 2 - gateWidth) / 2;
@@ -529,11 +579,13 @@ export class TownEnvironment {
 
         const addFrontWall = (z: number) => {
             const w1 = new THREE.Mesh(frontWallGeo, stoneMat);
-            w1.position.set(-(gateWidth / 2 + frontWallLen / 2), wallHeight / 2, z); w1.castShadow = true; w1.receiveShadow = true;
+            w1.position.set(-(gateWidth / 2 + frontWallLen / 2), wallHeight / 2, z); 
+            if (ENV_QUALITY.shadows) { w1.castShadow = true; w1.receiveShadow = true; }
             this.environmentRoot.add(w1);
 
             const w2 = new THREE.Mesh(frontWallGeo, stoneMat);
-            w2.position.set((gateWidth / 2 + frontWallLen / 2), wallHeight / 2, z); w2.castShadow = true; w2.receiveShadow = true;
+            w2.position.set((gateWidth / 2 + frontWallLen / 2), wallHeight / 2, z); 
+            if (ENV_QUALITY.shadows) { w2.castShadow = true; w2.receiveShadow = true; }
             this.environmentRoot.add(w2);
         };
 
@@ -544,23 +596,27 @@ export class TownEnvironment {
         const towerPositions = [ [[radius, radius]], [[-radius, radius]], [[radius, -radius]], [[-radius, -radius]] ];
         for (const pos of towerPositions) {
             const tower = new THREE.Mesh(towerGeo, darkStoneMat);
-            tower.position.set(pos[0][0], (wallHeight + 4) / 2, pos[0][1]); tower.castShadow = true; tower.receiveShadow = true;
+            tower.position.set(pos[0][0], (wallHeight + 4) / 2, pos[0][1]); 
+            if (ENV_QUALITY.shadows) { tower.castShadow = true; tower.receiveShadow = true; }
             this.environmentRoot.add(tower);
         }
 
         const addGate = (z: number, isNorth: boolean) => {
             const pillarGeo = getGeo('tw_gate_p', () => new THREE.BoxGeometry(6, wallHeight + 2, 6));
             const p1 = new THREE.Mesh(pillarGeo, darkStoneMat);
-            p1.position.set(-(gateWidth / 2 + 1), (wallHeight + 2) / 2, z); p1.castShadow = true; p1.receiveShadow = true;
+            p1.position.set(-(gateWidth / 2 + 1), (wallHeight + 2) / 2, z); 
+            if (ENV_QUALITY.shadows) { p1.castShadow = true; p1.receiveShadow = true; }
             this.environmentRoot.add(p1);
 
             const p2 = new THREE.Mesh(pillarGeo, darkStoneMat);
-            p2.position.set((gateWidth / 2 + 1), (wallHeight + 2) / 2, z); p2.castShadow = true; p2.receiveShadow = true;
+            p2.position.set((gateWidth / 2 + 1), (wallHeight + 2) / 2, z); 
+            if (ENV_QUALITY.shadows) { p2.castShadow = true; p2.receiveShadow = true; }
             this.environmentRoot.add(p2);
 
             const archGeo = getGeo('tw_gate_a', () => new THREE.BoxGeometry(gateWidth + 8, 4, 6));
             const arch = new THREE.Mesh(archGeo, darkStoneMat);
-            arch.position.set(0, wallHeight + 2, z); arch.castShadow = true; arch.receiveShadow = true;
+            arch.position.set(0, wallHeight + 2, z); 
+            if (ENV_QUALITY.shadows) { arch.castShadow = true; arch.receiveShadow = true; }
             this.environmentRoot.add(arch);
 
             const doorGeo = getGeo('tw_gate_d', () => new THREE.BoxGeometry(gateWidth / 2, wallHeight - 1, 1));
@@ -569,7 +625,8 @@ export class TownEnvironment {
             doorGroup1.position.set(-gateWidth / 2, 0, z);
             doorGroup1.rotation.y = isNorth ? Math.PI * 0.6 : -Math.PI * 0.6; 
             const d1 = new THREE.Mesh(doorGeo, woodMat);
-            d1.position.set(gateWidth / 4, (wallHeight - 1) / 2, 0); d1.castShadow = true;
+            d1.position.set(gateWidth / 4, (wallHeight - 1) / 2, 0); 
+            if (ENV_QUALITY.shadows) d1.castShadow = true;
             doorGroup1.add(d1);
             this.environmentRoot.add(doorGroup1);
 
@@ -577,7 +634,8 @@ export class TownEnvironment {
             doorGroup2.position.set(gateWidth / 2, 0, z);
             doorGroup2.rotation.y = isNorth ? -Math.PI * 0.6 : Math.PI * 0.6;
             const d2 = new THREE.Mesh(doorGeo, woodMat);
-            d2.position.set(-gateWidth / 4, (wallHeight - 1) / 2, 0); d2.castShadow = true;
+            d2.position.set(-gateWidth / 4, (wallHeight - 1) / 2, 0); 
+            if (ENV_QUALITY.shadows) d2.castShadow = true;
             doorGroup2.add(d2);
             this.environmentRoot.add(doorGroup2);
         };
@@ -602,19 +660,22 @@ export class TownEnvironment {
         const roofMat = getMat(`stall_roof_${roofColor}`, () => new THREE.MeshStandardMaterial({ color: roofColor, roughness: 1.0 }));
 
         const table = new THREE.Mesh(getGeo('stall_table_g', () => new THREE.BoxGeometry(4, 0.3, 2)), tableMat);
-        table.position.set(0, 1.2, 0.5); table.castShadow = true; table.receiveShadow = true;
+        table.position.set(0, 1.2, 0.5); 
+        if (ENV_QUALITY.shadows) { table.castShadow = true; table.receiveShadow = true; }
         stallGroup.add(table);
 
         const postGeo = getGeo('stall_post', () => new THREE.CylinderGeometry(0.15, 0.15, 3.5, 8));
         const postsPositions = [ [-1.8, 1.75, 1.3], [1.8, 1.75, 1.3], [-1.8, 1.75, -0.3], [1.8, 1.75, -0.3] ];
         postsPositions.forEach(pos => {
             const post = new THREE.Mesh(postGeo, woodMat);
-            post.position.set(pos[0], pos[1], pos[2]); post.castShadow = true;
+            post.position.set(pos[0], pos[1], pos[2]); 
+            if (ENV_QUALITY.shadows) post.castShadow = true;
             stallGroup.add(post);
         });
 
         const roof = new THREE.Mesh(getGeo('stall_roof_g', () => new THREE.BoxGeometry(4.4, 0.2, 3.0)), roofMat);
-        roof.position.set(0, 3.5, 0.5); roof.rotation.x = -0.2; roof.castShadow = true; roof.receiveShadow = true;
+        roof.position.set(0, 3.5, 0.5); roof.rotation.x = -0.2; 
+        if (ENV_QUALITY.shadows) { roof.castShadow = true; roof.receiveShadow = true; }
         stallGroup.add(roof);
 
         const propGroup = new THREE.Group();
@@ -628,6 +689,7 @@ export class TownEnvironment {
                 const bottleMat = getMat(`stall_bottle_${cHex}`, () => new THREE.MeshStandardMaterial({ color: cHex, emissive: cHex, emissiveIntensity: 0.5, transparent: true, opacity: 0.8 }));
                 const bottle = new THREE.Mesh(bottleGeo, bottleMat);
                 bottle.position.set((Math.random() - 0.5) * 3, 0.2, (Math.random() - 0.5) * 1);
+                // No shadows for tiny bottles
                 propGroup.add(bottle);
             }
         } 
@@ -637,6 +699,7 @@ export class TownEnvironment {
             for (let i = 0; i < 8; i++) {
                 const apple = new THREE.Mesh(appleGeo, appleMat);
                 apple.position.set(-1 + (Math.random() - 0.5) * 1, 0.1, (Math.random() - 0.5) * 1);
+                // No shadows for apples
                 propGroup.add(apple);
             }
             const breadGeo = getGeo('stall_bread', () => new THREE.BoxGeometry(0.4, 0.2, 0.2));
@@ -645,6 +708,7 @@ export class TownEnvironment {
                 const bread = new THREE.Mesh(breadGeo, breadMat);
                 bread.position.set(1 + (Math.random() - 0.5) * 1, 0.1, (Math.random() - 0.5) * 1);
                 bread.rotation.y = Math.random() * Math.PI;
+                // No shadows for bread
                 propGroup.add(bread);
             }
         } 
@@ -655,13 +719,17 @@ export class TownEnvironment {
             const anvilTop = new THREE.Mesh(getGeo('stall_anvil_t', () => new THREE.BoxGeometry(0.8, 0.3, 0.3)), stoneMat);
             anvilTop.position.set(-1, 0.55, 0);
             propGroup.add(anvilBase); propGroup.add(anvilTop);
+            
             const forge = new THREE.Mesh(getGeo('stall_forge', () => new THREE.BoxGeometry(1.2, 1.2, 1.2)), stoneMat);
-            forge.position.set(1, 0.6, -0.2); forge.castShadow = true;
+            forge.position.set(1, 0.6, -0.2); 
+            if (ENV_QUALITY.shadows) forge.castShadow = true;
             propGroup.add(forge);
+            
             const forgeLight = new THREE.PointLight(0xff7722, 2.0, 10);
             forgeLight.position.set(1, 0.8, 0.5);
             this.fireLights.push(forgeLight);
             propGroup.add(forgeLight);
+            
             const forgeFireGroup = new THREE.Group();
             forgeFireGroup.position.set(1, 0.2, 0.4); 
             this.createFireParticles(forgeFireGroup, 0.3); 
@@ -674,18 +742,21 @@ export class TownEnvironment {
                 const cHex = colors[i % colors.length];
                 const clothMat = getMat(`stall_cloth_${cHex}`, () => new THREE.MeshStandardMaterial({ color: cHex, roughness: 0.9 }));
                 const cloth = new THREE.Mesh(clothGeo, clothMat);
-                cloth.position.set(-1, 0.05 + i * 0.1, 0); cloth.rotation.y = (Math.random() - 0.5) * 0.2; cloth.castShadow = true;
+                cloth.position.set(-1, 0.05 + i * 0.1, 0); cloth.rotation.y = (Math.random() - 0.5) * 0.2; 
+                // No shadows for cloth
                 propGroup.add(cloth);
             }
             for (let i = 0; i < 3; i++) {
                 const cHex = colors[(i+2) % colors.length];
                 const clothMat = getMat(`stall_cloth_${cHex}`, () => new THREE.MeshStandardMaterial({ color: cHex, roughness: 0.9 }));
                 const cloth = new THREE.Mesh(clothGeo, clothMat);
-                cloth.position.set(0.5, 0.05 + i * 0.1, 0.3); cloth.rotation.y = (Math.random() - 0.5) * 0.2; cloth.castShadow = true;
+                cloth.position.set(0.5, 0.05 + i * 0.1, 0.3); cloth.rotation.y = (Math.random() - 0.5) * 0.2; 
+                // No shadows for cloth
                 propGroup.add(cloth);
             }
             const roll = new THREE.Mesh(getGeo('stall_roll', () => new THREE.CylinderGeometry(0.2, 0.2, 1.2, 16)), getMat('stall_roll_m', () => new THREE.MeshStandardMaterial({ color: 0xaa22aa, roughness: 0.9 })));
-            roll.rotation.z = Math.PI / 2; roll.position.set(1, 0.2, -0.2); roll.castShadow = true;
+            roll.rotation.z = Math.PI / 2; roll.position.set(1, 0.2, -0.2); 
+            if (ENV_QUALITY.shadows) roll.castShadow = true;
             propGroup.add(roll);
         }
         else if (type === "furniture") {
@@ -716,8 +787,12 @@ export class TownEnvironment {
         const baseGeo = getGeo('mirror_base', () => new THREE.BoxGeometry(3.0, 0.4, 1.0));
         const base = new THREE.Mesh(baseGeo, frameMat);
         base.position.y = 0.2;
-        base.castShadow = true;
-        base.receiveShadow = true;
+        
+        if (ENV_QUALITY.shadows) {
+            base.castShadow = true;
+            base.receiveShadow = true;
+        }
+        
         mirrorGroup.add(base);
 
         const glassGeo = getGeo('mirror_glass', () => new THREE.PlaneGeometry(2.0, 4.0));
@@ -729,7 +804,7 @@ export class TownEnvironment {
         const backGeo = getGeo('mirror_back', () => new THREE.BoxGeometry(2.2, 4.2, 0.2));
         const back = new THREE.Mesh(backGeo, frameMat);
         back.position.set(0, 2.5, 0);
-        back.castShadow = true;
+        if (ENV_QUALITY.shadows) back.castShadow = true;
         mirrorGroup.add(back);
 
         const auraGeo = getGeo('mirror_aura', () => new THREE.PlaneGeometry(2.4, 4.4));
@@ -894,42 +969,52 @@ export class TownEnvironment {
         const wingSize = 20;
 
         const floor1 = new THREE.Mesh(getGeo('t_f1', () => new THREE.PlaneGeometry(mainWidth, mainDepth)), floorMat);
-        floor1.rotation.x = -Math.PI / 2; floor1.position.set(-mainWidth/2, 0.1, 0); floor1.receiveShadow = true;
+        floor1.rotation.x = -Math.PI / 2; floor1.position.set(-mainWidth/2, 0.1, 0); 
+        if (ENV_QUALITY.shadows) floor1.receiveShadow = true;
         group.add(floor1);
 
         const floor2 = new THREE.Mesh(getGeo('t_f2', () => new THREE.PlaneGeometry(wingSize, wingSize)), floorMat);
-        floor2.rotation.x = -Math.PI / 2; floor2.position.set(-mainWidth - wingSize/2, 0.1, -mainDepth/2 + wingSize/2); floor2.receiveShadow = true;
+        floor2.rotation.x = -Math.PI / 2; floor2.position.set(-mainWidth - wingSize/2, 0.1, -mainDepth/2 + wingSize/2); 
+        if (ENV_QUALITY.shadows) floor2.receiveShadow = true;
         group.add(floor2);
 
         const buildingGroup = new THREE.Group();
         const nWall = new THREE.Mesh(getGeo('t_w1', () => new THREE.BoxGeometry(mainWidth + wingSize + wallThickness, wallHeight, wallThickness)), wallMat);
         nWall.position.set(-mainWidth/2 - wingSize/2, wallHeight/2, -mainDepth/2 + wallThickness/2);
-        nWall.castShadow = true; nWall.receiveShadow = true; buildingGroup.add(nWall);
+        if (ENV_QUALITY.shadows) { nWall.castShadow = true; nWall.receiveShadow = true; }
+        buildingGroup.add(nWall);
 
         const eWallPieceLen = (mainDepth - 8) / 2;
         const eWallGeo = getGeo('t_eW', () => new THREE.BoxGeometry(wallThickness, wallHeight, eWallPieceLen));
         const eWallN = new THREE.Mesh(eWallGeo, wallMat); 
         eWallN.position.set(-wallThickness/2, wallHeight/2, -mainDepth/2 + eWallPieceLen/2);
-        eWallN.castShadow = true; eWallN.receiveShadow = true; buildingGroup.add(eWallN);
+        if (ENV_QUALITY.shadows) { eWallN.castShadow = true; eWallN.receiveShadow = true; }
+        buildingGroup.add(eWallN);
+        
         const eWallS = new THREE.Mesh(eWallGeo, wallMat); 
         eWallS.position.set(-wallThickness/2, wallHeight/2, mainDepth/2 - eWallPieceLen/2);
-        eWallS.castShadow = true; eWallS.receiveShadow = true; buildingGroup.add(eWallS);
+        if (ENV_QUALITY.shadows) { eWallS.castShadow = true; eWallS.receiveShadow = true; }
+        buildingGroup.add(eWallS);
 
         const sWall = new THREE.Mesh(getGeo('t_sW', () => new THREE.BoxGeometry(mainWidth + wallThickness, wallHeight, wallThickness)), wallMat);
         sWall.position.set(-mainWidth/2, wallHeight/2, mainDepth/2 - wallThickness/2);
-        sWall.castShadow = true; sWall.receiveShadow = true; buildingGroup.add(sWall);
+        if (ENV_QUALITY.shadows) { sWall.castShadow = true; sWall.receiveShadow = true; }
+        buildingGroup.add(sWall);
 
         const wWallShort = new THREE.Mesh(getGeo('t_wW', () => new THREE.BoxGeometry(wallThickness, wallHeight, mainDepth - wingSize)), wallMat);
         wWallShort.position.set(-mainWidth + wallThickness/2, wallHeight/2, wingSize/2);
-        wWallShort.castShadow = true; wWallShort.receiveShadow = true; buildingGroup.add(wWallShort);
+        if (ENV_QUALITY.shadows) { wWallShort.castShadow = true; wWallShort.receiveShadow = true; }
+        buildingGroup.add(wWallShort);
 
         const wingSWall = new THREE.Mesh(getGeo('t_wingS', () => new THREE.BoxGeometry(wingSize + wallThickness, wallHeight, wallThickness)), wallMat);
         wingSWall.position.set(-mainWidth - wingSize/2, wallHeight/2, -mainDepth/2 + wingSize - wallThickness/2);
-        wingSWall.castShadow = true; wingSWall.receiveShadow = true; buildingGroup.add(wingSWall);
+        if (ENV_QUALITY.shadows) { wingSWall.castShadow = true; wingSWall.receiveShadow = true; }
+        buildingGroup.add(wingSWall);
 
         const wingWWall = new THREE.Mesh(getGeo('t_wingW', () => new THREE.BoxGeometry(wallThickness, wallHeight, wingSize)), wallMat);
         wingWWall.position.set(-mainWidth - wingSize + wallThickness/2, wallHeight/2, -mainDepth/2 + wingSize/2);
-        wingWWall.castShadow = true; wingWWall.receiveShadow = true; buildingGroup.add(wingWWall);
+        if (ENV_QUALITY.shadows) { wingWWall.castShadow = true; wingWWall.receiveShadow = true; }
+        buildingGroup.add(wingWWall);
 
         this.onTavernWallsCreated(buildingGroup);
         group.add(buildingGroup);
@@ -940,7 +1025,9 @@ export class TownEnvironment {
         fpGroup.add(new THREE.Mesh(getGeo('t_fp2', () => new THREE.BoxGeometry(9, 6, 1.5)), stoneMat).translateY(3).translateZ(-1.75));
         
         const fireLight = new THREE.PointLight(0xff7722, 4.0, 30);
-        fireLight.position.set(0, 2.0, 1.5); fireLight.castShadow = true; fpGroup.add(fireLight);
+        fireLight.position.set(0, 2.0, 1.5); 
+        if (ENV_QUALITY.shadows) fireLight.castShadow = true; 
+        fpGroup.add(fireLight);
         this.fireLights.push(fireLight);
         this.createFireParticles(fpGroup, 1.0); 
         group.add(fpGroup);

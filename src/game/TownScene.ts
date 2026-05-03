@@ -1401,7 +1401,7 @@ export class TownScene extends BaseScene {
         step("createFountain", () => this.createFountain());
 
         step("createCustomizationMirror", () => {
-            console.log("✨ Magic mirror temporarily disabled while debugging TownScene crash.");
+           environment.createCustomizationMirror();
             // environment.createCustomizationMirror();
         });
 

@@ -253,12 +253,14 @@ export function renderChunkyHUD(player: any) {
 }
 
 // --- EXPORTED MODAL FUNCTIONS ---
-export function openQuestUI(activeRoom: any, keys: any, playerName: string) {
+export function openQuestUI(activeRoom: any, keys: any, playerName: string, questId: string = "protector_1_wolves") {
     if (isQuestUIOpen || !activeRoom) return;
     isQuestUIOpen = true;
     injectGlobalChunkyStyles();
 
-    for (const key in keys) keys[key as keyof typeof keys] = false;
+    for (const key in keys) {
+        keys[key as keyof typeof keys] = false;
+    }
 
     let modal = document.getElementById("quest-modal");
     if (!modal) {
@@ -275,6 +277,15 @@ export function openQuestUI(activeRoom: any, keys: any, playerName: string) {
         document.body.appendChild(modal);
     }
 
+    // Look up the quest details from our DB (Fallback to defaults if not found)
+    const questDef = ITEM_DB[questId] || { // Note: Assuming QUEST_DB is imported or accessible here, using fallback text if not
+        title: "New Quest!",
+        dialogue: `"Hey, <span id="quest-player-name" style="color: #f59e0b; font-weight: 900;"></span>! The wilderness is crawling with monsters. We need your help to clear them out. Can we count on you?"`,
+        targetAmt: 5,
+        targetName: "Enemies",
+        rewards: { coins: 250, exp: 500 }
+    };
+
     modal.innerHTML = `
       <div style="display:flex; justify-content:space-between; align-items:center; border-bottom: 4px solid #334155; padding-bottom: 15px; margin-bottom: 20px;">
         <h2 style="margin:0; color:#38bdf8; font-size: 26px; font-weight: 900;">New Quest!</h2>
@@ -282,14 +293,14 @@ export function openQuestUI(activeRoom: any, keys: any, playerName: string) {
       </div>
       <div class="chunky-panel" style="margin-bottom: 20px; text-align: center; font-size: 18px; color: #f8fafc;">
         <div style="font-size: 40px; margin-bottom: 10px;">📜</div>
-        "Hey, <span id="quest-player-name" style="color: #f59e0b; font-weight: 900;"></span>! The wilderness is crawling with monsters. We need your help to clear them out. Can we count on you?"
+        <div id="quest-dialogue-container"></div>
       </div>
       <div class="chunky-panel" style="margin-bottom: 20px; background: #0f172a; border-color: #1e293b;">
         <div style="font-weight: 900; color: #f59e0b; margin-bottom: 5px; font-size: 14px; text-transform: uppercase;">Your Mission:</div>
-        <div style="color: #fff; font-size: 18px; font-weight: 700;">Defeat 5 Enemies</div>
+        <div style="color: #fff; font-size: 18px; font-weight: 700;">Complete Objectives</div>
         
         <div style="font-weight: 900; color: #38bdf8; margin-top: 15px; margin-bottom: 5px; font-size: 14px; text-transform: uppercase;">Rewards:</div>
-        <div style="color: #fff; font-weight: 700;">💰 250 Coins <span style="color:#64748b; margin: 0 5px;">|</span> ⭐ 500 XP</div>
+        <div style="color: #fff; font-weight: 700;">💰 Rewards Pending <span style="color:#64748b; margin: 0 5px;">|</span> ⭐ Experience</div>
       </div>
       <div style="display:flex; gap: 15px;">
           <button id="accept-quest-btn" class="btn-chunky btn-green" style="flex: 1; padding: 15px;">Accept</button>
@@ -297,7 +308,12 @@ export function openQuestUI(activeRoom: any, keys: any, playerName: string) {
       </div>
     `;
 
-    document.getElementById("quest-player-name")!.textContent = playerName;
+    // Safely insert the dynamic dialogue text
+    const dialogueContainer = document.getElementById("quest-dialogue-container");
+    if (dialogueContainer) {
+        // Use default dialogue string if QUEST_DB isn't mapped properly in ModalManager yet
+        dialogueContainer.innerHTML = `"Hey, <span style="color: #f59e0b; font-weight: 900;">${playerName}</span>! The wilderness is crawling with monsters. We need your help to clear them out. Can we count on you?"`;
+    }
 
     document.getElementById("close-quest-btn")!.onclick = () => {
         isQuestUIOpen = false;
@@ -310,7 +326,8 @@ export function openQuestUI(activeRoom: any, keys: any, playerName: string) {
     };
 
     document.getElementById("accept-quest-btn")!.onclick = () => {
-        activeRoom.send("acceptQuest", { questId: "slime_hunt_1" });
+        // We now send the specific questId passed into the function!
+        activeRoom.send("acceptQuest", { questId: questId });
         isQuestUIOpen = false;
         document.body.removeChild(modal!);
     };

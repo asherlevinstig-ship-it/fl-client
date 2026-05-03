@@ -297,7 +297,7 @@ export function initInputManager(deps: InputDependencies): void {
                 const startedFishing = attemptFishing(ctx); 
                 room.send("interact");
                 if (!startedFishing) {
-                    attemptAttack(ctx, false);
+                    attemptAttack(ctx); // Removed false
                 }
                 return;
             }
@@ -352,7 +352,7 @@ export function initInputManager(deps: InputDependencies): void {
             }
 
             // Fallthrough: No interaction targets found, swing weapon!
-            attemptAttack(ctx, false);
+            attemptAttack(ctx); // Removed false
         }
 
         // --- BUILD / BUY MODE (Outside Town) ---
@@ -482,7 +482,7 @@ export function initInputManager(deps: InputDependencies): void {
                 return;
             }
 
-            if (event.button === 0) attemptAttack(ctx, true);
+            if (event.button === 0) attemptAttack(ctx); // Removed true
         }
     });
 

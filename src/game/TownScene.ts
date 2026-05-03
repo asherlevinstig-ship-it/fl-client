@@ -2224,30 +2224,23 @@ export class TownScene extends BaseScene {
         const plotCenterZ = gridY * 20 + 10;
 
         // 1. Calculate dynamic bounds based on what is built on the property
-        let minX = plotCenterX - 9;
-        let maxX = plotCenterX + 9;
-        let minZ = plotCenterZ - 9;
-        let maxZ = plotCenterZ + 9;
-        let hasBuildings = false;
+        let minX = plotCenterX - 9.8;
+        let maxX = plotCenterX + 9.8;
+        let minZ = plotCenterZ - 9.8;
+        let maxZ = plotCenterZ + 9.8;
 
         this.buildingMeshes.forEach((bldg) => {
             const bx = bldg.mesh.position.x;
             const bz = bldg.mesh.position.z;
             
-            // Check if the building belongs to this specific plot
+            // If the building's center falls in this plot, expand the plot's fence to wrap it fully
             if (Math.floor(bx / 20) === gridX && Math.floor(bz / 20) === gridY) {
-                if (!hasBuildings) {
-                    // Reset to inner extremes so the first building dictates the baseline size
-                    minX = 9999; maxX = -9999; minZ = 9999; maxZ = -9999;
-                    hasBuildings = true;
-                }
-                
                 let hw = 0; let hd = 0;
-                if (bldg.type === "house") { hw = 6; hd = 6; }
-                else if (bldg.type === "shop") { hw = 5; hd = 4; }
-                else if (bldg.type === "farm") { hw = 7.2; hd = 7.2; } // 14.4 total width to cover retaining walls
+                if (bldg.type === "house") { hw = 6.0; hd = 6.0; }
+                else if (bldg.type === "shop") { hw = 5.0; hd = 4.0; }
+                else if (bldg.type === "farm") { hw = 7.2; hd = 7.2; }
                 
-                const pad = 1.5; // Padding so the fence doesn't touch the walls
+                const pad = 1.2; 
                 minX = Math.min(minX, bx - hw - pad);
                 maxX = Math.max(maxX, bx + hw + pad);
                 minZ = Math.min(minZ, bz - hd - pad);
@@ -2255,14 +2248,7 @@ export class TownScene extends BaseScene {
             }
         });
 
-        // Cap to plot boundaries so a badly placed building doesn't stretch the fence into another player's land
-        minX = Math.max(minX, plotCenterX - 9.8);
-        maxX = Math.min(maxX, plotCenterX + 9.8);
-        minZ = Math.max(minZ, plotCenterZ - 9.8);
-        maxZ = Math.min(maxZ, plotCenterZ + 9.8);
-
         const group = new THREE.Group();
-        // Notice we DO NOT shift the group position. Everything is built in pure world space to track terrain height perfectly.
 
         const postGeo = new THREE.CylinderGeometry(0.15, 0.15, 1.5, 8);
         const postMat = new THREE.MeshStandardMaterial({ color: 0x4a3221, roughness: 0.9 });
@@ -2282,12 +2268,11 @@ export class TownScene extends BaseScene {
             group.add(rope);
         };
 
-        // 2. Draw terrain-hugging edges
         const drawFenceEdge = (startX: number, startZ: number, endX: number, endZ: number) => {
             const dx = endX - startX;
             const dz = endZ - startZ;
             const dist = Math.sqrt(dx*dx + dz*dz);
-            const segments = Math.max(1, Math.ceil(dist / 4.0)); // Place a post every ~4 units max
+            const segments = Math.max(1, Math.ceil(dist / 4.0));
             
             for (let i = 0; i < segments; i++) {
                 const t1 = i / segments;
@@ -2316,7 +2301,6 @@ export class TownScene extends BaseScene {
         drawFenceEdge(maxX, maxZ, minX, maxZ); // Bottom edge
         drawFenceEdge(minX, maxZ, minX, minZ); // Left edge
 
-        // 3. Dynamic Signpost positioning
         const signX = Math.max(minX + 2, plotCenterX - 2); 
         const signZ = maxZ; 
         const signY = getTerrainHeight(signX, signZ);

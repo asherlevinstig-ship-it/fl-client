@@ -190,6 +190,8 @@ export class TownScene extends BaseScene {
 
     private godNpc?: GiantGodNPC;
 
+    private surfaceHeightCache = new Map<string, number>();
+
     private hoverPlotMesh?: THREE.Mesh;
     private lastHoverPlotId: string = "";
     public isBuyMode: boolean = false;
@@ -257,6 +259,17 @@ export class TownScene extends BaseScene {
         } else if (typeof (this as any).animate === "function") {
             (this as any).animate();
         }
+    }
+
+    // --- CACHED HEIGHT HELPER ---
+    public getSurfaceHeightCached(x: number, z: number): number {
+        const key = `${Math.round(x * 2) / 2}_${Math.round(z * 2) / 2}`;
+        const cached = this.surfaceHeightCache.get(key);
+        if (cached !== undefined) return cached;
+
+        const h = this.getSurfaceHeight(x, z);
+        this.surfaceHeightCache.set(key, h);
+        return h;
     }
 
     // --- NEW MASTER HELPER: Dynamically override Y coordinates if standing inside a building ---
@@ -704,15 +717,8 @@ export class TownScene extends BaseScene {
         this.updateSceneryAnimations(dt); 
         this.updateCasinoAnimations(dt);
 
-        // --- NEW CODE: Correct load-order elevation issues every frame ---
-        this.decorationMeshes.forEach((mesh) => {
-            const surfaceY = this.getSurfaceHeight(mesh.position.x, mesh.position.z);
-            const finalY = Math.max(mesh.userData.serverY || mesh.position.y, surfaceY);
-            mesh.position.y = finalY;
-        });
-
         this.lootVisuals.forEach(chest => {
-            chest.position.y = this.getSurfaceHeight(chest.position.x, chest.position.z);
+            chest.position.y = this.getSurfaceHeightCached(chest.position.x, chest.position.z);
             
             if (chest.userData.isOpen && chest.userData.openProgress !== undefined && chest.userData.openProgress < 1) {
                 chest.userData.openProgress += dt * 6.0; 
@@ -790,14 +796,14 @@ export class TownScene extends BaseScene {
             if (h.mesh.userData.targetX !== undefined && h.mesh.userData.targetZ !== undefined) {
                 h.mesh.position.x = THREE.MathUtils.lerp(h.mesh.position.x, h.mesh.userData.targetX, 5 * dt);
                 h.mesh.position.z = THREE.MathUtils.lerp(h.mesh.position.z, h.mesh.userData.targetZ, 5 * dt);
-                h.mesh.position.y = this.getSurfaceHeight(h.mesh.position.x, h.mesh.position.z) + 0.05;
+                h.mesh.position.y = this.getSurfaceHeightCached(h.mesh.position.x, h.mesh.position.z) + 0.05;
             }
 
             if (h.type === "map_marker" || h.type === "recall_beacon" || h.type === "town_portal_node" || h.type === "healing_blossom") {
                 h.mesh.rotation.y += dt;
             }
             if (h.type === "map_marker" || h.type === "doom_familiar") {
-                const baseH = this.getSurfaceHeight(h.mesh.position.x, h.mesh.position.z);
+                const baseH = this.getSurfaceHeightCached(h.mesh.position.x, h.mesh.position.z);
                 h.mesh.position.y = baseH + Math.sin(timeSec * 3) * 0.3;
             }
             if (h.type === "whirlwind_aura") {
@@ -834,7 +840,7 @@ export class TownScene extends BaseScene {
 
                 // --- NEW CODE: Perfect elevation logic ---
                 if ((visual as any).targetPosition) {
-                    let targetY = this.getSurfaceHeight(visual.targetPosition.x, visual.targetPosition.z);
+                    let targetY = this.getSurfaceHeightCached(visual.targetPosition.x, visual.targetPosition.z);
 
                     const distToLake = Math.sqrt((px - LAKE_X) ** 2 + (pz - LAKE_Z) ** 2);
                     if (this.lakeMesh && distToLake <= DOCK_INNER - 2) {
@@ -927,7 +933,7 @@ export class TownScene extends BaseScene {
         if (!enemyData) {
             const typeName = label.split(" (")[0]; 
             const visual = new EnemyModel(typeName);
-            const correctY = this.getSurfaceHeight(x, z);
+            const correctY = this.getSurfaceHeightCached(x, z);
             visual.mesh.position.set(x, correctY, z);
             visual.targetPosition.set(x, correctY, z);
             
@@ -958,7 +964,7 @@ export class TownScene extends BaseScene {
 
         enemyData.action = action;
         // --- FIX: Ensure enemies walk on the solid floor instead of clipping ---
-        enemyData.visual.targetPosition.set(x, this.getSurfaceHeight(x, z), z);
+        enemyData.visual.targetPosition.set(x, this.getSurfaceHeightCached(x, z), z);
 
         const isBleeding = afflictions.includes("Bleed");
         const isNecrosis = afflictions.includes("Necrosis");
@@ -999,7 +1005,7 @@ export class TownScene extends BaseScene {
 
         const camX = this.camera.position.x;
         const camZ = this.camera.position.z;
-        const terrainUnderCamera = this.getSurfaceHeight(camX, camZ);
+        const terrainUnderCamera = this.getSurfaceHeightCached(camX, camZ);
 
         if (this.camera.position.y < terrainUnderCamera + 1.0) {
             const targetY = terrainUnderCamera + 1.0;
@@ -1337,7 +1343,7 @@ export class TownScene extends BaseScene {
         environment.createTowerPerimeter();
 
         const mapSize = 5000;
-        const segments = 800; 
+        const segments = 300; 
         const groundGeo = new THREE.PlaneGeometry(mapSize, mapSize, segments, segments);
         
         const colors: number[] = [];
@@ -1401,8 +1407,8 @@ export class TownScene extends BaseScene {
         step("createFountain", () => this.createFountain());
 
         step("createCustomizationMirror", () => {
-           environment.createCustomizationMirror();
-            // environment.createCustomizationMirror();
+            console.log("✨ Magic mirror restored!");
+            environment.createCustomizationMirror();
         });
 
         step("createFishingLake", () => this.createFishingLake());
@@ -1978,6 +1984,17 @@ export class TownScene extends BaseScene {
         if (this.ownedPlots.has(plotId)) {
             this.updatePlotFence(plotId);
         }
+
+        this.recalculateDecorationHeights();
+    }
+
+    // Helper function to call when static architecture changes
+    private recalculateDecorationHeights() {
+        this.decorationMeshes.forEach((mesh) => {
+            const surfaceY = this.getSurfaceHeight(mesh.position.x, mesh.position.z);
+            const finalY = Math.max(mesh.userData.serverY || mesh.position.y, surfaceY);
+            mesh.position.y = finalY;
+        });
     }
 
     public updateBuilding(id: string, type: string, isConstructed: boolean, progress: number, targetProgress: number) {

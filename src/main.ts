@@ -84,6 +84,9 @@ let currentZone: ZoneName | null = null;
 let isTransitioning = false;
 let cleanupRoomBindings: (() => void) | null = null;
 
+// --- GLOBAL NETWORK CONTEXT ---
+let cachedNetworkContext: NetworkContext | null = null;
+
 let hoverX = 0; 
 let hoverY = 0;
 
@@ -405,6 +408,10 @@ function buildNetworkContext(): NetworkContext {
     };
 }
 
+function refreshNetworkContext() {
+    cachedNetworkContext = buildNetworkContext();
+}
+
 async function switchZone(nextZone: ZoneName): Promise<void> {
   if (isTransitioning || currentZone === nextZone) return;
 
@@ -493,11 +500,13 @@ async function switchZone(nextZone: ZoneName): Promise<void> {
 
     localStorage.setItem(`rpg_last_zone_${PLAYER_NAME}`, nextZone);
 
+    refreshNetworkContext();
+
     if (activeRoom && activeScene) {
       localStorage.setItem(`rpg_reconnection_token_${PLAYER_NAME}`, activeRoom.reconnectionToken);
 
       console.log("[switchZone] post-setup START: setupRoomBindings");
-      cleanupRoomBindings = setupRoomBindings(activeRoom, activeScene, buildNetworkContext());
+      if(cachedNetworkContext) cleanupRoomBindings = setupRoomBindings(activeRoom, activeScene, cachedNetworkContext);
       console.log("[switchZone] post-setup OK: setupRoomBindings");
 
       console.log("[switchZone] post-setup START: rehydrateAbilityUI");
@@ -726,13 +735,13 @@ function startHudLoop(): void {
                 !playerVisuals.has(activeRoom.sessionId)
             ) {
                 import("./game/NetworkBindings").then(m => {
-                    if (activeRoom && activeScene) {
+                    if (activeRoom && activeScene && cachedNetworkContext) {
                         m.initPlayerVisual(
                             me,
                             activeRoom.sessionId,
                             activeRoom,
                             activeScene,
-                            buildNetworkContext()
+                            cachedNetworkContext
                         );
                     }
                 });
@@ -760,7 +769,9 @@ function startHudLoop(): void {
 
             const ctx = getActionContext();
 
-            syncStateToScene(activeRoom, activeScene, buildNetworkContext());
+            if (frameCount % 6 === 0 && cachedNetworkContext) {
+                 syncStateToScene(activeRoom, activeScene, cachedNetworkContext);
+            }
 
             updateHUD(
                 dt, 
@@ -849,20 +860,20 @@ function startHudLoop(): void {
                 }
 
                if (syncDistSq > 225.0) {
-                    console.warn("[CLIENT DESYNC RESET]", {
-                        zone: currentZone,
-                        local: { x: localPlayerPos.x, y: localPlayerPos.y },
-                        server: { x: me.x, y: me.y },
-                        syncDistSq,
-                        lastProcessedInput: me.lastProcessedInput,
-                        pendingInputs: pendingInputs.length
-                    });
-                    localPlayerPos.x = me.x;
-                    localPlayerPos.y = me.y;
-                    networkState.lastSentX = me.x;
-                    networkState.lastSentY = me.y;
-                    pendingInputs.length = 0;
-                }
+                   console.warn("[CLIENT DESYNC RESET]", {
+                       zone: currentZone,
+                       local: { x: localPlayerPos.x, y: localPlayerPos.y },
+                       server: { x: me.x, y: me.y },
+                       syncDistSq,
+                       lastProcessedInput: me.lastProcessedInput,
+                       pendingInputs: pendingInputs.length
+                   });
+                   localPlayerPos.x = me.x;
+                   localPlayerPos.y = me.y;
+                   networkState.lastSentX = me.x;
+                   networkState.lastSentY = me.y;
+                   pendingInputs.length = 0;
+               }
 
                 let inputX = 0; let inputY = 0;
                 let camDx = 0; let camDy = 0;
@@ -1116,6 +1127,8 @@ async function boot(): Promise<void> {
           
           localStorage.setItem(`rpg_last_zone_${PLAYER_NAME}`, actualZone);
 
+          refreshNetworkContext();
+
           clearContainer(container);
           
           if (actualZone === "town") activeScene = new TownScene(container);
@@ -1124,8 +1137,8 @@ async function boot(): Promise<void> {
           else if (actualZone === "dungeon") activeScene = new DungeonScene(container);
           else activeScene = new FieldScene(container);
           
-          if (activeRoom && activeScene) {
-              cleanupRoomBindings = setupRoomBindings(activeRoom, activeScene, buildNetworkContext());
+          if (activeRoom && activeScene && cachedNetworkContext) {
+              cleanupRoomBindings = setupRoomBindings(activeRoom, activeScene, cachedNetworkContext);
 
               rehydrateAbilityUI(activeRoom);
               activeRoom.send("set_aura_style", { style: PLAYER_AURA_STYLE });

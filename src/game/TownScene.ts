@@ -121,17 +121,16 @@ export function getTerrainHeight(x: number, z: number): number {
     return finalHeight;
 }
 
-// --- NEW FUNCTION: Anchor buildings to the highest point of their footprint ---
+// --- Anchor buildings to the highest point of their footprint ---
 export function getBuildingFootprintMaxHeight(cx: number, cz: number, type: string): number {
     let hw = 0; let hd = 0;
     if (type === "house") { hw = 6; hd = 6; }
     else if (type === "shop") { hw = 5; hd = 4; }
     else if (type === "farm") { hw = 7.2; hd = 7.2; }
-    else return getTerrainHeight(cx, cz); // Fallback for unknown types
+    else return getTerrainHeight(cx, cz);
 
     let maxH = getTerrainHeight(cx, cz);
     
-    // Sample a 4x4 grid across the footprint to find the highest terrain bump
     const steps = 4; 
     for (let x = -hw; x <= hw; x += (hw * 2) / steps) {
         for (let z = -hd; z <= hd; z += (hd * 2) / steps) {
@@ -173,80 +172,6 @@ type RealmEventVisual = {
     beacon: THREE.Mesh;
     currentState: string;
 };
-
-class InstancedMeshGroup {
-    public mesh: THREE.InstancedMesh;
-    public activeCount: number = 0; 
-    public idToIndex = new Map<string, number>();
-    public indexToId = new Map<number, string>();
-    public isDirty: boolean = false; 
-
-    constructor(geo: THREE.BufferGeometry, mat: THREE.Material, maxCount: number) {
-        this.mesh = new THREE.InstancedMesh(geo, mat, maxCount);
-        this.mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-        this.mesh.castShadow = true;
-        this.mesh.receiveShadow = true;
-        
-        this.mesh.frustumCulled = false;
-        this.mesh.count = 0; 
-    }
-
-    addInstance(id: string, matrix: THREE.Matrix4) {
-        if (this.idToIndex.has(id)) {
-            this.updateMatrix(id, matrix);
-            return;
-        }
-        
-        const maxInstances = this.mesh.instanceMatrix ? this.mesh.instanceMatrix.count : 15000;
-        if (this.activeCount >= maxInstances) return; 
-
-        const index = this.activeCount++;
-        this.idToIndex.set(id, index);
-        this.indexToId.set(index, id);
-        this.mesh.setMatrixAt(index, matrix);
-        
-        this.mesh.count = this.activeCount; 
-        this.isDirty = true; 
-    }
-
-    removeInstance(id: string) {
-        if (!this.idToIndex.has(id)) return;
-        const indexToRemove = this.idToIndex.get(id)!;
-        const lastIndex = this.activeCount - 1;
-
-        if (indexToRemove !== lastIndex) {
-            const lastId = this.indexToId.get(lastIndex)!;
-            const lastMatrix = new THREE.Matrix4();
-            this.mesh.getMatrixAt(lastIndex, lastMatrix);
-
-            this.mesh.setMatrixAt(indexToRemove, lastMatrix);
-            this.idToIndex.set(lastId, indexToRemove);
-            this.indexToId.set(indexToRemove, lastId);
-        }
-
-        this.idToIndex.delete(id);
-        this.indexToId.delete(lastIndex);
-        this.activeCount--;
-        
-        this.mesh.count = this.activeCount; 
-        this.isDirty = true;
-    }
-    
-    updateMatrix(id: string, matrix: THREE.Matrix4) {
-        const index = this.idToIndex.get(id);
-        if (index !== undefined) {
-            this.mesh.setMatrixAt(index, matrix);
-            this.isDirty = true;
-        }
-    }
-
-    flush() {
-        if (this.isDirty) {
-            this.mesh.instanceMatrix.needsUpdate = true;
-            this.isDirty = false;
-        }
-    }
-}
 
 export class TownScene extends BaseScene {
     public groundMesh?: THREE.Mesh; 
@@ -327,13 +252,33 @@ export class TownScene extends BaseScene {
     }
 
     public start() {
-        console.log("[TownScene] start() called");
-        
         if (typeof (BaseScene.prototype as any).start === "function") {
             (BaseScene.prototype as any).start.call(this);
         } else if (typeof (this as any).animate === "function") {
             (this as any).animate();
         }
+    }
+
+    // --- NEW HELPER: Get Floor/Terrain Y properly ---
+    public getSurfaceHeight(x: number, z: number): number {
+        const terrainY = getTerrainHeight(x, z);
+        
+        for (const bldg of this.buildingMeshes.values()) {
+            if (bldg.type === "farm") continue;
+            
+            const bx = bldg.mesh.position.x;
+            const bz = bldg.mesh.position.z;
+            
+            let hw = 0; let hd = 0;
+            if (bldg.type === "house") { hw = 6; hd = 6; }
+            else if (bldg.type === "shop") { hw = 5; hd = 4; }
+            
+            // If the query falls inside the building, elevate to the exact floor level
+            if (x > bx - hw && x < bx + hw && z > bz - hd && z < bz + hd) {
+                return bldg.mesh.position.y + 0.4; // 0.4 is the thickness of the floor slab
+            }
+        }
+        return terrainY;
     }
 
     public override updatePlayer(
@@ -434,7 +379,7 @@ export class TownScene extends BaseScene {
 
     public playAbilityVisual(id: string, abilityId: string, targetX: number, targetZ: number) {
         const playerVisual = this.playerVisuals.get(id);
-        const terrainHeight = getTerrainHeight(targetX, targetZ);
+        const terrainHeight = this.getSurfaceHeight(targetX, targetZ); // UPDATED
 
         spawnAbilityVFX(
             this.scene, 
@@ -451,7 +396,7 @@ export class TownScene extends BaseScene {
 
         if (!visual) {
             const group = new THREE.Group();
-            const terrainY = getTerrainHeight(x, z);
+            const terrainY = this.getSurfaceHeight(x, z); // UPDATED
             group.position.set(x, terrainY + 0.1, z);
 
             const ringGeo = new THREE.TorusGeometry(radius, 0.4, 16, 64);
@@ -536,7 +481,7 @@ export class TownScene extends BaseScene {
         if (this.hazardVisuals.has(id)) return;
 
         const group = new THREE.Group();
-        const terrainY = getTerrainHeight(x, z);
+        const terrainY = this.getSurfaceHeight(x, z); // UPDATED
         group.position.set(x, terrainY + 0.05, z);
 
         const steelMat = new THREE.MeshStandardMaterial({ color: 0x888888, metalness: 0.8, roughness: 0.4 });
@@ -695,7 +640,7 @@ export class TownScene extends BaseScene {
             case "mana_pillar":
                 const pillarGeo = new THREE.CylinderGeometry(0.8, 0.8, 4.0, 8);
                 const pillarMat = new THREE.MeshBasicMaterial({ color: 0x00aaff, transparent: true, opacity: 0.7, blending: THREE.AdditiveBlending });
-                const pillarMesh = new THREE.Mesh(pillarGeo, pillarMat);
+                const pillarMesh = new THREE.Mesh(pillarGeo, pillarMat); // FIX: Added THREE. namespace
                 pillarMesh.position.y = 2.0; 
                 
                 if (customData && customData.optionText) {
@@ -741,12 +686,6 @@ export class TownScene extends BaseScene {
     protected onUpdate(dt: number): void {
         if (!(this as any)._renderDebugLogged) {
             (this as any)._renderDebugLogged = true;
-            console.log("[TownScene] first render frame", {
-                children: this.scene.children.length,
-                camera: this.camera.position,
-                rendererSize: (this as any).renderer ? (this as any).renderer.getSize(new THREE.Vector2()) : "Unknown",
-                canvasConnected: (this as any).renderer ? (this as any).renderer.domElement.isConnected : false
-            });
         }
 
         this.frameCount++; 
@@ -840,14 +779,14 @@ export class TownScene extends BaseScene {
             if (h.mesh.userData.targetX !== undefined && h.mesh.userData.targetZ !== undefined) {
                 h.mesh.position.x = THREE.MathUtils.lerp(h.mesh.position.x, h.mesh.userData.targetX, 5 * dt);
                 h.mesh.position.z = THREE.MathUtils.lerp(h.mesh.position.z, h.mesh.userData.targetZ, 5 * dt);
-                h.mesh.position.y = getTerrainHeight(h.mesh.position.x, h.mesh.position.z) + 0.05;
+                h.mesh.position.y = this.getSurfaceHeight(h.mesh.position.x, h.mesh.position.z) + 0.05; // UPDATED
             }
 
             if (h.type === "map_marker" || h.type === "recall_beacon" || h.type === "town_portal_node" || h.type === "healing_blossom") {
                 h.mesh.rotation.y += dt;
             }
             if (h.type === "map_marker" || h.type === "doom_familiar") {
-                const baseH = getTerrainHeight(h.mesh.position.x, h.mesh.position.z);
+                const baseH = this.getSurfaceHeight(h.mesh.position.x, h.mesh.position.z);
                 h.mesh.position.y = baseH + Math.sin(timeSec * 3) * 0.3;
             }
             if (h.type === "whirlwind_aura") {
@@ -882,7 +821,7 @@ export class TownScene extends BaseScene {
                 const distSq = (px - camX) ** 2 + (pz - camZ) ** 2;
                 if (distSq > CULL_DIST_SQ && id !== this.localPlayerId) return;
 
-                let targetY = getTerrainHeight(px, pz);
+                let targetY = this.getSurfaceHeight(px, pz); // UPDATED - Handles bumping up when inside building
 
                 const distToLake = Math.sqrt((px - LAKE_X) ** 2 + (pz - LAKE_Z) ** 2);
                 if (this.lakeMesh && distToLake <= DOCK_INNER - 2) {
@@ -895,23 +834,6 @@ export class TownScene extends BaseScene {
                     }
                 } else if (visual.isSwimming && distToLake > DOCK_INNER) {
                      visual.isSwimming = false;
-                }
-
-                for (const bldg of this.buildingMeshes.values()) {
-                    if (bldg.type === "farm") continue; 
-
-                    const bx = bldg.mesh.position.x;
-                    const bz = bldg.mesh.position.z;
-                    
-                    let hw = 0; let hd = 0;
-                    if (bldg.type === "house") { hw = 6; hd = 6; } 
-                    else if (bldg.type === "shop") { hw = 5; hd = 4; }
-                    
-                    if (px > bx - hw && px < bx + hw && pz > bz - hd && pz < bz + hd) {
-                        // --- FIX: Ensure the player's feet touch the solid 0.4 thick floor ---
-                        targetY = bldg.mesh.position.y + 0.4;
-                        break;
-                    }
                 }
 
                 let leap = visual.mesh.userData.leapOffset || 0;
@@ -1063,7 +985,7 @@ export class TownScene extends BaseScene {
 
         const camX = this.camera.position.x;
         const camZ = this.camera.position.z;
-        const terrainUnderCamera = getTerrainHeight(camX, camZ);
+        const terrainUnderCamera = this.getSurfaceHeight(camX, camZ);
 
         if (this.camera.position.y < terrainUnderCamera + 1.0) {
             const targetY = terrainUnderCamera + 1.0;
@@ -1533,7 +1455,7 @@ export class TownScene extends BaseScene {
         label.scale.set(3.0, 0.8, 1.0);
         chestGroup.add(label);
 
-        chestGroup.position.set(x, getTerrainHeight(x, z), z);
+        chestGroup.position.set(x, this.getSurfaceHeight(x, z), z); // UPDATED
         this.scene.add(chestGroup);
         this.lootVisuals.set(id, chestGroup);
     }
@@ -1670,8 +1592,8 @@ export class TownScene extends BaseScene {
             mesh.scale.y = safeScale * 0.7; 
         }
         
-        const terrainHeight = getTerrainHeight(safeX, safeZ);
-        mesh.position.set(safeX, terrainHeight + (safeKind.includes("rock") ? 0.2 : 0), safeZ);
+        const surfaceHeight = this.getSurfaceHeight(safeX, safeZ); // UPDATED
+        mesh.position.set(safeX, surfaceHeight + (safeKind.includes("rock") ? 0.2 : 0), safeZ);
         
         this.scene.add(mesh);
         
@@ -2022,7 +1944,6 @@ export class TownScene extends BaseScene {
 
         const group = buildStructureModel(type, !isConstructed, 0xffd700);
         
-        // --- NEW CODE: Anchor building to the highest point of its footprint ---
         const targetY = getBuildingFootprintMaxHeight(x, z, type);
         group.position.set(x, targetY, z);
         
@@ -2057,11 +1978,14 @@ export class TownScene extends BaseScene {
     public addDecoration(id: string, type: string, x: number, y: number, z: number, rotation: number) {
         if (this.decorationMeshes.has(id)) return;
 
+        // --- NEW CODE: Auto-elevate decoration if it spawns inside the building bounds ---
+        const surfaceY = this.getSurfaceHeight(x, z);
+        const finalY = Math.max(y, surfaceY); 
+
         const group = buildDecoModel(type, false);
-        
-        group.position.set(x, y, z);
-        
+        group.position.set(x, finalY, z);
         group.rotation.y = rotation;
+        
         this.scene.add(group);
         this.decorationMeshes.set(id, group);
     }
@@ -2085,7 +2009,6 @@ export class TownScene extends BaseScene {
             const activeBlueprint = this.blueprintMeshes.get(this.currentBlueprintType);
             if (!activeBlueprint) return;
 
-            // --- NEW CODE: Hologram anchors to max footprint height ---
             const targetY = getBuildingFootprintMaxHeight(snapX, snapZ, this.currentBlueprintType);
             activeBlueprint.position.set(snapX, targetY, snapZ);
             activeBlueprint.visible = visible;
@@ -2116,7 +2039,10 @@ export class TownScene extends BaseScene {
             const snapX = Math.round(x * 2) / 2;
             const snapZ = Math.round(z * 2) / 2;
 
-            activeGhost.position.set(snapX, getTerrainHeight(snapX, snapZ) + 0.05, snapZ);
+            // --- UPDATED: Snap hologram to the elevated floor surface ---
+            const decoY = this.getSurfaceHeight(snapX, snapZ) + 0.05;
+
+            activeGhost.position.set(snapX, decoY, snapZ);
             activeGhost.rotation.y = this.decoRotation;
             activeGhost.visible = visible;
 
@@ -2184,6 +2110,7 @@ export class TownScene extends BaseScene {
             const worldX = centerX + localX;
             const worldZ = centerZ + localZ;
 
+            // Plot overlay follows absolute terrain, no change needed here.
             posAttr.setY(i, getTerrainHeight(worldX, worldZ) + 0.15);
         }
         posAttr.needsUpdate = true;

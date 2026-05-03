@@ -190,7 +190,10 @@ export class TownScene extends BaseScene {
 
     private godNpc?: GiantGodNPC;
 
+    // --- PERFORMANCE CACHES ---
     private surfaceHeightCache = new Map<string, number>();
+    private hazardGeoCache = new Map<string, THREE.BufferGeometry>();
+    private hazardMatCache = new Map<string, THREE.Material>();
 
     private hoverPlotMesh?: THREE.Mesh;
     private lastHoverPlotId: string = "";
@@ -261,7 +264,14 @@ export class TownScene extends BaseScene {
         }
     }
 
-    // --- CACHED HEIGHT HELPER ---
+    // ==========================================
+    // TERRAIN & HEIGHT CACHING
+    // ==========================================
+
+    public clearHeightCache() {
+        this.surfaceHeightCache.clear();
+    }
+
     public getSurfaceHeightCached(x: number, z: number): number {
         const key = `${Math.round(x * 2) / 2}_${Math.round(z * 2) / 2}`;
         const cached = this.surfaceHeightCache.get(key);
@@ -272,7 +282,6 @@ export class TownScene extends BaseScene {
         return h;
     }
 
-    // --- NEW MASTER HELPER: Dynamically override Y coordinates if standing inside a building ---
     public getSurfaceHeight(x: number, z: number): number {
         const terrainY = getTerrainHeight(x, z);
         
@@ -293,6 +302,45 @@ export class TownScene extends BaseScene {
         return terrainY;
     }
 
+    // ==========================================
+    // TARGETING OVERRIDES
+    // ==========================================
+
+    public getVisualSurfaceHeight(x: number, z: number): number {
+        return this.getSurfaceHeightCached(x, z) + 0.05;
+    }
+
+    protected createKeyboardReticle(radius: number): THREE.Group {
+        return this.createKeyboardTargetingReticle(radius);
+    }
+
+    public createKeyboardTargetingReticle(radius: number): THREE.Group {
+        const group = new THREE.Group();
+
+        const ringGeo = new THREE.RingGeometry(radius * 0.92, radius, 48);
+        ringGeo.rotateX(-Math.PI / 2);
+
+        const ringMat = new THREE.MeshBasicMaterial({
+            color: 0x00E5FF, // High contrast FUI Cyan
+            transparent: true,
+            opacity: 0.65,
+            depthWrite: false,
+            blending: THREE.AdditiveBlending
+        });
+
+        const ring = new THREE.Mesh(ringGeo, ringMat);
+        group.add(ring);
+
+        // Add an inner directional indicator
+        const dotGeo = new THREE.CircleGeometry(0.4, 16);
+        const dotMat = new THREE.MeshBasicMaterial({ color: 0x00E5FF, depthWrite: false });
+        const dot = new THREE.Mesh(dotGeo, dotMat);
+        dot.rotation.x = -Math.PI / 2;
+        group.add(dot);
+
+        return group;
+    }
+
     public override updatePlayer(
         id: string, x: number, z: number, name?: string, equippedItem?: string, equipBack?: string,
         isSleeping: boolean = false, sleepRot: number = 0, isSwimming: boolean = false, height: number = 0,
@@ -302,8 +350,8 @@ export class TownScene extends BaseScene {
         gender: string = "body1", skinColor: string = "#ffccaa", hairStyle: string = "short", hairColor: string = "#333333", eyeColor: string = "#00aaff",
         isAuraActive: boolean = false, auraStyle: string = "tyrant"   
     ) {
-        // --- FIX: Intercept the server physics height and force it to the true solid surface ---
-        const correctHeight = this.getSurfaceHeight(x, z);
+        // Use cached height to avoid redundant expensive calls
+        const correctHeight = this.getSurfaceHeightCached(x, z);
 
         super.updatePlayer(
             id, x, z, name, equippedItem, equipBack, isSleeping, sleepRot, isSwimming, correctHeight,
@@ -392,9 +440,9 @@ export class TownScene extends BaseScene {
         }
     }
 
-    public playAbilityVisual(id: string, abilityId: string, targetX: number, targetZ: number) {
+    public override playAbilityVisual(id: string, abilityId: string, targetX: number, targetZ: number) {
         const playerVisual = this.playerVisuals.get(id);
-        const terrainHeight = this.getSurfaceHeight(targetX, targetZ);
+        const terrainHeight = this.getSurfaceHeightCached(targetX, targetZ);
 
         spawnAbilityVFX(
             this.scene, 
@@ -411,7 +459,7 @@ export class TownScene extends BaseScene {
 
         if (!visual) {
             const group = new THREE.Group();
-            const terrainY = this.getSurfaceHeight(x, z);
+            const terrainY = this.getSurfaceHeightCached(x, z);
             group.position.set(x, terrainY + 0.1, z);
 
             const ringGeo = new THREE.TorusGeometry(radius, 0.4, 16, 64);
@@ -492,171 +540,231 @@ export class TownScene extends BaseScene {
         }
     }
 
+    // --- HAZARD CACHE HELPERS ---
+    private getGeo(key: string, creator: () => THREE.BufferGeometry): THREE.BufferGeometry {
+        if (!this.hazardGeoCache.has(key)) this.hazardGeoCache.set(key, creator());
+        return this.hazardGeoCache.get(key)!;
+    }
+
+    private getMat(key: string, creator: () => THREE.Material): THREE.Material {
+        if (!this.hazardMatCache.has(key)) this.hazardMatCache.set(key, creator());
+        return this.hazardMatCache.get(key)!;
+    }
+
     public addHazard(id: string, type: string, x: number, z: number, rank: number, customData: any = {}) {
         if (this.hazardVisuals.has(id)) return;
 
         const group = new THREE.Group();
-        const terrainY = this.getSurfaceHeight(x, z); 
+        const terrainY = this.getSurfaceHeightCached(x, z); 
         group.position.set(x, terrainY + 0.05, z);
 
-        const steelMat = new THREE.MeshStandardMaterial({ color: 0x888888, metalness: 0.8, roughness: 0.4 });
-        const woodMat = new THREE.MeshStandardMaterial({ color: 0x5c4033, roughness: 0.9 });
-        const glowingCyan = new THREE.MeshBasicMaterial({ color: 0x00aaff, transparent: true, opacity: 0.6, blending: THREE.AdditiveBlending });
-        const glowingRed = new THREE.MeshBasicMaterial({ color: 0xff0000, transparent: true, opacity: 0.6, blending: THREE.AdditiveBlending });
-        const glowingYellow = new THREE.MeshBasicMaterial({ color: 0xffcc00, transparent: true, opacity: 0.5, blending: THREE.AdditiveBlending });
+        const steelMat = this.getMat("steel", () => new THREE.MeshStandardMaterial({ color: 0x888888, metalness: 0.8, roughness: 0.4 }));
+        const woodMat = this.getMat("wood", () => new THREE.MeshStandardMaterial({ color: 0x5c4033, roughness: 0.9 }));
+        const glowingCyan = this.getMat("glowCyan", () => new THREE.MeshBasicMaterial({ color: 0x00aaff, transparent: true, opacity: 0.6, blending: THREE.AdditiveBlending }));
+        const glowingRed = this.getMat("glowRed", () => new THREE.MeshBasicMaterial({ color: 0xff0000, transparent: true, opacity: 0.6, blending: THREE.AdditiveBlending }));
+        const glowingYellow = this.getMat("glowYellow", () => new THREE.MeshBasicMaterial({ color: 0xffcc00, transparent: true, opacity: 0.5, blending: THREE.AdditiveBlending }));
 
         switch (type) {
             case "map_marker":
-                const marker = new THREE.Mesh(new THREE.OctahedronGeometry(0.5, 0), glowingCyan);
+                const markerGeo = this.getGeo("octa_0.5", () => new THREE.OctahedronGeometry(0.5, 0));
+                const marker = new THREE.Mesh(markerGeo, glowingCyan);
                 marker.position.y = 2.0;
                 group.add(marker);
                 break;
             case "recall_beacon":
-                const rBase = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.8, 0.2, 8), steelMat);
-                const rCrystal = new THREE.Mesh(new THREE.OctahedronGeometry(0.4, 0), new THREE.MeshBasicMaterial({ color: 0xaa00ff, transparent: true, opacity: 0.8 }));
+                const rBaseGeo = this.getGeo("cyl_0.6_0.8", () => new THREE.CylinderGeometry(0.6, 0.8, 0.2, 8));
+                const rBase = new THREE.Mesh(rBaseGeo, steelMat);
+                const rCrystalGeo = this.getGeo("octa_0.4", () => new THREE.OctahedronGeometry(0.4, 0));
+                const rCrystalMat = this.getMat("glowPurple", () => new THREE.MeshBasicMaterial({ color: 0xaa00ff, transparent: true, opacity: 0.8 }));
+                const rCrystal = new THREE.Mesh(rCrystalGeo, rCrystalMat);
                 rCrystal.position.y = 0.8;
                 group.add(rBase, rCrystal);
                 break;
             case "tinkerer_trap":
-                const trapBase = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 0.1, 16), steelMat);
-                const trapLight = new THREE.Mesh(new THREE.SphereGeometry(0.15), glowingRed);
+                const trapBaseGeo = this.getGeo("cyl_0.5_0.1", () => new THREE.CylinderGeometry(0.5, 0.5, 0.1, 16));
+                const trapBase = new THREE.Mesh(trapBaseGeo, steelMat);
+                const trapLightGeo = this.getGeo("sphere_0.15", () => new THREE.SphereGeometry(0.15));
+                const trapLight = new THREE.Mesh(trapLightGeo, glowingRed);
                 trapLight.position.y = 0.1;
                 group.add(trapBase, trapLight);
                 break;
             case "engineer_turret":
-                const turBase = new THREE.Mesh(new THREE.BoxGeometry(0.8, 1.0, 0.8), steelMat);
+                const turBaseGeo = this.getGeo("box_0.8_1.0", () => new THREE.BoxGeometry(0.8, 1.0, 0.8));
+                const turBase = new THREE.Mesh(turBaseGeo, steelMat);
                 turBase.position.y = 0.5;
-                const turBarrel = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 1.0), steelMat);
+                const turBarrelGeo = this.getGeo("cyl_0.1_1.0", () => new THREE.CylinderGeometry(0.1, 0.1, 1.0));
+                const turBarrel = new THREE.Mesh(turBarrelGeo, steelMat);
                 turBarrel.rotation.x = Math.PI / 2;
                 turBarrel.position.set(0, 0.8, 0.5);
                 group.add(turBase, turBarrel);
                 break;
             case "engineer_shield_dome":
-                const dome = new THREE.Mesh(new THREE.SphereGeometry(5.0, 16, 16), new THREE.MeshBasicMaterial({ color: 0x00aaff, transparent: true, opacity: 0.2, side: THREE.DoubleSide }));
+                const domeGeo = this.getGeo("sphere_5.0", () => new THREE.SphereGeometry(5.0, 16, 16));
+                const domeMat = this.getMat("dome_cyan", () => new THREE.MeshBasicMaterial({ color: 0x00aaff, transparent: true, opacity: 0.2, side: THREE.DoubleSide }));
+                const dome = new THREE.Mesh(domeGeo, domeMat);
                 group.add(dome);
                 break;
             case "defense_tower":
-                const towerGeo = new THREE.CylinderGeometry(1.5, 1.8, 8.0, 8);
-                const towerMat = new THREE.MeshStandardMaterial({ color: 0x555555, roughness: 1.0 });
+                const towerGeo = this.getGeo("cyl_1.5_8.0", () => new THREE.CylinderGeometry(1.5, 1.8, 8.0, 8));
+                const towerMat = this.getMat("tower_gray", () => new THREE.MeshStandardMaterial({ color: 0x555555, roughness: 1.0 }));
                 const tower = new THREE.Mesh(towerGeo, towerMat);
                 tower.position.y = 4.0;
                 group.add(tower);
                 break;
             case "town_portal_node":
-                const pRing = new THREE.Mesh(new THREE.TorusGeometry(1.5, 0.2, 8, 24), glowingCyan);
+                const pRingGeo = this.getGeo("torus_1.5_0.2", () => new THREE.TorusGeometry(1.5, 0.2, 8, 24));
+                const pRing = new THREE.Mesh(pRingGeo, glowingCyan);
                 pRing.rotation.x = -Math.PI / 2;
                 group.add(pRing);
                 break;
             case "party_keg":
-                const keg = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.6, 1.2, 12), woodMat);
+                const kegGeo = this.getGeo("cyl_0.6_1.2", () => new THREE.CylinderGeometry(0.6, 0.6, 1.2, 12));
+                const keg = new THREE.Mesh(kegGeo, woodMat);
                 keg.position.y = 0.6;
                 group.add(keg);
                 break;
             case "regen_mist":
-                const mist = new THREE.Mesh(new THREE.SphereGeometry(customData.radius || 5.0, 16, 16), new THREE.MeshBasicMaterial({ color: 0x00ffaa, transparent: true, opacity: 0.3 }));
+                const mistRad = customData.radius || 5.0;
+                const mistGeo = this.getGeo(`sphere_${mistRad}`, () => new THREE.SphereGeometry(mistRad, 16, 16));
+                const mistMat = this.getMat("mist_green", () => new THREE.MeshBasicMaterial({ color: 0x00ffaa, transparent: true, opacity: 0.3 }));
+                const mist = new THREE.Mesh(mistGeo, mistMat);
                 mist.position.y = 2.0;
                 group.add(mist);
                 break;
             case "blood_decoy":
-                const bDecoy = new THREE.Mesh(new THREE.BoxGeometry(0.8, 1.8, 0.4), glowingRed);
+                const bDecoyGeo = this.getGeo("box_0.8_1.8", () => new THREE.BoxGeometry(0.8, 1.8, 0.4));
+                const bDecoy = new THREE.Mesh(bDecoyGeo, glowingRed);
                 bDecoy.position.y = 0.9;
                 group.add(bDecoy);
                 break;
             case "dark_singularity":
-                const bHole = new THREE.Mesh(new THREE.SphereGeometry(1.5, 16, 16), new THREE.MeshBasicMaterial({ color: 0x000000 }));
-                const bAura = new THREE.Mesh(new THREE.SphereGeometry(1.8, 16, 16), new THREE.MeshBasicMaterial({ color: 0x440088, transparent: true, opacity: 0.5 }));
+                const bHoleGeo = this.getGeo("sphere_1.5", () => new THREE.SphereGeometry(1.5, 16, 16));
+                const bHoleMat = this.getMat("black_hole", () => new THREE.MeshBasicMaterial({ color: 0x000000 }));
+                const bHole = new THREE.Mesh(bHoleGeo, bHoleMat);
+                const bAuraGeo = this.getGeo("sphere_1.8", () => new THREE.SphereGeometry(1.8, 16, 16));
+                const bAuraMat = this.getMat("dark_aura", () => new THREE.MeshBasicMaterial({ color: 0x440088, transparent: true, opacity: 0.5 }));
+                const bAura = new THREE.Mesh(bAuraGeo, bAuraMat);
                 bHole.position.y = 2.0; bAura.position.y = 2.0;
                 group.add(bHole, bAura);
                 break;
             case "doom_familiar":
-                const eye = new THREE.Mesh(new THREE.SphereGeometry(0.5, 16, 16), new THREE.MeshBasicMaterial({ color: 0x8800ff }));
+                const eyeGeo = this.getGeo("sphere_0.5", () => new THREE.SphereGeometry(0.5, 16, 16));
+                const eyeMat = this.getMat("doom_purple", () => new THREE.MeshBasicMaterial({ color: 0x8800ff }));
+                const eye = new THREE.Mesh(eyeGeo, eyeMat);
                 eye.position.y = 3.0;
                 group.add(eye);
                 break;
             case "radiant_trail":
-                const trail = new THREE.Mesh(new THREE.PlaneGeometry(2.0, 2.0), glowingYellow);
+                const trailGeo = this.getGeo("plane_2.0", () => new THREE.PlaneGeometry(2.0, 2.0));
+                const trail = new THREE.Mesh(trailGeo, glowingYellow);
                 trail.rotation.x = -Math.PI / 2;
                 group.add(trail);
                 break;
             case "aura_of_purity":
-                const aura = new THREE.Mesh(new THREE.RingGeometry(5.8, 6.0, 32), glowingYellow);
+                const purityGeo = this.getGeo("ring_5.8_6.0", () => new THREE.RingGeometry(5.8, 6.0, 32));
+                const aura = new THREE.Mesh(purityGeo, glowingYellow);
                 aura.rotation.x = -Math.PI / 2;
                 group.add(aura);
                 break;
             case "holy_fire_ring":
-                const hRing = new THREE.Mesh(new THREE.TorusGeometry(6.0, 0.3, 8, 32), new THREE.MeshBasicMaterial({ color: 0xff8800, transparent: true, opacity: 0.7 }));
+                const hRingGeo = this.getGeo("torus_6.0_0.3", () => new THREE.TorusGeometry(6.0, 0.3, 8, 32));
+                const hRingMat = this.getMat("holy_fire", () => new THREE.MeshBasicMaterial({ color: 0xff8800, transparent: true, opacity: 0.7 }));
+                const hRing = new THREE.Mesh(hRingGeo, hRingMat);
                 hRing.rotation.x = -Math.PI / 2;
                 group.add(hRing);
                 break;
             case "consecrated_ground":
-                const cg = new THREE.Mesh(new THREE.CircleGeometry(5.0, 32), glowingYellow);
+                const cgGeo = this.getGeo("circle_5.0", () => new THREE.CircleGeometry(5.0, 32));
+                const cg = new THREE.Mesh(cgGeo, glowingYellow);
                 cg.rotation.x = -Math.PI / 2;
                 group.add(cg);
                 break;
             case "grand_cross_turret":
-                const crossV = new THREE.Mesh(new THREE.BoxGeometry(0.4, 4.0, 0.4), glowingYellow);
-                const crossH = new THREE.Mesh(new THREE.BoxGeometry(2.0, 0.4, 0.4), glowingYellow);
+                const crossVGeo = this.getGeo("box_0.4_4.0", () => new THREE.BoxGeometry(0.4, 4.0, 0.4));
+                const crossHGeo = this.getGeo("box_2.0_0.4", () => new THREE.BoxGeometry(2.0, 0.4, 0.4));
+                const crossV = new THREE.Mesh(crossVGeo, glowingYellow);
+                const crossH = new THREE.Mesh(crossHGeo, glowingYellow);
                 crossV.position.y = 3.0; crossH.position.y = 3.5;
                 group.add(crossV, crossH);
                 break;
             case "heavenly_judgment":
             case "orbital_strike_mini":
                 const r = customData.radius || 2.5;
-                const pillar = new THREE.Mesh(new THREE.CylinderGeometry(r, r, 20.0, 16), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.5 }));
-                pillar.position.y = 10.0;
-                group.add(pillar);
+                const pillarGeoHJ = this.getGeo(`cyl_${r}_20.0`, () => new THREE.CylinderGeometry(r, r, 20.0, 16));
+                const pillarMatHJ = this.getMat("pillar_white", () => new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.5 }));
+                const pillarHJ = new THREE.Mesh(pillarGeoHJ, pillarMatHJ);
+                pillarHJ.position.y = 10.0;
+                group.add(pillarHJ);
                 break;
             case "bull_rush_fire":
-                const fTrail = new THREE.Mesh(new THREE.PlaneGeometry(1.5, 1.5), new THREE.MeshBasicMaterial({ color: 0xff4400, transparent: true, opacity: 0.8 }));
+                const fTrailGeo = this.getGeo("plane_1.5", () => new THREE.PlaneGeometry(1.5, 1.5));
+                const fTrailMat = this.getMat("fire_orange", () => new THREE.MeshBasicMaterial({ color: 0xff4400, transparent: true, opacity: 0.8 }));
+                const fTrail = new THREE.Mesh(fTrailGeo, fTrailMat);
                 fTrail.rotation.x = -Math.PI / 2;
                 group.add(fTrail);
                 break;
             case "shattered_crater":
-                const crater = new THREE.Mesh(new THREE.CircleGeometry(5.0, 16), new THREE.MeshStandardMaterial({ color: 0x221100, roughness: 1.0 }));
+                const craterGeo = this.getGeo("circle_5.0_16", () => new THREE.CircleGeometry(5.0, 16));
+                const craterMat = this.getMat("crater_brown", () => new THREE.MeshStandardMaterial({ color: 0x221100, roughness: 1.0 }));
+                const crater = new THREE.Mesh(craterGeo, craterMat);
                 crater.rotation.x = -Math.PI / 2;
                 group.add(crater);
                 break;
             case "whirlwind_aura":
-                const wind = new THREE.Mesh(new THREE.CylinderGeometry(3.0, 3.0, 3.0, 16), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.2, side: THREE.DoubleSide }));
+                const windGeo = this.getGeo("cyl_3.0_3.0", () => new THREE.CylinderGeometry(3.0, 3.0, 3.0, 16));
+                const windMat = this.getMat("wind_white", () => new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.2, side: THREE.DoubleSide }));
+                const wind = new THREE.Mesh(windGeo, windMat);
                 wind.position.y = 1.5;
                 group.add(wind);
                 break;
             case "spirit_animal":
-                const wolfGeo = new THREE.BoxGeometry(0.8, 1.2, 1.8);
-                const wolfMat = new THREE.MeshBasicMaterial({ color: 0x00ffaa, transparent: true, opacity: 0.5 });
+                const wolfGeo = this.getGeo("box_0.8_1.2_1.8", () => new THREE.BoxGeometry(0.8, 1.2, 1.8));
+                const wolfMat = this.getMat("wolf_green", () => new THREE.MeshBasicMaterial({ color: 0x00ffaa, transparent: true, opacity: 0.5 }));
                 const wolf = new THREE.Mesh(wolfGeo, wolfMat);
                 wolf.position.y = 0.6;
                 group.add(wolf);
                 break;
             case "jagged_stone":
-                const spike = new THREE.Mesh(new THREE.ConeGeometry(1.0, 2.5, 4), new THREE.MeshStandardMaterial({ color: 0x4a3221, roughness: 1.0 }));
+                const spikeGeo = this.getGeo("cone_1.0_2.5", () => new THREE.ConeGeometry(1.0, 2.5, 4));
+                const spikeMat = this.getMat("stone_brown", () => new THREE.MeshStandardMaterial({ color: 0x4a3221, roughness: 1.0 }));
+                const spike = new THREE.Mesh(spikeGeo, spikeMat);
                 spike.position.y = 1.25;
                 group.add(spike);
                 break;
             case "healing_blossom":
-                const flowerBase = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 1.0), new THREE.MeshStandardMaterial({ color: 0x22aa22 }));
+                const flowerBaseGeo = this.getGeo("cyl_0.1_1.0_base", () => new THREE.CylinderGeometry(0.1, 0.1, 1.0));
+                const flowerBaseMat = this.getMat("stem_green", () => new THREE.MeshStandardMaterial({ color: 0x22aa22 }));
+                const flowerBase = new THREE.Mesh(flowerBaseGeo, flowerBaseMat);
                 flowerBase.position.y = 0.5;
-                const petal = new THREE.Mesh(new THREE.SphereGeometry(0.5, 8, 8), new THREE.MeshBasicMaterial({ color: 0xff66cc, transparent: true, opacity: 0.8 }));
+                const petalGeo = this.getGeo("sphere_0.5_8", () => new THREE.SphereGeometry(0.5, 8, 8));
+                const petalMat = this.getMat("petal_pink", () => new THREE.MeshBasicMaterial({ color: 0xff66cc, transparent: true, opacity: 0.8 }));
+                const petal = new THREE.Mesh(petalGeo, petalMat);
                 petal.position.y = 1.0;
                 group.add(flowerBase, petal);
                 break;
             case "wrath_of_the_forest":
-                const roots = new THREE.Mesh(new THREE.TorusGeometry(customData.radius || 10.0, 0.6, 8, 24), new THREE.MeshStandardMaterial({ color: 0x114411, roughness: 0.9 }));
+                const rootRad = customData.radius || 10.0;
+                const rootsGeo = this.getGeo(`torus_${rootRad}_0.6`, () => new THREE.TorusGeometry(rootRad, 0.6, 8, 24));
+                const rootsMat = this.getMat("roots_green", () => new THREE.MeshStandardMaterial({ color: 0x114411, roughness: 0.9 }));
+                const roots = new THREE.Mesh(rootsGeo, rootsMat);
                 roots.rotation.x = -Math.PI / 2;
                 group.add(roots);
                 break;
             case "world_tree_sapling":
-                const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.6, 2.0), woodMat);
+                const trunkGeo = this.getGeo("cyl_0.4_0.6_2.0", () => new THREE.CylinderGeometry(0.4, 0.6, 2.0));
+                const trunk = new THREE.Mesh(trunkGeo, woodMat);
                 trunk.position.y = 1.0;
-                const leaves = new THREE.Mesh(new THREE.ConeGeometry(2.0, 3.0, 8), new THREE.MeshBasicMaterial({ color: 0x00ffaa, transparent: true, opacity: 0.7 }));
+                const leavesGeo = this.getGeo("cone_2.0_3.0", () => new THREE.ConeGeometry(2.0, 3.0, 8));
+                const leavesMat = this.getMat("leaves_green", () => new THREE.MeshBasicMaterial({ color: 0x00ffaa, transparent: true, opacity: 0.7 }));
+                const leaves = new THREE.Mesh(leavesGeo, leavesMat);
                 leaves.position.y = 3.0;
                 group.add(trunk, leaves);
                 break;
             case "mana_pillar":
-                const pillarGeo = new THREE.CylinderGeometry(0.8, 0.8, 4.0, 8);
-                const pillarMat = new THREE.MeshBasicMaterial({ color: 0x00aaff, transparent: true, opacity: 0.7, blending: THREE.AdditiveBlending });
-                const pillarMesh = new THREE.Mesh(pillarGeo, pillarMat);
-                pillarMesh.position.y = 2.0; 
+                const pillarGeoMP = this.getGeo("cyl_0.8_4.0", () => new THREE.CylinderGeometry(0.8, 0.8, 4.0, 8));
+                const pillarMatMP = this.getMat("mana_cyan", () => new THREE.MeshBasicMaterial({ color: 0x00aaff, transparent: true, opacity: 0.7, blending: THREE.AdditiveBlending }));
+                const pillarMeshMP = new THREE.Mesh(pillarGeoMP, pillarMatMP);
+                pillarMeshMP.position.y = 2.0; 
                 
                 if (customData && customData.optionText) {
                     const optionLabel = this.createNameLabel(customData.optionText);
@@ -665,7 +773,7 @@ export class TownScene extends BaseScene {
                     group.add(optionLabel);
                 }
                 
-                group.add(pillarMesh);
+                group.add(pillarMeshMP);
                 break;
         }
 
@@ -686,12 +794,9 @@ export class TownScene extends BaseScene {
         if (h) {
             this.scene.remove(h.mesh);
             h.mesh.traverse((c) => {
-                if (c instanceof THREE.Mesh) {
-                    if (c.geometry) c.geometry.dispose();
-                    if (c.material) {
-                        if (Array.isArray(c.material)) c.material.forEach(m => m.dispose());
-                        else c.material.dispose();
-                    }
+                if (c instanceof THREE.Sprite && c.material) {
+                    if (c.material.map) c.material.map.dispose();
+                    c.material.dispose();
                 }
             });
             this.hazardVisuals.delete(id);
@@ -759,6 +864,11 @@ export class TownScene extends BaseScene {
             const waterSurfaceY = shoreHeight - 0.8;
             
             this.lakeMesh.position.y = waterSurfaceY + Math.sin(timeSec * 2) * 0.05;
+        }
+
+        const t = this.keyboardTargeting;
+        if (t?.active && t.reticle) {
+            t.reticle.position.y = this.getVisualSurfaceHeight(t.x, t.z);
         }
 
         if (this.frameCount % 5 === 0) {
@@ -838,7 +948,6 @@ export class TownScene extends BaseScene {
                 const distSq = (px - camX) ** 2 + (pz - camZ) ** 2;
                 if (distSq > CULL_DIST_SQ && id !== this.localPlayerId) return;
 
-                // --- NEW CODE: Perfect elevation logic ---
                 if ((visual as any).targetPosition) {
                     let targetY = this.getSurfaceHeightCached(visual.targetPosition.x, visual.targetPosition.z);
 
@@ -963,7 +1072,6 @@ export class TownScene extends BaseScene {
         }
 
         enemyData.action = action;
-        // --- FIX: Ensure enemies walk on the solid floor instead of clipping ---
         enemyData.visual.targetPosition.set(x, this.getSurfaceHeightCached(x, z), z);
 
         const isBleeding = afflictions.includes("Bleed");
@@ -1475,7 +1583,7 @@ export class TownScene extends BaseScene {
         label.scale.set(3.0, 0.8, 1.0);
         chestGroup.add(label);
 
-        chestGroup.position.set(x, this.getSurfaceHeight(x, z), z); 
+        chestGroup.position.set(x, this.getSurfaceHeightCached(x, z), z); 
         this.scene.add(chestGroup);
         this.lootVisuals.set(id, chestGroup);
     }
@@ -1612,7 +1720,7 @@ export class TownScene extends BaseScene {
             mesh.scale.y = safeScale * 0.7; 
         }
         
-        const surfaceHeight = this.getSurfaceHeight(safeX, safeZ);
+        const surfaceHeight = this.getSurfaceHeightCached(safeX, safeZ);
         mesh.position.set(safeX, surfaceHeight + (safeKind.includes("rock") ? 0.2 : 0), safeZ);
         
         this.scene.add(mesh);
@@ -1985,13 +2093,13 @@ export class TownScene extends BaseScene {
             this.updatePlotFence(plotId);
         }
 
+        this.clearHeightCache();
         this.recalculateDecorationHeights();
     }
 
-    // Helper function to call when static architecture changes
     private recalculateDecorationHeights() {
         this.decorationMeshes.forEach((mesh) => {
-            const surfaceY = this.getSurfaceHeight(mesh.position.x, mesh.position.z);
+            const surfaceY = this.getSurfaceHeightCached(mesh.position.x, mesh.position.z);
             const finalY = Math.max(mesh.userData.serverY || mesh.position.y, surfaceY);
             mesh.position.y = finalY;
         });
@@ -2009,11 +2117,11 @@ export class TownScene extends BaseScene {
     public addDecoration(id: string, type: string, x: number, y: number, z: number, rotation: number) {
         if (this.decorationMeshes.has(id)) return;
 
-        const surfaceY = this.getSurfaceHeight(x, z);
+        const surfaceY = this.getSurfaceHeightCached(x, z);
         const finalY = Math.max(y, surfaceY); 
 
         const group = buildDecoModel(type, false);
-        group.userData.serverY = y; // FIX: Store the raw server Y to fix load-order syncing
+        group.userData.serverY = y;
         group.position.set(x, finalY, z);
         group.rotation.y = rotation;
         
@@ -2070,7 +2178,7 @@ export class TownScene extends BaseScene {
             const snapX = Math.round(x * 2) / 2;
             const snapZ = Math.round(z * 2) / 2;
 
-            const decoY = this.getSurfaceHeight(snapX, snapZ) + 0.05;
+            const decoY = this.getSurfaceHeightCached(snapX, snapZ) + 0.05;
 
             activeGhost.position.set(snapX, decoY, snapZ);
             activeGhost.rotation.y = this.decoRotation;
@@ -2527,12 +2635,9 @@ export class TownScene extends BaseScene {
         for (const h of this.hazardVisuals.values()) {
             this.scene.remove(h.mesh);
             h.mesh.traverse((c) => {
-                if (c instanceof THREE.Mesh) {
-                    if (c.geometry) c.geometry.dispose();
-                    if (c.material) {
-                        if (Array.isArray(c.material)) c.material.forEach(m => m.dispose());
-                        else c.material.dispose();
-                    }
+                if (c instanceof THREE.Sprite && c.material) {
+                    if (c.material.map) c.material.map.dispose();
+                    c.material.dispose();
                 }
             });
         }
@@ -2564,6 +2669,14 @@ export class TownScene extends BaseScene {
         this.fairyParticlesList = []; this.waterfallParticlesList = [];
 
         if (this.grassMesh) { this.grassMesh.geometry.dispose(); if (this.grassMesh.material instanceof THREE.Material) this.grassMesh.material.dispose(); }
+        
+        for (const geo of this.hazardGeoCache.values()) geo.dispose();
+        this.hazardGeoCache.clear();
+
+        for (const mat of this.hazardMatCache.values()) mat.dispose();
+        this.hazardMatCache.clear();
+
+        this.clearHeightCache();
         
         this.sceneryVisuals.clear();
     }

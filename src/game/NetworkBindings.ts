@@ -182,17 +182,6 @@ export function initPlayerVisual(player: any, id: string, room: any, sceneObj: a
             sceneObj.camera.position.set(safeX, th + 25, safeY + 25);
             sceneObj.camera.lookAt(safeX, th + 2, safeY);
         }
-
-        // Removed duplicate log to prevent spam on every update
-        /*
-        console.log("[NetworkBindings] Local player initialized:", {
-            id,
-            x: safeX,
-            y: safeY,
-            height: th,
-            zone: ctx.currentZone
-        });
-        */
     }
 }
 
@@ -412,6 +401,56 @@ function bindMessageListeners(room: any, sceneObj: any, ctx: NetworkContext) {
             else ctx.showTransientUI("fishing-result-ui", `❌ ${data.message || "The fish got away!"}`, "#ff4444", 3000);
         });
     });
+
+    // --- MEDITATION & COMMUNION HANDLERS ---
+    room.onMessage("meditation_question", (data: { index: number, text: string }) => {
+        const ui = document.getElementById("meditation-ui");
+        const qContainer = document.getElementById("med-question-container");
+        const input = document.getElementById("meditation-answer") as HTMLInputElement;
+
+        if (ui && qContainer && input) {
+            ui.style.display = "block";
+            document.getElementById("med-main-content")!.style.display = "block";
+            document.getElementById("med-upgrade-content")!.style.display = "none";
+            document.getElementById("med-feedback")!.innerText = "";
+
+            qContainer.innerHTML = data.text.replace(/_/g, `<span class="text-amber">______</span>`);
+            qContainer.setAttribute("data-qindex", data.index.toString());
+
+            input.disabled = false;
+            setTimeout(() => input.focus(), 50); 
+        }
+    });
+
+    room.onMessage("meditation_result", (data: { correct: boolean, text: string }) => {
+        const feedback = document.getElementById("med-feedback");
+        const input = document.getElementById("meditation-answer") as HTMLInputElement;
+
+        if (feedback && input) {
+            feedback.innerText = data.text;
+            feedback.className = data.correct ? "text-green text-md" : "text-red text-md";
+
+            if (!data.correct) {
+                input.disabled = false;
+                setTimeout(() => input.focus(), 50);
+            }
+        }
+    });
+
+    room.onMessage("meditation_upgrade_choice", () => {
+        document.getElementById("med-main-content")!.style.display = "none";
+        document.getElementById("med-upgrade-content")!.style.display = "block";
+
+        const feedback = document.getElementById("med-feedback");
+        if (feedback) {
+            feedback.innerText = "You have reached a milestone in your meditation.";
+            feedback.className = "text-amber text-md";
+        }
+    });
+
+    room.onMessage("showCommunionQuestion", (data: { question: string }) => {
+        ctx.showTransientUI("communion-q", data.question, "#38bdf8", 5000);
+    });
 }
 
 // ==========================================
@@ -549,10 +588,6 @@ function bindWorldEntities(room: any, sceneObj: any, ctx: NetworkContext) {
         }
     });
 }
-
-// ==========================================
-// STATE SYNCHRONIZATION LOOP
-// ==========================================
 
 // ==========================================
 // STATE SYNCHRONIZATION LOOP

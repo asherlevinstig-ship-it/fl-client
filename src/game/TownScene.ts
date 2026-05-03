@@ -2010,6 +2010,14 @@ export class TownScene extends BaseScene {
         }
 
         this.buildingMeshes.set(id, { type, mesh: group, label });
+
+        // --- NEW CODE: Update dynamic fence bounding box ---
+        const plotX = Math.floor(x / 20);
+        const plotZ = Math.floor(z / 20);
+        const plotId = `${plotX}_${plotZ}`;
+        if (this.ownedPlots.has(plotId)) {
+            this.updatePlotFence(plotId);
+        }
     }
 
     public updateBuilding(id: string, type: string, isConstructed: boolean, progress: number, targetProgress: number) {
@@ -2165,64 +2173,169 @@ export class TownScene extends BaseScene {
     }
 
     public addLandPlot(id: string, gridX: number, gridY: number, ownerId: string, ownerName: string) {
-        if (this.plotFences.has(id)) return;
+        if (this.ownedPlots.has(id)) return;
         this.ownedPlots.set(id, ownerName);
+        this.updatePlotFence(id); // Trigger dynamic fence generation
+    }
 
-        const group = new THREE.Group();
+    public removeLandPlot(id: string) {
+        if (!this.plotFences.has(id)) return;
+        const group = this.plotFences.get(id);
+        if (group) {
+            this.scene.remove(group);
+            // Cleanup geometries to prevent memory leaks
+            group.traverse(child => {
+                if (child instanceof THREE.Mesh) {
+                    if (child.geometry) child.geometry.dispose();
+                    if (child.material) child.material.dispose();
+                } else if (child instanceof THREE.Sprite) {
+                    if (child.material && child.material.map) child.material.map.dispose();
+                    if (child.material) child.material.dispose();
+                }
+            });
+        }
+        this.plotFences.delete(id); 
+        this.ownedPlots.delete(id);
+    }
+
+    public updatePlotFence(plotId: string) {
+        const ownerName = this.ownedPlots.get(plotId);
+        if (!ownerName) return;
+
+        // Clean up existing fence if it's resizing
+        if (this.plotFences.has(plotId)) {
+            const oldFence = this.plotFences.get(plotId)!;
+            this.scene.remove(oldFence);
+            oldFence.traverse(child => {
+                if (child instanceof THREE.Mesh) {
+                    if (child.geometry) child.geometry.dispose();
+                    if (child.material) child.material.dispose();
+                } else if (child instanceof THREE.Sprite) {
+                    if (child.material && child.material.map) child.material.map.dispose();
+                    if (child.material) child.material.dispose();
+                }
+            });
+        }
+
+        const [gxStr, gyStr] = plotId.split("_");
+        const gridX = parseInt(gxStr);
+        const gridY = parseInt(gyStr);
         const plotCenterX = gridX * 20 + 10;
         const plotCenterZ = gridY * 20 + 10;
+
+        // 1. Calculate dynamic bounds based on what is built on the property
+        let minX = plotCenterX - 9;
+        let maxX = plotCenterX + 9;
+        let minZ = plotCenterZ - 9;
+        let maxZ = plotCenterZ + 9;
+        let hasBuildings = false;
+
+        this.buildingMeshes.forEach((bldg) => {
+            const bx = bldg.mesh.position.x;
+            const bz = bldg.mesh.position.z;
+            
+            // Check if the building belongs to this specific plot
+            if (Math.floor(bx / 20) === gridX && Math.floor(bz / 20) === gridY) {
+                if (!hasBuildings) {
+                    // Reset to inner extremes so the first building dictates the baseline size
+                    minX = 9999; maxX = -9999; minZ = 9999; maxZ = -9999;
+                    hasBuildings = true;
+                }
+                
+                let hw = 0; let hd = 0;
+                if (bldg.type === "house") { hw = 6; hd = 6; }
+                else if (bldg.type === "shop") { hw = 5; hd = 4; }
+                else if (bldg.type === "farm") { hw = 7.2; hd = 7.2; } // 14.4 total width to cover retaining walls
+                
+                const pad = 1.5; // Padding so the fence doesn't touch the walls
+                minX = Math.min(minX, bx - hw - pad);
+                maxX = Math.max(maxX, bx + hw + pad);
+                minZ = Math.min(minZ, bz - hd - pad);
+                maxZ = Math.max(maxZ, bz + hd + pad);
+            }
+        });
+
+        // Cap to plot boundaries so a badly placed building doesn't stretch the fence into another player's land
+        minX = Math.max(minX, plotCenterX - 9.8);
+        maxX = Math.min(maxX, plotCenterX + 9.8);
+        minZ = Math.max(minZ, plotCenterZ - 9.8);
+        maxZ = Math.min(maxZ, plotCenterZ + 9.8);
+
+        const group = new THREE.Group();
+        // Notice we DO NOT shift the group position. Everything is built in pure world space to track terrain height perfectly.
 
         const postGeo = new THREE.CylinderGeometry(0.15, 0.15, 1.5, 8);
         const postMat = new THREE.MeshStandardMaterial({ color: 0x4a3221, roughness: 0.9 });
         const ropeGeo = new THREE.CylinderGeometry(0.04, 0.04, 1, 8);
         const ropeMat = new THREE.MeshStandardMaterial({ color: 0xd2b48c, roughness: 1.0 });
 
-        const addPost = (x: number, z: number) => {
-            const post = new THREE.Mesh(postGeo, postMat);
-            post.position.set(x, 0.75, z);
-            post.castShadow = true; group.add(post);
-        };
-
-        const addRope = (x1: number, y: number, z1: number, x2: number, z2: number) => {
-            const dx = x2 - x1; const dz = z2 - z1;
-            const length = Math.sqrt(dx*dx + dz*dz);
+        const addTerrainRope = (x1: number, y1: number, z1: number, x2: number, y2: number, z2: number) => {
+            const dx = x2 - x1; const dy = y2 - y1; const dz = z2 - z1;
+            const length = Math.sqrt(dx*dx + dy*dy + dz*dz);
             const rope = new THREE.Mesh(ropeGeo, ropeMat);
             rope.scale.set(1, length, 1);
-            rope.position.set(x1 + dx/2, y, z1 + dz/2);
-            rope.lookAt(x1 + dx, y, z1 + dz);
+            
+            rope.position.set(x1 + dx/2, y1 + dy/2, z1 + dz/2);
+            rope.lookAt(x2, y2, z2);
             rope.rotateX(Math.PI / 2);
-            rope.castShadow = true; group.add(rope);
+            rope.castShadow = true;
+            group.add(rope);
         };
 
-        const addRopes = (x1: number, z1: number, x2: number, z2: number) => { 
-            addRope(x1, 1.0, z1, x2, z2); 
-            addRope(x1, 0.5, z1, x2, z2); 
+        // 2. Draw terrain-hugging edges
+        const drawFenceEdge = (startX: number, startZ: number, endX: number, endZ: number) => {
+            const dx = endX - startX;
+            const dz = endZ - startZ;
+            const dist = Math.sqrt(dx*dx + dz*dz);
+            const segments = Math.max(1, Math.ceil(dist / 4.0)); // Place a post every ~4 units max
+            
+            for (let i = 0; i < segments; i++) {
+                const t1 = i / segments;
+                const t2 = (i + 1) / segments;
+                
+                const p1x = startX + dx * t1;
+                const p1z = startZ + dz * t1;
+                const p1y = getTerrainHeight(p1x, p1z);
+                
+                const p2x = startX + dx * t2;
+                const p2z = startZ + dz * t2;
+                const p2y = getTerrainHeight(p2x, p2z);
+                
+                const post = new THREE.Mesh(postGeo, postMat);
+                post.position.set(p1x, p1y + 0.75, p1z);
+                post.castShadow = true;
+                group.add(post);
+                
+                addTerrainRope(p1x, p1y + 1.1, p1z, p2x, p2y + 1.1, p2z);
+                addTerrainRope(p1x, p1y + 0.5, p1z, p2x, p2y + 0.5, p2z);
+            }
         };
 
-        const hs = 10; 
-        addPost(-hs, -hs); addPost(hs, -hs); addPost(hs, hs); addPost(-hs, hs);
-        addPost(-2, hs); addPost(2, hs);
+        drawFenceEdge(minX, minZ, maxX, minZ); // Top edge
+        drawFenceEdge(maxX, minZ, maxX, maxZ); // Right edge
+        drawFenceEdge(maxX, maxZ, minX, maxZ); // Bottom edge
+        drawFenceEdge(minX, maxZ, minX, minZ); // Left edge
 
-        addRopes(-hs, -hs, hs, -hs); addRopes(hs, -hs, hs, hs); addRopes(-hs, -hs, -hs, hs); addRopes(-hs, hs, -2, hs); addRopes(2, hs, hs, hs); 
+        // 3. Dynamic Signpost positioning
+        const signX = Math.max(minX + 2, plotCenterX - 2); 
+        const signZ = maxZ; 
+        const signY = getTerrainHeight(signX, signZ);
 
         const signPost = new THREE.Mesh(new THREE.BoxGeometry(0.1, 1.5, 0.1), postMat);
-        signPost.position.set(-2.5, 0.75, hs); group.add(signPost);
+        signPost.position.set(signX, signY + 0.75, signZ); 
+        group.add(signPost);
 
         const signBoard = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.6, 0.05), postMat);
-        signBoard.position.set(-2.5, 1.2, hs + 0.05); group.add(signBoard);
+        signBoard.position.set(signX, signY + 1.2, signZ + 0.05); 
+        group.add(signBoard);
 
         const label = this.createNameLabel(ownerName + "'s Land");
-        label.scale.set(1.5, 0.5, 1); label.position.set(-2.5, 1.2, hs + 0.1); group.add(label);
+        label.scale.set(1.5, 0.5, 1); 
+        label.position.set(signX, signY + 1.2, signZ + 0.1); 
+        group.add(label);
 
-        group.position.set(plotCenterX, getTerrainHeight(plotCenterX, plotCenterZ), plotCenterZ);
-        this.scene.add(group); this.plotFences.set(id, group);
-    }
-
-    public removeLandPlot(id: string) {
-        if (!this.plotFences.has(id)) return;
-        const group = this.plotFences.get(id);
-        if (group) this.scene.remove(group);
-        this.plotFences.delete(id); this.ownedPlots.delete(id);
+        this.scene.add(group);
+        this.plotFences.set(plotId, group);
     }
 
     private updateParticles(camX: number, camZ: number) {

@@ -143,22 +143,29 @@ function _internalBuildStructure(type: string, isWireframe: boolean, colorHex: n
 
         roofGroup.add(createMesh(GEOS.box, wMat, [10.5, 0.5, 8.5], [0, 5.25, 0], cast, rec));
 
-    } else if (type === "farm") {
-        // --- FIX: Thickened dirt pad (0.4 to 0.8) and raised center to clear terrain ---
-        baseGroup.add(createMesh(GEOS.box, getMat(MATS.dirt, isWireframe, colorHex), [14, 0.8, 14], [0, 0.4, 0], false, rec));
+   } else if (type === "farm") {
+        // 1. Thick raised dirt pad (2 units thick, moved up)
+        baseGroup.add(createMesh(GEOS.box, getMat(MATS.dirt, isWireframe, colorHex), [14, 2.0, 14], [0, 1.0, 0], false, rec));
 
-        // PERFORMANCE: Replaced 25 independent meshes with 1 InstancedMesh
+        // 2. Wooden retaining walls around the edges to make the height look intentional
+        const wMat = getMat(MATS.wood, isWireframe, colorHex);
+        baseGroup.add(createMesh(GEOS.box, wMat, [14.4, 2.2, 0.4], [0, 1.1, -7.2], cast, rec)); // Back wall
+        baseGroup.add(createMesh(GEOS.box, wMat, [14.4, 2.2, 0.4], [0, 1.1, 7.2], cast, rec));  // Front wall
+        baseGroup.add(createMesh(GEOS.box, wMat, [0.4, 2.2, 14.4], [-7.2, 1.1, 0], cast, rec)); // Left wall
+        baseGroup.add(createMesh(GEOS.box, wMat, [0.4, 2.2, 14.4], [7.2, 1.1, 0], cast, rec));  // Right wall
+
+        // 3. Instanced crops (Moved up to sit on the newly raised dirt)
         const cropMat = getMat(MATS.crop, isWireframe, colorHex);
         const cropInstanced = new THREE.InstancedMesh(GEOS.box, cropMat, 25);
-        cropInstanced.castShadow = false; // Crops are too small to justify shadow calculations
+        cropInstanced.castShadow = false; 
         cropInstanced.receiveShadow = rec;
         
         const dummy = new THREE.Object3D();
         let idx = 0;
         for (let i = -5; i <= 5; i += 2.5) {
             for (let j = -5; j <= 5; j += 2.5) {
-                // --- FIX: Raised crops from 0.6 to 0.8 to sit on top of new thicker dirt ---
-                dummy.position.set(i, 0.8, j);
+                // Dirt top is at y=2.0. Crop is 0.8 tall. Center sits at 2.4.
+                dummy.position.set(i, 2.4, j);
                 dummy.scale.set(0.8, 0.8, 0.8);
                 dummy.updateMatrix();
                 cropInstanced.setMatrixAt(idx++, dummy.matrix);

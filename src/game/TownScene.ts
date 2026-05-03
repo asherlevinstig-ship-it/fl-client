@@ -299,7 +299,7 @@ export class TownScene extends BaseScene {
 
         this.createLights();
 
-               this.buildTownOfBeginnings();
+        this.buildTownOfBeginnings();
         this.createHoverPlot();
         this.createBlueprints();
         this.createDecoGhosts();
@@ -1379,7 +1379,7 @@ export class TownScene extends BaseScene {
         environment.createTowerPerimeter();
 
         const mapSize = 5000;
-        const segments = 400; 
+        const segments = 800; // --- FIX: Increased terrain resolution to match mathematical curve ---
         const groundGeo = new THREE.PlaneGeometry(mapSize, mapSize, segments, segments);
         
         const colors: number[] = [];

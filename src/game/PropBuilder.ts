@@ -94,6 +94,7 @@ function _internalBuildStructure(type: string, isWireframe: boolean, colorHex: n
     const cast = !isWireframe; // Holograms don't cast shadows
     const rec = !isWireframe;
 
+    // --- FIX: Global deep foundation to prevent floating on slopes ---
     if (!isWireframe) {
         let fw = 8, fd = 8;
         if (type === "house") { fw = 12; fd = 12; } 
@@ -106,7 +107,8 @@ function _internalBuildStructure(type: string, isWireframe: boolean, colorHex: n
     if (type === "house") {
         const wMat = getMat(MATS.houseWall, isWireframe, colorHex);
         
-        const floor = createMesh(GEOS.plane, getMat(MATS.floor, isWireframe, colorHex), [12, 12, 1], [0, 0.05, 0], false, rec);
+        // --- FIX: Raised floor from 0.05 to 0.4 to clear bumpy terrain math ---
+        const floor = createMesh(GEOS.plane, getMat(MATS.floor, isWireframe, colorHex), [12, 12, 1], [0, 0.4, 0], false, rec);
         floor.rotation.x = -Math.PI / 2;
         baseGroup.add(floor);
 
@@ -123,7 +125,8 @@ function _internalBuildStructure(type: string, isWireframe: boolean, colorHex: n
     } else if (type === "shop") {
         const wMat = getMat(MATS.shopWall, isWireframe, colorHex);
         
-        const floor = createMesh(GEOS.plane, getMat(MATS.floor, isWireframe, colorHex), [10, 8, 1], [0, 0.05, 0], false, rec);
+        // --- FIX: Raised floor from 0.05 to 0.4 to clear bumpy terrain math ---
+        const floor = createMesh(GEOS.plane, getMat(MATS.floor, isWireframe, colorHex), [10, 8, 1], [0, 0.4, 0], false, rec);
         floor.rotation.x = -Math.PI / 2;
         baseGroup.add(floor);
 
@@ -141,7 +144,8 @@ function _internalBuildStructure(type: string, isWireframe: boolean, colorHex: n
         roofGroup.add(createMesh(GEOS.box, wMat, [10.5, 0.5, 8.5], [0, 5.25, 0], cast, rec));
 
     } else if (type === "farm") {
-        baseGroup.add(createMesh(GEOS.box, getMat(MATS.dirt, isWireframe, colorHex), [14, 0.4, 14], [0, 0.2, 0], false, rec));
+        // --- FIX: Thickened dirt pad (0.4 to 0.8) and raised center to clear terrain ---
+        baseGroup.add(createMesh(GEOS.box, getMat(MATS.dirt, isWireframe, colorHex), [14, 0.8, 14], [0, 0.4, 0], false, rec));
 
         // PERFORMANCE: Replaced 25 independent meshes with 1 InstancedMesh
         const cropMat = getMat(MATS.crop, isWireframe, colorHex);
@@ -153,7 +157,8 @@ function _internalBuildStructure(type: string, isWireframe: boolean, colorHex: n
         let idx = 0;
         for (let i = -5; i <= 5; i += 2.5) {
             for (let j = -5; j <= 5; j += 2.5) {
-                dummy.position.set(i, 0.6, j);
+                // --- FIX: Raised crops from 0.6 to 0.8 to sit on top of new thicker dirt ---
+                dummy.position.set(i, 0.8, j);
                 dummy.scale.set(0.8, 0.8, 0.8);
                 dummy.updateMatrix();
                 cropInstanced.setMatrixAt(idx++, dummy.matrix);

@@ -94,12 +94,12 @@ function _internalBuildStructure(type: string, isWireframe: boolean, colorHex: n
     const cast = !isWireframe; // Holograms don't cast shadows
     const rec = !isWireframe;
 
-    // --- FIX: Global deep foundation to prevent floating on slopes ---
+    // --- Deep foundation to prevent floating on slopes ---
     if (!isWireframe) {
         let fw = 8, fd = 8;
         if (type === "house") { fw = 12; fd = 12; } 
         else if (type === "shop") { fw = 10; fd = 8; }
-        else if (type === "farm") { fw = 14; fd = 14; }
+        else if (type === "farm") { fw = 14.4; fd = 14.4; } // Slightly wider to match retaining walls
         
         baseGroup.add(createMesh(GEOS.box, MATS.foundation, [fw, 10, fd], [0, -4.95, 0], false, rec));
     }
@@ -107,9 +107,9 @@ function _internalBuildStructure(type: string, isWireframe: boolean, colorHex: n
     if (type === "house") {
         const wMat = getMat(MATS.houseWall, isWireframe, colorHex);
         
-        // --- FIX: Raised floor from 0.05 to 0.4 to clear bumpy terrain math ---
-        const floor = createMesh(GEOS.plane, getMat(MATS.floor, isWireframe, colorHex), [12, 12, 1], [0, 0.4, 0], false, rec);
-        floor.rotation.x = -Math.PI / 2;
+        // --- Solid Slab Floor ---
+        // 12x12 wide, 0.4 units thick. Centered at y=0.2 so the top is perfectly at y=0.4.
+        const floor = createMesh(GEOS.box, getMat(MATS.floor, isWireframe, colorHex), [12, 0.4, 12], [0, 0.2, 0], false, rec);
         baseGroup.add(floor);
 
         baseGroup.add(createMesh(GEOS.box, wMat, [12, 6, 1], [0, 3, -5.5], cast, rec));
@@ -125,9 +125,8 @@ function _internalBuildStructure(type: string, isWireframe: boolean, colorHex: n
     } else if (type === "shop") {
         const wMat = getMat(MATS.shopWall, isWireframe, colorHex);
         
-        // --- FIX: Raised floor from 0.05 to 0.4 to clear bumpy terrain math ---
-        const floor = createMesh(GEOS.plane, getMat(MATS.floor, isWireframe, colorHex), [10, 8, 1], [0, 0.4, 0], false, rec);
-        floor.rotation.x = -Math.PI / 2;
+        // --- Solid Slab Floor ---
+        const floor = createMesh(GEOS.box, getMat(MATS.floor, isWireframe, colorHex), [10, 0.4, 8], [0, 0.2, 0], false, rec);
         baseGroup.add(floor);
 
         baseGroup.add(createMesh(GEOS.box, wMat, [10, 5, 1], [0, 2.5, -3.5], cast, rec));
@@ -143,7 +142,8 @@ function _internalBuildStructure(type: string, isWireframe: boolean, colorHex: n
 
         roofGroup.add(createMesh(GEOS.box, wMat, [10.5, 0.5, 8.5], [0, 5.25, 0], cast, rec));
 
-   } else if (type === "farm") {
+    } else if (type === "farm") {
+        // --- Raised Planter Box Design ---
         // 1. Thick raised dirt pad (2 units thick, moved up)
         baseGroup.add(createMesh(GEOS.box, getMat(MATS.dirt, isWireframe, colorHex), [14, 2.0, 14], [0, 1.0, 0], false, rec));
 
@@ -154,10 +154,10 @@ function _internalBuildStructure(type: string, isWireframe: boolean, colorHex: n
         baseGroup.add(createMesh(GEOS.box, wMat, [0.4, 2.2, 14.4], [-7.2, 1.1, 0], cast, rec)); // Left wall
         baseGroup.add(createMesh(GEOS.box, wMat, [0.4, 2.2, 14.4], [7.2, 1.1, 0], cast, rec));  // Right wall
 
-        // 3. Instanced crops (Moved up to sit on the newly raised dirt)
+        // 3. Instanced crops (Moved up to sit correctly on the raised dirt)
         const cropMat = getMat(MATS.crop, isWireframe, colorHex);
         const cropInstanced = new THREE.InstancedMesh(GEOS.box, cropMat, 25);
-        cropInstanced.castShadow = false; 
+        cropInstanced.castShadow = false; // Crops are too small to justify shadow calculations
         cropInstanced.receiveShadow = rec;
         
         const dummy = new THREE.Object3D();

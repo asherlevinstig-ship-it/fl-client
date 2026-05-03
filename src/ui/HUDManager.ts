@@ -880,7 +880,7 @@ export function ensureOverlay(getActiveRoom: () => any, getActionContext: () => 
         bottomCenterContainer = document.createElement("div");
         bottomCenterContainer.id = "hud-bottom-center";
         bottomCenterContainer.style.position = "fixed";
-        bottomCenterContainer.style.bottom = "110px"; 
+        bottomCenterContainer.style.bottom = "140px"; 
         bottomCenterContainer.style.left = "50%";
         bottomCenterContainer.style.transform = "translateX(-50%)";
         bottomCenterContainer.style.display = "flex";

@@ -756,32 +756,31 @@ export function openSkillTreeUI(activeRoom: any, pathway: string, keys: any) {
                 `;
             }
 
+            // [FIX APPLIED HERE]: Wraps both header and upgrades list into a single scroll container, preventing description clipping
             rightPaneHtml += `
-                <div style="display:flex; justify-content: space-between; align-items: flex-start; border-bottom: 4px solid #475569; padding-bottom: 20px; margin-bottom: 20px;">
-                    <div style="display:flex; align-items: flex-start; gap: 20px; flex: 1;">
-                        <div style="width: 80px; height: 80px; font-size: 40px; background: #1e293b; border: 4px solid ${(isCurrentlyViewedSkillLocked || isSystemPathwayLockedOut) ? '#64748b' : activeSkillData.color}; border-radius: 20px; display:flex; justify-content:center; align-items:center;">
-                            <span style="${(isCurrentlyViewedSkillLocked || isSystemPathwayLockedOut) ? 'filter: grayscale(1); opacity: 0.5;' : ''}">${activeSkillData.icon}</span>
+                <div class="st-scrollbar" style="display: flex; flex-direction: column; overflow-y: auto; flex-grow: 1; padding-right: 10px; height: 100%;">
+                    <div style="display:flex; justify-content: space-between; align-items: flex-start; border-bottom: 4px solid #475569; padding-bottom: 20px; margin-bottom: 20px; flex-shrink: 0;">
+                        <div style="display:flex; align-items: flex-start; gap: 20px; flex: 1;">
+                            <div style="width: 80px; height: 80px; font-size: 40px; background: #1e293b; border: 4px solid ${(isCurrentlyViewedSkillLocked || isSystemPathwayLockedOut) ? '#64748b' : activeSkillData.color}; border-radius: 20px; display:flex; justify-content:center; align-items:center; flex-shrink: 0;">
+                                <span style="${(isCurrentlyViewedSkillLocked || isSystemPathwayLockedOut) ? 'filter: grayscale(1); opacity: 0.5;' : ''}">${activeSkillData.icon}</span>
+                            </div>
+                            <div style="flex: 1;">
+                                <h2 style="margin: 0 0 5px 0; font-family: var(--st-font-header); color: ${(isCurrentlyViewedSkillLocked || isSystemPathwayLockedOut) ? '#94a3b8' : activeSkillData.color}; font-size: 30px; font-weight: 900; text-transform: uppercase;">
+                                    ${activeSkillData.name}
+                                </h2>
+                                <div style="color: #cbd5e1; font-size: 16px; font-weight: 700; line-height: 1.4; word-wrap: break-word;">${activeSkillData.desc}</div>
+                                <div style="color: #94a3b8; font-size: 14px; margin-top: 8px; font-weight: 900;">⏱️ Base Cooldown: ${activeSkillData.cooldownTime}s</div>
+                                ${proficiencyHtml}
+                            </div>
                         </div>
-                        <div style="flex: 1;">
-                            <h2 style="margin: 0 0 5px 0; font-family: var(--st-font-header); color: ${(isCurrentlyViewedSkillLocked || isSystemPathwayLockedOut) ? '#94a3b8' : activeSkillData.color}; font-size: 30px; font-weight: 900; text-transform: uppercase;">
-                                ${activeSkillData.name}
-                            </h2>
-                            <div style="color: #cbd5e1; font-size: 16px; font-weight: 700; line-height: 1.4;">${activeSkillData.desc}</div>
-                            <div style="color: #94a3b8; font-size: 14px; margin-top: 8px; font-weight: 900;">⏱️ Base Cooldown: ${activeSkillData.cooldownTime}s</div>
-                            ${proficiencyHtml}
+                        <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 8px; flex-shrink: 0;">
+                            <button id="btn-equip-pathway" class="btn-chunky ${equipBtnClass}" ${equipDisabled} style="padding: 15px 25px; min-width: 180px;">
+                                ${equipBtnText}
+                            </button>
+                            ${!isEquipped && !isCurrentlyViewedSkillLocked && !isSystemPathwayLockedOut ? `<div style="font-size: 11px; font-weight: 900; color: #f59e0b;">Locks other choices!</div>` : ''}
                         </div>
                     </div>
-                    <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 8px;">
-                        <button id="btn-equip-pathway" class="btn-chunky ${equipBtnClass}" ${equipDisabled} style="padding: 15px 25px; min-width: 180px;">
-                            ${equipBtnText}
-                        </button>
-                        ${!isEquipped && !isCurrentlyViewedSkillLocked && !isSystemPathwayLockedOut ? `<div style="font-size: 11px; font-weight: 900; color: #f59e0b;">Locks other choices!</div>` : ''}
-                    </div>
-                </div>
-            `;
-
-            rightPaneHtml += `
-                <div class="st-scrollbar" style="display: flex; flex-direction: column; gap: 20px; overflow-y: auto; flex-grow: 1; padding-right: 5px;">
+                    <div style="display: flex; flex-direction: column; gap: 20px; flex-shrink: 0;">
             `;
 
             const upgradeKeys = Object.keys(activeSkillData.upgrades || {});
@@ -852,7 +851,8 @@ export function openSkillTreeUI(activeRoom: any, pathway: string, keys: any) {
                 });
             }
 
-            rightPaneHtml += `</div>`;
+            // [FIX APPLIED HERE]: Closing both nested containers correctly
+            rightPaneHtml += `</div></div>`;
         }
 
         const headerTitleText = currentTreeMode === "familiar" ? "FAMILIARS" : (currentTreeMode === "utility" ? "SKILLS" : "COMBAT");

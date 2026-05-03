@@ -147,6 +147,8 @@ type SceneryVisual = {
     baseRotY: number;
     baseRotZ: number;
     hitShakeTimer: number;
+    fallingTimer?: number;
+    isRock?: boolean;
     labelSprite?: THREE.Sprite;
     lastHp: number;
 };
@@ -282,33 +284,31 @@ export class TownScene extends BaseScene {
         return h;
     }
 
-   public getSurfaceHeight(x: number, z: number): number {
-    const terrainY = getTerrainHeight(x, z);
-    
-    for (const bldg of this.buildingMeshes.values()) {
-        const bx = bldg.mesh.position.x;
-        const bz = bldg.mesh.position.z;
+    public getSurfaceHeight(x: number, z: number): number {
+        const terrainY = getTerrainHeight(x, z);
         
-        let hw = 0; 
-        let hd = 0;
-        let floorThickness = 0;
-        
-        if (bldg.type === "house") { 
-            hw = 6.0; hd = 6.0; floorThickness = 0.4; 
-        } else if (bldg.type === "shop") { 
-            hw = 5.0; hd = 4.0; floorThickness = 0.4; 
-        } else if (bldg.type === "farm") { 
-            hw = 7.2; hd = 7.2; floorThickness = 2.0; // The dirt pad is 2.0 units thick
+        for (const bldg of this.buildingMeshes.values()) {
+            const bx = bldg.mesh.position.x;
+            const bz = bldg.mesh.position.z;
+            
+            let hw = 0; 
+            let hd = 0;
+            let floorThickness = 0;
+            
+            if (bldg.type === "house") { 
+                hw = 6.0; hd = 6.0; floorThickness = 0.4; 
+            } else if (bldg.type === "shop") { 
+                hw = 5.0; hd = 4.0; floorThickness = 0.4; 
+            } else if (bldg.type === "farm") { 
+                hw = 7.2; hd = 7.2; floorThickness = 2.0;
+            }
+            
+            if (x > bx - hw && x < bx + hw && z > bz - hd && z < bz + hd) {
+                return bldg.mesh.position.y + floorThickness;
+            }
         }
-        
-        // Check if the player coordinates fall inside the building footprint
-        if (x > bx - hw && x < bx + hw && z > bz - hd && z < bz + hd) {
-            return bldg.mesh.position.y + floorThickness;
-        }
+        return terrainY;
     }
-    
-    return terrainY;
-}
 
     // ==========================================
     // TARGETING OVERRIDES
@@ -1739,6 +1739,8 @@ export class TownScene extends BaseScene {
             baseRotY: mesh.rotation.y, 
             baseRotZ: mesh.rotation.z, 
             hitShakeTimer: 0,
+            fallingTimer: 0,
+            isRock: safeKind.includes("rock"),
             lastHp: 99999 
         });
     }
@@ -1777,13 +1779,19 @@ export class TownScene extends BaseScene {
     public removeScenery(id: string) {
         const visual = this.sceneryVisuals.get(id);
         if (!visual) return;
-        this.scene.remove(visual.mesh);
         
         if (visual.labelSprite) {
-            visual.labelSprite.material.dispose();
+            visual.mesh.remove(visual.labelSprite);
+            if (visual.labelSprite.material) visual.labelSprite.material.dispose();
+            visual.labelSprite = undefined;
         }
         
-        this.sceneryVisuals.delete(id);
+        if (visual.isRock) {
+            this.scene.remove(visual.mesh);
+            this.sceneryVisuals.delete(id);
+        } else {
+            visual.fallingTimer = 1.0; 
+        }
     }
 
     private createFountain() {
@@ -2509,13 +2517,24 @@ export class TownScene extends BaseScene {
     }
 
     private updateSceneryAnimations(dt: number) {
-        for (const visual of this.sceneryVisuals.values()) {
+        for (const [id, visual] of this.sceneryVisuals.entries()) {
+            if (visual.fallingTimer !== undefined && visual.fallingTimer > 0) {
+                visual.fallingTimer -= dt;
+                const progress = 1.0 - Math.max(0, visual.fallingTimer); 
+                const easeIn = progress * progress;
+                visual.mesh.rotation.x = visual.baseRotX + (easeIn * (Math.PI / 2));
+                
+                if (visual.fallingTimer <= 0) {
+                    this.scene.remove(visual.mesh);
+                    this.sceneryVisuals.delete(id);
+                }
+                continue; 
+            }
+
             if (visual.hitShakeTimer > 0) {
                 visual.hitShakeTimer -= dt;
-                
                 visual.mesh.rotation.z = visual.baseRotZ + Math.sin(visual.hitShakeTimer * 50) * 0.1;
                 visual.mesh.rotation.x = visual.baseRotX + Math.cos(visual.hitShakeTimer * 50) * 0.1;
-                
                 if (visual.hitShakeTimer <= 0) {
                     visual.mesh.rotation.z = visual.baseRotZ;
                     visual.mesh.rotation.x = visual.baseRotX;

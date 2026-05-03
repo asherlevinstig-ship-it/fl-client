@@ -121,6 +121,27 @@ export function getTerrainHeight(x: number, z: number): number {
     return finalHeight;
 }
 
+// --- NEW FUNCTION: Anchor buildings to the highest point of their footprint ---
+export function getBuildingFootprintMaxHeight(cx: number, cz: number, type: string): number {
+    let hw = 0; let hd = 0;
+    if (type === "house") { hw = 6; hd = 6; }
+    else if (type === "shop") { hw = 5; hd = 4; }
+    else if (type === "farm") { hw = 7.2; hd = 7.2; }
+    else return getTerrainHeight(cx, cz); // Fallback for unknown types
+
+    let maxH = getTerrainHeight(cx, cz);
+    
+    // Sample a 4x4 grid across the footprint to find the highest terrain bump
+    const steps = 4; 
+    for (let x = -hw; x <= hw; x += (hw * 2) / steps) {
+        for (let z = -hd; z <= hd; z += (hd * 2) / steps) {
+            maxH = Math.max(maxH, getTerrainHeight(cx + x, cz + z));
+        }
+    }
+    
+    return maxH;
+}
+
 type SceneryVisual = {
     mesh: THREE.Group | THREE.Mesh;
     baseRotX: number;
@@ -887,7 +908,8 @@ export class TownScene extends BaseScene {
                     else if (bldg.type === "shop") { hw = 5; hd = 4; }
                     
                     if (px > bx - hw && px < bx + hw && pz > bz - hd && pz < bz + hd) {
-                        targetY = bldg.mesh.position.y + 0.05;
+                        // --- FIX: Ensure the player's feet touch the solid 0.4 thick floor ---
+                        targetY = bldg.mesh.position.y + 0.4;
                         break;
                     }
                 }
@@ -1379,7 +1401,7 @@ export class TownScene extends BaseScene {
         environment.createTowerPerimeter();
 
         const mapSize = 5000;
-        const segments = 800; // --- FIX: Increased terrain resolution to match mathematical curve ---
+        const segments = 800; 
         const groundGeo = new THREE.PlaneGeometry(mapSize, mapSize, segments, segments);
         
         const colors: number[] = [];
@@ -1999,19 +2021,22 @@ export class TownScene extends BaseScene {
         }
 
         const group = buildStructureModel(type, !isConstructed, 0xffd700);
-        group.position.set(x, getTerrainHeight(x, z), z);
+        
+        // --- NEW CODE: Anchor building to the highest point of its footprint ---
+        const targetY = getBuildingFootprintMaxHeight(x, z, type);
+        group.position.set(x, targetY, z);
+        
         this.scene.add(group);
 
         let label: THREE.Sprite | undefined = undefined;
         if (!isConstructed) {
             label = this.createNameLabel(`Building: ${progress}/${targetProgress}`);
-            label.position.set(x, getTerrainHeight(x, z) + 10, z);
+            label.position.set(x, targetY + 10, z);
             this.scene.add(label);
         }
 
         this.buildingMeshes.set(id, { type, mesh: group, label });
 
-        // --- NEW CODE: Update dynamic fence bounding box ---
         const plotX = Math.floor(x / 20);
         const plotZ = Math.floor(z / 20);
         const plotId = `${plotX}_${plotZ}`;
@@ -2060,7 +2085,9 @@ export class TownScene extends BaseScene {
             const activeBlueprint = this.blueprintMeshes.get(this.currentBlueprintType);
             if (!activeBlueprint) return;
 
-            activeBlueprint.position.set(snapX, getTerrainHeight(snapX, snapZ), snapZ);
+            // --- NEW CODE: Hologram anchors to max footprint height ---
+            const targetY = getBuildingFootprintMaxHeight(snapX, snapZ, this.currentBlueprintType);
+            activeBlueprint.position.set(snapX, targetY, snapZ);
             activeBlueprint.visible = visible;
 
             const plotX = Math.floor(snapX / 20);
@@ -2175,7 +2202,7 @@ export class TownScene extends BaseScene {
     public addLandPlot(id: string, gridX: number, gridY: number, ownerId: string, ownerName: string) {
         if (this.ownedPlots.has(id)) return;
         this.ownedPlots.set(id, ownerName);
-        this.updatePlotFence(id); // Trigger dynamic fence generation
+        this.updatePlotFence(id); 
     }
 
     public removeLandPlot(id: string) {
@@ -2183,7 +2210,6 @@ export class TownScene extends BaseScene {
         const group = this.plotFences.get(id);
         if (group) {
             this.scene.remove(group);
-            // Cleanup geometries to prevent memory leaks
             group.traverse(child => {
                 if (child instanceof THREE.Mesh) {
                     if (child.geometry) child.geometry.dispose();
@@ -2202,7 +2228,6 @@ export class TownScene extends BaseScene {
         const ownerName = this.ownedPlots.get(plotId);
         if (!ownerName) return;
 
-        // Clean up existing fence if it's resizing
         if (this.plotFences.has(plotId)) {
             const oldFence = this.plotFences.get(plotId)!;
             this.scene.remove(oldFence);
@@ -2223,7 +2248,6 @@ export class TownScene extends BaseScene {
         const plotCenterX = gridX * 20 + 10;
         const plotCenterZ = gridY * 20 + 10;
 
-        // 1. Calculate dynamic bounds based on what is built on the property
         let minX = plotCenterX - 9.8;
         let maxX = plotCenterX + 9.8;
         let minZ = plotCenterZ - 9.8;
@@ -2233,7 +2257,6 @@ export class TownScene extends BaseScene {
             const bx = bldg.mesh.position.x;
             const bz = bldg.mesh.position.z;
             
-            // If the building's center falls in this plot, expand the plot's fence to wrap it fully
             if (Math.floor(bx / 20) === gridX && Math.floor(bz / 20) === gridY) {
                 let hw = 0; let hd = 0;
                 if (bldg.type === "house") { hw = 6.0; hd = 6.0; }
@@ -2296,10 +2319,10 @@ export class TownScene extends BaseScene {
             }
         };
 
-        drawFenceEdge(minX, minZ, maxX, minZ); // Top edge
-        drawFenceEdge(maxX, minZ, maxX, maxZ); // Right edge
-        drawFenceEdge(maxX, maxZ, minX, maxZ); // Bottom edge
-        drawFenceEdge(minX, maxZ, minX, minZ); // Left edge
+        drawFenceEdge(minX, minZ, maxX, minZ); 
+        drawFenceEdge(maxX, minZ, maxX, maxZ); 
+        drawFenceEdge(maxX, maxZ, minX, maxZ); 
+        drawFenceEdge(minX, maxZ, minX, minZ); 
 
         const signX = Math.max(minX + 2, plotCenterX - 2); 
         const signZ = maxZ; 

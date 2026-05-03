@@ -259,7 +259,7 @@ export class TownScene extends BaseScene {
         }
     }
 
-    // --- NEW HELPER: Get Floor/Terrain Y properly ---
+    // --- NEW MASTER HELPER: Dynamically override Y coordinates if standing inside a building ---
     public getSurfaceHeight(x: number, z: number): number {
         const terrainY = getTerrainHeight(x, z);
         
@@ -273,9 +273,8 @@ export class TownScene extends BaseScene {
             if (bldg.type === "house") { hw = 6; hd = 6; }
             else if (bldg.type === "shop") { hw = 5; hd = 4; }
             
-            // If the query falls inside the building, elevate to the exact floor level
             if (x > bx - hw && x < bx + hw && z > bz - hd && z < bz + hd) {
-                return bldg.mesh.position.y + 0.4; // 0.4 is the thickness of the floor slab
+                return bldg.mesh.position.y + 0.4; // Force everything up to the 0.4 thick floor slab
             }
         }
         return terrainY;
@@ -290,8 +289,11 @@ export class TownScene extends BaseScene {
         gender: string = "body1", skinColor: string = "#ffccaa", hairStyle: string = "short", hairColor: string = "#333333", eyeColor: string = "#00aaff",
         isAuraActive: boolean = false, auraStyle: string = "tyrant"   
     ) {
+        // --- FIX: Intercept the server physics height and force it to the true solid surface ---
+        const correctHeight = this.getSurfaceHeight(x, z);
+
         super.updatePlayer(
-            id, x, z, name, equippedItem, equipBack, isSleeping, sleepRot, isSwimming, height,
+            id, x, z, name, equippedItem, equipBack, isSleeping, sleepRot, isSwimming, correctHeight,
             equipHead, equipChest, equipLegs, equipFeet, equipOffHand, isWolfVisual, isSprinting,
             isMeditating, teamId, mountedFamiliarId, gender, skinColor, hairStyle, hairColor, eyeColor
         );
@@ -379,7 +381,7 @@ export class TownScene extends BaseScene {
 
     public playAbilityVisual(id: string, abilityId: string, targetX: number, targetZ: number) {
         const playerVisual = this.playerVisuals.get(id);
-        const terrainHeight = this.getSurfaceHeight(targetX, targetZ); // UPDATED
+        const terrainHeight = this.getSurfaceHeight(targetX, targetZ);
 
         spawnAbilityVFX(
             this.scene, 
@@ -396,7 +398,7 @@ export class TownScene extends BaseScene {
 
         if (!visual) {
             const group = new THREE.Group();
-            const terrainY = this.getSurfaceHeight(x, z); // UPDATED
+            const terrainY = this.getSurfaceHeight(x, z);
             group.position.set(x, terrainY + 0.1, z);
 
             const ringGeo = new THREE.TorusGeometry(radius, 0.4, 16, 64);
@@ -481,7 +483,7 @@ export class TownScene extends BaseScene {
         if (this.hazardVisuals.has(id)) return;
 
         const group = new THREE.Group();
-        const terrainY = this.getSurfaceHeight(x, z); // UPDATED
+        const terrainY = this.getSurfaceHeight(x, z); 
         group.position.set(x, terrainY + 0.05, z);
 
         const steelMat = new THREE.MeshStandardMaterial({ color: 0x888888, metalness: 0.8, roughness: 0.4 });
@@ -640,7 +642,7 @@ export class TownScene extends BaseScene {
             case "mana_pillar":
                 const pillarGeo = new THREE.CylinderGeometry(0.8, 0.8, 4.0, 8);
                 const pillarMat = new THREE.MeshBasicMaterial({ color: 0x00aaff, transparent: true, opacity: 0.7, blending: THREE.AdditiveBlending });
-                const pillarMesh = new THREE.Mesh(pillarGeo, pillarMat); // FIX: Added THREE. namespace
+                const pillarMesh = new THREE.Mesh(pillarGeo, pillarMat);
                 pillarMesh.position.y = 2.0; 
                 
                 if (customData && customData.optionText) {
@@ -702,7 +704,16 @@ export class TownScene extends BaseScene {
         this.updateSceneryAnimations(dt); 
         this.updateCasinoAnimations(dt);
 
+        // --- NEW CODE: Correct load-order elevation issues every frame ---
+        this.decorationMeshes.forEach((mesh) => {
+            const surfaceY = this.getSurfaceHeight(mesh.position.x, mesh.position.z);
+            const finalY = Math.max(mesh.userData.serverY || mesh.position.y, surfaceY);
+            mesh.position.y = finalY;
+        });
+
         this.lootVisuals.forEach(chest => {
+            chest.position.y = this.getSurfaceHeight(chest.position.x, chest.position.z);
+            
             if (chest.userData.isOpen && chest.userData.openProgress !== undefined && chest.userData.openProgress < 1) {
                 chest.userData.openProgress += dt * 6.0; 
                 if (chest.userData.openProgress > 1) chest.userData.openProgress = 1;
@@ -779,7 +790,7 @@ export class TownScene extends BaseScene {
             if (h.mesh.userData.targetX !== undefined && h.mesh.userData.targetZ !== undefined) {
                 h.mesh.position.x = THREE.MathUtils.lerp(h.mesh.position.x, h.mesh.userData.targetX, 5 * dt);
                 h.mesh.position.z = THREE.MathUtils.lerp(h.mesh.position.z, h.mesh.userData.targetZ, 5 * dt);
-                h.mesh.position.y = this.getSurfaceHeight(h.mesh.position.x, h.mesh.position.z) + 0.05; // UPDATED
+                h.mesh.position.y = this.getSurfaceHeight(h.mesh.position.x, h.mesh.position.z) + 0.05;
             }
 
             if (h.type === "map_marker" || h.type === "recall_beacon" || h.type === "town_portal_node" || h.type === "healing_blossom") {
@@ -821,26 +832,27 @@ export class TownScene extends BaseScene {
                 const distSq = (px - camX) ** 2 + (pz - camZ) ** 2;
                 if (distSq > CULL_DIST_SQ && id !== this.localPlayerId) return;
 
-                let targetY = this.getSurfaceHeight(px, pz); // UPDATED - Handles bumping up when inside building
-
-                const distToLake = Math.sqrt((px - LAKE_X) ** 2 + (pz - LAKE_Z) ** 2);
-                if (this.lakeMesh && distToLake <= DOCK_INNER - 2) {
-                    const waterSurface = this.lakeMesh.userData.surfaceY;
-                    if (targetY < waterSurface) {
-                        targetY = Math.max(targetY, waterSurface - 0.7); 
-                        visual.isSwimming = true;
-                    } else {
-                        visual.isSwimming = false;
-                    }
-                } else if (visual.isSwimming && distToLake > DOCK_INNER) {
-                     visual.isSwimming = false;
-                }
-
-                let leap = visual.mesh.userData.leapOffset || 0;
-                targetY += leap;
-
+                // --- NEW CODE: Perfect elevation logic ---
                 if ((visual as any).targetPosition) {
-                     (visual as any).targetPosition.y = targetY;
+                    let targetY = this.getSurfaceHeight(visual.targetPosition.x, visual.targetPosition.z);
+
+                    const distToLake = Math.sqrt((px - LAKE_X) ** 2 + (pz - LAKE_Z) ** 2);
+                    if (this.lakeMesh && distToLake <= DOCK_INNER - 2) {
+                        const waterSurface = this.lakeMesh.userData.surfaceY;
+                        if (targetY < waterSurface) {
+                            targetY = Math.max(targetY, waterSurface - 0.7); 
+                            visual.isSwimming = true;
+                        } else {
+                            visual.isSwimming = false;
+                        }
+                    } else if (visual.isSwimming && distToLake > DOCK_INNER) {
+                         visual.isSwimming = false;
+                    }
+
+                    let leap = visual.mesh.userData.leapOffset || 0;
+                    targetY += leap;
+
+                    (visual as any).targetPosition.y = targetY;
                 }
 
                 if ((visual as any).auraMesh) {
@@ -915,8 +927,9 @@ export class TownScene extends BaseScene {
         if (!enemyData) {
             const typeName = label.split(" (")[0]; 
             const visual = new EnemyModel(typeName);
-            visual.mesh.position.set(x, terrainY, z);
-            visual.targetPosition.set(x, terrainY, z);
+            const correctY = this.getSurfaceHeight(x, z);
+            visual.mesh.position.set(x, correctY, z);
+            visual.targetPosition.set(x, correctY, z);
             
             this.scene.add(visual.mesh);
 
@@ -944,7 +957,8 @@ export class TownScene extends BaseScene {
         }
 
         enemyData.action = action;
-        enemyData.visual.targetPosition.set(x, terrainY, z);
+        // --- FIX: Ensure enemies walk on the solid floor instead of clipping ---
+        enemyData.visual.targetPosition.set(x, this.getSurfaceHeight(x, z), z);
 
         const isBleeding = afflictions.includes("Bleed");
         const isNecrosis = afflictions.includes("Necrosis");
@@ -1455,7 +1469,7 @@ export class TownScene extends BaseScene {
         label.scale.set(3.0, 0.8, 1.0);
         chestGroup.add(label);
 
-        chestGroup.position.set(x, this.getSurfaceHeight(x, z), z); // UPDATED
+        chestGroup.position.set(x, this.getSurfaceHeight(x, z), z); 
         this.scene.add(chestGroup);
         this.lootVisuals.set(id, chestGroup);
     }
@@ -1592,7 +1606,7 @@ export class TownScene extends BaseScene {
             mesh.scale.y = safeScale * 0.7; 
         }
         
-        const surfaceHeight = this.getSurfaceHeight(safeX, safeZ); // UPDATED
+        const surfaceHeight = this.getSurfaceHeight(safeX, safeZ);
         mesh.position.set(safeX, surfaceHeight + (safeKind.includes("rock") ? 0.2 : 0), safeZ);
         
         this.scene.add(mesh);
@@ -1978,11 +1992,11 @@ export class TownScene extends BaseScene {
     public addDecoration(id: string, type: string, x: number, y: number, z: number, rotation: number) {
         if (this.decorationMeshes.has(id)) return;
 
-        // --- NEW CODE: Auto-elevate decoration if it spawns inside the building bounds ---
         const surfaceY = this.getSurfaceHeight(x, z);
         const finalY = Math.max(y, surfaceY); 
 
         const group = buildDecoModel(type, false);
+        group.userData.serverY = y; // FIX: Store the raw server Y to fix load-order syncing
         group.position.set(x, finalY, z);
         group.rotation.y = rotation;
         
@@ -2039,7 +2053,6 @@ export class TownScene extends BaseScene {
             const snapX = Math.round(x * 2) / 2;
             const snapZ = Math.round(z * 2) / 2;
 
-            // --- UPDATED: Snap hologram to the elevated floor surface ---
             const decoY = this.getSurfaceHeight(snapX, snapZ) + 0.05;
 
             activeGhost.position.set(snapX, decoY, snapZ);
@@ -2110,7 +2123,6 @@ export class TownScene extends BaseScene {
             const worldX = centerX + localX;
             const worldZ = centerZ + localZ;
 
-            // Plot overlay follows absolute terrain, no change needed here.
             posAttr.setY(i, getTerrainHeight(worldX, worldZ) + 0.15);
         }
         posAttr.needsUpdate = true;

@@ -33,6 +33,19 @@ export type BoneData = {
   baseRot: THREE.Euler;
 };
 
+export type KeyboardTargetingState = {
+  active: boolean;
+  abilityId: string;
+  slotNum: number;
+  originX: number;
+  originZ: number;
+  x: number;
+  z: number;
+  range: number;
+  radius: number;
+  reticle?: THREE.Group;
+};
+
 export type PlayerVisual = {
   mesh: THREE.Group;
   modelMesh?: THREE.Group; 
@@ -150,9 +163,13 @@ export abstract class BaseScene {
   protected cameraAngle = 0; 
   protected cameraPitch = 0.8; 
   protected cameraZoom = 30; 
+  private cameraShake = 0;
 
   private lastTime = performance.now();
   protected currentDt = 0.016; // Tracks global DT for decoupled lerp functions
+
+  // --- KEYBOARD TARGETING ---
+  protected keyboardTargeting: KeyboardTargetingState | null = null;
 
   // --- PERFORMANCE Caches & Pools ---
   private labelTextureCache = new Map<string, THREE.CanvasTexture>();
@@ -165,6 +182,7 @@ export abstract class BaseScene {
   private telegraphPool: ObjectPool<THREE.Group>;
   private aoeBlastPool: ObjectPool<THREE.Mesh>;
   private enemyMeleePool: ObjectPool<THREE.Mesh>;
+  private hitSparksPool: ObjectPool<THREE.Mesh>;
 
   // --- FISHING SYSTEM (Shared Physics/Rendering) ---
   protected fishingLines = new Map<string, { 
@@ -196,6 +214,22 @@ export abstract class BaseScene {
     this.container.appendChild(this.renderer.domElement);
 
     this.familiarRenderer = new FamiliarRenderer(this.scene);
+
+    // Initialize Hit Sparks Pool
+    this.hitSparksPool = new ObjectPool<THREE.Mesh>(
+      () => {
+        const geo = new THREE.SphereGeometry(0.15, 8, 8);
+        const mat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+        const mesh = new THREE.Mesh(geo, mat);
+        mesh.visible = false;
+        this.scene.add(mesh);
+        return mesh;
+      },
+      (mesh) => {
+        mesh.visible = true;
+        mesh.scale.setScalar(1.0);
+      }
+    );
 
     // Initialize Slash Pool (Player attacks)
     this.slashPool = new ObjectPool<THREE.Mesh>(
@@ -307,6 +341,11 @@ export abstract class BaseScene {
     this.lastTime = now;
     this.currentDt = dt; // Cache global delta time
 
+    if (this.cameraShake > 0) {
+        this.cameraShake -= dt * 5;
+        if (this.cameraShake < 0) this.cameraShake = 0;
+    }
+
     this.updateInterpolatedEntities(dt); 
     this.updateAttacks(dt);
     this.updateDamageNumbers(dt);
@@ -356,9 +395,15 @@ export abstract class BaseScene {
 
     const lookAtY = py + 2.0;
 
-    const targetX = px + Math.sin(this.cameraAngle) * Math.cos(this.cameraPitch) * this.cameraZoom;
-    const targetZ = pz + Math.cos(this.cameraAngle) * Math.cos(this.cameraPitch) * this.cameraZoom;
-    const targetY = lookAtY + Math.sin(this.cameraPitch) * this.cameraZoom;
+    let targetX = px + Math.sin(this.cameraAngle) * Math.cos(this.cameraPitch) * this.cameraZoom;
+    let targetZ = pz + Math.cos(this.cameraAngle) * Math.cos(this.cameraPitch) * this.cameraZoom;
+    let targetY = lookAtY + Math.sin(this.cameraPitch) * this.cameraZoom;
+
+    // Apply Shake
+    if (this.cameraShake > 0) {
+        targetX += (Math.random() - 0.5) * this.cameraShake;
+        targetZ += (Math.random() - 0.5) * this.cameraShake;
+    }
 
     const camLerp = 1.0 - Math.exp(-8.0 * actualDt);
 
@@ -369,10 +414,170 @@ export abstract class BaseScene {
     this.camera.lookAt(px, lookAtY, pz);
   }
 
+  // ==========================================
+  // KEYBOARD TARGETING SYSTEM
+  // ==========================================
+
+  public getVisualSurfaceHeight(x: number, z: number): number {
+    return 0.1; // Override in TownScene for terrain height
+  }
+
+  public enterKeyboardTargetingMode(data: {
+      abilityId: string;
+      slotNum: number;
+      originX: number;
+      originZ: number;
+      facingX: number;
+      facingZ: number;
+      range: number;
+      radius: number;
+  }) {
+      const startX = data.originX + data.facingX * Math.min(5, data.range);
+      const startZ = data.originZ + data.facingZ * Math.min(5, data.range);
+
+      const reticle = new THREE.Group();
+      
+      // High contrast Cyan Reticle
+      const ringGeo = new THREE.RingGeometry(data.radius - 0.2, data.radius, 32);
+      const ringMat = new THREE.MeshBasicMaterial({ color: 0x00E5FF, side: THREE.DoubleSide, transparent: true, opacity: 0.6, depthWrite: false });
+      const ring = new THREE.Mesh(ringGeo, ringMat);
+      ring.rotation.x = -Math.PI / 2;
+      reticle.add(ring);
+
+      const dotGeo = new THREE.CircleGeometry(0.3, 16);
+      const dotMat = new THREE.MeshBasicMaterial({ color: 0x00E5FF, depthWrite: false });
+      const dot = new THREE.Mesh(dotGeo, dotMat);
+      dot.rotation.x = -Math.PI / 2;
+      reticle.add(dot);
+
+      reticle.position.set(startX, this.getVisualSurfaceHeight(startX, startZ), startZ);
+      this.scene.add(reticle);
+
+      this.keyboardTargeting = {
+          active: true,
+          abilityId: data.abilityId,
+          slotNum: data.slotNum,
+          originX: data.originX,
+          originZ: data.originZ,
+          x: startX,
+          z: startZ,
+          range: data.range,
+          radius: data.radius,
+          reticle
+      };
+  }
+
+  public moveKeyboardReticle(dx: number, dz: number, dt: number) {
+      if (!this.keyboardTargeting?.active) return;
+
+      const speed = 14;
+      const t = this.keyboardTargeting;
+
+      t.x += dx * speed * dt;
+      t.z += dz * speed * dt;
+
+      const ox = t.x - t.originX;
+      const oz = t.z - t.originZ;
+      const d = Math.sqrt(ox * ox + oz * oz);
+
+      if (d > t.range) {
+          t.x = t.originX + (ox / d) * t.range;
+          t.z = t.originZ + (oz / d) * t.range;
+      }
+
+      if (t.reticle) {
+          t.reticle.position.x = t.x;
+          t.reticle.position.z = t.z;
+          t.reticle.position.y = this.getVisualSurfaceHeight(t.x, t.z) + 0.1;
+          t.reticle.rotation.y += dt; // Gentle spin for feedback
+      }
+  }
+
+  public confirmKeyboardTarget(room: any) {
+      if (!this.keyboardTargeting?.active) return;
+
+      const t = this.keyboardTargeting;
+
+      room.send("useAbility", {
+          abilityId: t.abilityId,
+          targetX: t.x,
+          targetZ: t.z
+      });
+
+      this.playAbilityVisual(this.localPlayerId!, t.abilityId, t.x, t.z);
+      this.cancelKeyboardTarget();
+  }
+
+  public cancelKeyboardTarget() {
+      if (this.keyboardTargeting?.reticle) {
+          this.scene.remove(this.keyboardTargeting.reticle);
+          this.keyboardTargeting.reticle.traverse((c: any) => {
+              if (c.geometry) c.geometry.dispose();
+              if (c.material) c.material.dispose();
+          });
+      }
+      this.keyboardTargeting = null;
+  }
+
+  public findBestKeyboardTarget(originX: number, originZ: number, dirX: number, dirZ: number, range: number, coneAngle: number): THREE.Vector3 | null {
+      let bestTarget: THREE.Vector3 | null = null;
+      let closestDist = range * range;
+      const forward = new THREE.Vector2(dirX, dirZ).normalize();
+
+      for (const entry of this.enemyVisuals.values()) {
+          const mesh = entry.model.mesh;
+          const dx = mesh.position.x - originX;
+          const dz = mesh.position.z - originZ;
+          const distSq = dx * dx + dz * dz;
+
+          if (distSq <= closestDist) {
+              const toTarget = new THREE.Vector2(dx, dz).normalize();
+              const angle = Math.acos(forward.dot(toTarget));
+
+              if (angle <= coneAngle / 2) {
+                  closestDist = distSq;
+                  bestTarget = new THREE.Vector3(mesh.position.x, mesh.position.y, mesh.position.z);
+              }
+          }
+      }
+
+      return bestTarget;
+  }
+
+  public playHitConfirm(x: number, y: number, z: number, isCrit = false) {
+      const spark = this.hitSparksPool.get();
+      spark.position.set(x, y + 1.0, z);
+      
+      if (spark.material instanceof THREE.MeshBasicMaterial) {
+          spark.material.color.setHex(isCrit ? 0xffaa00 : 0xffffff);
+      }
+
+      this.activeEffects.push({
+          mesh: spark,
+          life: 0.3,
+          maxLife: 0.3,
+          update: (dt, mesh, progress) => {
+              mesh.position.y += dt * 2;
+              mesh.scale.setScalar(1.0 - progress);
+              if (progress >= 1.0) {
+                  this.hitSparksPool.release(mesh as THREE.Mesh);
+                  mesh.visible = false;
+              }
+          }
+      });
+
+      if (isCrit) {
+          this.cameraShake = Math.max(this.cameraShake, 0.4);
+      }
+  }
+
+  // ==========================================
+  // EXISTING METHODS (Unchanged integration below)
+  // ==========================================
+
   public addEnemy(id: string, label: string, typeKey?: string) {
       if (this.enemyVisuals.has(id)) return;
 
-      // Fix applied here: prioritize the passed in typeKey over parsing the label
       const type = typeKey || label.split(" (")[0]; 
       const model = new EnemyModel(type); 
       
@@ -430,7 +635,6 @@ export abstract class BaseScene {
       this.enemyVisuals.delete(id);
   }
 
-  // --- DYNAMIC APPEARANCE HELPERS ---
   private rebuildHair(visual: PlayerVisual, style: string) {
       if (visual.hairGroup && visual.hairGroup.parent) {
           visual.hairGroup.parent.remove(visual.hairGroup);
@@ -467,7 +671,6 @@ export abstract class BaseScene {
           tail.castShadow = true;
           hairGroup.add(main, tail);
       }
-      // "bald" just leaves the group empty
 
       if (visual.headGroup) {
           visual.headGroup.add(hairGroup);
@@ -502,7 +705,7 @@ export abstract class BaseScene {
       isSwimming: false,
       isSprinting: false,
       isMeditating: false,
-      mountedFamiliarId: "", // Default to not mounted
+      mountedFamiliarId: "", 
       limbs: {} 
     };
 
@@ -537,7 +740,6 @@ export abstract class BaseScene {
     const model = new THREE.Group();
     model.userData.baseY = 0; 
     
-    // Create unique materials for customization tracking
     const skinMat = new THREE.MeshStandardMaterial({ color: 0xffccaa, roughness: 0.7 });
     const hairMat = new THREE.MeshStandardMaterial({ color: 0x333333, roughness: 0.8 });
     const eyeMat = new THREE.MeshStandardMaterial({ color: 0x00aaff, roughness: 0.9 });
@@ -581,7 +783,6 @@ export abstract class BaseScene {
     mouth.position.set(0, -0.08, 0.26);
     head.add(mouth);
 
-    // Initial Hair Build
     this.rebuildHair(visual, "short");
 
     const armGeo = new THREE.BoxGeometry(0.35, 0.8, 0.4);
@@ -634,7 +835,7 @@ export abstract class BaseScene {
     this.playerMeshes.set(id, playerGroup as any);
   }
 
-public updatePlayer(
+  public updatePlayer(
     id: string,
     x: number,
     z: number,
@@ -672,7 +873,6 @@ public updatePlayer(
     visual.isMeditating = isMeditating;
     visual.mountedFamiliarId = mountedFamiliarId;
 
-    // --- APPLY DYNAMIC APPEARANCE ---
     if (visual.skinColor !== skinColor && visual.skinMaterial) {
         visual.skinColor = skinColor;
         visual.skinMaterial.color.set(skinColor);
@@ -688,9 +888,9 @@ public updatePlayer(
     if (visual.gender !== gender && visual.torsoMesh) {
         visual.gender = gender;
         if (gender === "body2") { 
-            visual.torsoMesh.scale.set(0.85, 1.0, 0.85); // Slimmer silhouette
+            visual.torsoMesh.scale.set(0.85, 1.0, 0.85); 
         } else {
-            visual.torsoMesh.scale.set(1.0, 1.0, 1.0); // Standard silhouette
+            visual.torsoMesh.scale.set(1.0, 1.0, 1.0); 
         }
     }
     if (visual.hairStyle !== hairStyle) {
@@ -1033,7 +1233,7 @@ public updatePlayer(
         
         const texture = new THREE.CanvasTexture(canvas);
         texture.minFilter = THREE.LinearFilter;
-        texture.generateMipmaps = false; // --- CRITICAL WEBGL CRASH FIX ---
+        texture.generateMipmaps = false; 
         const material = new THREE.SpriteMaterial({ map: texture, transparent: true, depthWrite: false });
         const sprite = new THREE.Sprite(material);
         sprite.scale.set(1.5, 0.75, 1);
@@ -1106,7 +1306,7 @@ public updatePlayer(
 
           texture = new THREE.CanvasTexture(canvas);
           texture.minFilter = THREE.LinearFilter;
-          texture.generateMipmaps = false; // --- CRITICAL WEBGL CRASH FIX ---
+          texture.generateMipmaps = false; 
           this.chatTextureCache.set(cacheKey, texture);
       }
       
@@ -1665,7 +1865,7 @@ public updatePlayer(
 
         texture = new THREE.CanvasTexture(canvas);
         texture.minFilter = THREE.LinearFilter;
-        texture.generateMipmaps = false; // --- CRITICAL WEBGL CRASH FIX ---
+        texture.generateMipmaps = false; 
         texture.name = text + (subText ? `\n${subText}` : "");
         
         this.labelTextureCache.set(cacheKey, texture);
@@ -1699,13 +1899,13 @@ public updatePlayer(
     this.familiarRenderer.dispose();
     this.equipmentBuilder.dispose(); 
     this.clearLocalCommunionPillars();
+    this.cancelKeyboardTarget();
 
     for (const visual of this.playerVisuals.values()) {
       if (visual.labelSprite.material instanceof THREE.SpriteMaterial) { 
           visual.labelSprite.material.dispose(); 
       }
 
-      // Dispose unique customization materials
       visual.skinMaterial?.dispose();
       visual.hairMaterial?.dispose();
       visual.eyeMaterial?.dispose();
@@ -1747,6 +1947,7 @@ public updatePlayer(
     this.slashPool.disposeAll(m => { m.geometry.dispose(); (m.material as THREE.Material).dispose(); });
     this.aoeBlastPool.disposeAll(m => { m.geometry.dispose(); (m.material as THREE.Material).dispose(); });
     this.enemyMeleePool.disposeAll(m => { m.geometry.dispose(); (m.material as THREE.Material).dispose(); });
+    this.hitSparksPool.disposeAll(m => { m.geometry.dispose(); (m.material as THREE.Material).dispose(); });
     this.telegraphPool.disposeAll(g => {
         g.traverse(c => {
             if (c instanceof THREE.Mesh) { c.geometry.dispose(); (c.material as THREE.Material).dispose(); }
@@ -1777,7 +1978,6 @@ public updatePlayer(
     }
     this.activeEffects = [];
 
-    // Cleanup Fishing Lines
     for (const data of this.fishingLines.values()) {
         this.scene.remove(data.curveLine);
         this.scene.remove(data.bobber);
@@ -1799,7 +1999,6 @@ public updatePlayer(
     }
     this.enemyVisuals.clear();
 
-    // --- CLEANUP COINS ---
     for (const coin of this.activeCoins.values()) {
         this.scene.remove(coin.group);
         coin.group.traverse((c: any) => {
@@ -1812,7 +2011,6 @@ public updatePlayer(
     }
     this.activeCoins.clear();
 
-    // Cleanup Caches
     for (const tex of this.labelTextureCache.values()) tex.dispose();
     this.labelTextureCache.clear();
 
@@ -1822,7 +2020,6 @@ public updatePlayer(
     this.playerMeshes.clear(); 
     this.playerVisuals.clear(); 
     
-    // --- CRITICAL WEBGL CRASH FIX ---
     this.renderer.forceContextLoss();
     this.renderer.dispose();
 

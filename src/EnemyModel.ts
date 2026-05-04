@@ -13,7 +13,7 @@ export class EnemyModel {
 
     constructor(type: string) {
         this.mesh = new THREE.Group();
-        this.targetPosition = new THREE.Vector3(0, 5, 0); 
+        this.targetPosition = new THREE.Vector3(0, 5, 0); // Spawn high to drop in safely
         this.type = type || "Unknown";
         
         this.bodyGroup = new THREE.Group();
@@ -27,6 +27,7 @@ export class EnemyModel {
     private buildModel() {
         const safeType = this.type.toLowerCase();
 
+        // 1. Build Base Geometry
         if (safeType.includes("slime")) {
             this.buildSlime(safeType);
         } else if (safeType.includes("wolf")) {
@@ -46,6 +47,40 @@ export class EnemyModel {
         } else {
             this.buildFallback();
         }
+
+        // 2. Global Variant Overlays
+        const isElite = safeType.includes("elite") || safeType.includes("alpha");
+        const isBoss = safeType.includes("king") || safeType.includes("boss");
+        const isCorrupted = safeType.includes("corrupt") || safeType.includes("necrotic");
+        const isFire = safeType.includes("fire") || safeType.includes("ember");
+
+        if (isElite) this.mesh.scale.setScalar(1.2);
+        if (isBoss) this.mesh.scale.setScalar(1.5);
+        if (isCorrupted) this.addAura(this.bodyGroup, 0x8800ff, 1.8);
+        if (isFire && !safeType.includes("fire")) this.addAura(this.bodyGroup, 0xff4400, 1.5);
+    }
+
+    // ==========================================
+    // AFFLICTION STATUS
+    // ==========================================
+
+    public setAfflictions(afflictions: string[]) {
+        const hasBleed = afflictions.includes("Bleed");
+        const hasNecrosis = afflictions.includes("Necrosis");
+        const hasIlluminated = afflictions.includes("Illuminated");
+
+        let emissive = 0x000000;
+
+        if (hasBleed && hasNecrosis) emissive = 0x550055;
+        else if (hasBleed) emissive = 0x550000;
+        else if (hasNecrosis) emissive = 0x330066;
+        else if (hasIlluminated) emissive = 0x555500;
+
+        this.mesh.traverse((child: any) => {
+            if (child instanceof THREE.Mesh && child.material && child.material.emissive !== undefined) {
+                child.material.emissive.setHex(emissive);
+            }
+        });
     }
 
     // ==========================================
@@ -248,11 +283,17 @@ export class EnemyModel {
     // ==========================================
 
     private addEyes(parent: THREE.Object3D, color: number, positions: THREE.Vector3[], size: number) {
-        const eyeMat = new THREE.MeshBasicMaterial({ color });
-        positions.forEach(pos => {
+        const eyeMat = new THREE.MeshStandardMaterial({ 
+            color, 
+            emissive: color, 
+            emissiveIntensity: 1.8, 
+            roughness: 0.25 
+        });
+        positions.forEach((pos, i) => {
             const eye = new THREE.Mesh(new THREE.SphereGeometry(size, 8, 8), eyeMat);
             eye.position.copy(pos);
             parent.add(eye);
+            this.bodyParts[`eye_${i}`] = eye;
         });
     }
 
@@ -386,10 +427,6 @@ export class EnemyModel {
         this.mesh.add(shadow);
     }
 
-    // ==========================================
-    // UPDATE LOOP
-    // ==========================================
-
     private addMandibles(parent: THREE.Object3D, mat: THREE.Material) {
         const geo = new THREE.BoxGeometry(0.1, 0.1, 0.4);
         
@@ -403,6 +440,10 @@ export class EnemyModel {
 
         parent.add(leftMandible, rightMandible);
     }
+
+    // ==========================================
+    // UPDATE LOOP
+    // ==========================================
 
     public update(dt: number, isMoving: boolean, action?: string) {
         if (isNaN(this.targetPosition.x)) this.targetPosition.x = 0;
@@ -418,6 +459,7 @@ export class EnemyModel {
         const safeType = this.type.toLowerCase();
         const body = this.bodyParts["mainBody"];
         
+        // --- BASE TYPE ANIMATIONS ---
         if (body) {
             if (safeType.includes("slime") || safeType.includes("toad")) {
                 if (isMoving) {
@@ -473,8 +515,6 @@ export class EnemyModel {
             }
             else if (safeType.includes("wraith")) {
                 body.position.y = this.baseHoverY + Math.sin(this.animTime * 2) * 0.3;
-                if (action === "attacking") body.rotation.x = 0.2; // Lean forward
-                else body.rotation.x = 0;
             }
             else if (safeType.includes("goblin")) {
                 const isKing = safeType.includes("king");
@@ -486,9 +526,6 @@ export class EnemyModel {
                 } else {
                     body.position.y = baseY;
                     body.rotation.z = 0;
-                }
-                if (action === "attacking" && this.bodyParts["weapon"]) {
-                    this.bodyParts["weapon"].rotation.x = Math.sin(this.animTime * 20) * 1.5;
                 }
             }
 
@@ -507,12 +544,33 @@ export class EnemyModel {
             });
         }
 
-        // --- MOVEMENT LERP ---
+        // --- GLOBAL ACTION STATES ---
+        const isAttacking = action === "attacking";
+        const isRecovering = action === "recovering";
+        const isStunned = action === "stunned";
+
+        if (isAttacking) {
+            this.bodyGroup.scale.setScalar(1.0 + Math.sin(this.animTime * 30) * 0.08);
+            this.bodyGroup.rotation.x = -0.25;
+            if (this.bodyParts["weapon"]) {
+                this.bodyParts["weapon"].rotation.x = Math.sin(this.animTime * 20) * 1.5;
+            }
+        } else if (isRecovering) {
+            this.bodyGroup.scale.y = 0.85;
+            this.bodyGroup.rotation.x = 0.15;
+        } else if (isStunned) {
+            this.bodyGroup.rotation.z = Math.sin(this.animTime * 20) * 0.15;
+        } else {
+            this.bodyGroup.scale.lerp(new THREE.Vector3(1, 1, 1), 0.15);
+            this.bodyGroup.rotation.x = THREE.MathUtils.lerp(this.bodyGroup.rotation.x, 0, 0.15);
+            this.bodyGroup.rotation.z = THREE.MathUtils.lerp(this.bodyGroup.rotation.z, 0, 0.15);
+        }
+
+        // --- MOVEMENT & ROTATION LERP ---
         const moveLerp = 1.0 - Math.exp(-10.0 * dt);
         this.mesh.position.lerp(this.targetPosition, moveLerp);
 
-        // --- ROTATION INTERPOLATION ---
-        if (isMoving || action === "attacking") {
+        if (isMoving || isAttacking) {
             const dx = this.targetPosition.x - this.mesh.position.x;
             const dz = this.targetPosition.z - this.mesh.position.z;
             

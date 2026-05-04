@@ -1044,9 +1044,10 @@ export class TownScene extends BaseScene {
 
     public addEnemy(id: string, name: string) {}
 
-    public updateEnemy(id: string, x: number, z: number, label: string, action: string, attackRadius: number, targetX: number, targetY: number, terrainY: number, afflictions: string[] = []) {
+   public updateEnemy(id: string, x: number, z: number, label: string, action: string, attackRadius: number, targetX: number, targetY: number, terrainY: number, afflictions: string[] = []) {
         let enemyData = this.enemies.get(id);
 
+        // 1. Initialize if new
         if (!enemyData) {
             const typeName = label.split(" (")[0]; 
             const visual = new EnemyModel(typeName);
@@ -1065,6 +1066,7 @@ export class TownScene extends BaseScene {
             this.enemies.set(id, enemyData);
         }
 
+        // 2. Update label if it changed (e.g., HP updates in the name)
         if (enemyData.currentLabel !== label) {
             const oldMat = enemyData.labelSprite.material;
             enemyData.visual.mesh.remove(enemyData.labelSprite);
@@ -1079,30 +1081,10 @@ export class TownScene extends BaseScene {
             enemyData.currentLabel = label;
         }
 
+        // 3. Update movement, action, and afflictions
         enemyData.action = action;
         enemyData.visual.targetPosition.set(x, this.getSurfaceHeightCached(x, z), z);
-
-        const isBleeding = afflictions.includes("Bleed");
-        const isNecrosis = afflictions.includes("Necrosis");
-        const isIlluminated = afflictions.includes("Illuminated");
-
-        enemyData.visual.mesh.traverse((child: any) => {
-            if (child instanceof THREE.Mesh && child.material) {
-                if (child.material.emissive !== undefined) {
-                    if (isBleeding && isNecrosis) {
-                        child.material.emissive.setHex(0x550055); 
-                    } else if (isBleeding) {
-                        child.material.emissive.setHex(0x550000); 
-                    } else if (isNecrosis) {
-                        child.material.emissive.setHex(0x330066); 
-                    } else if (isIlluminated) {
-                        child.material.emissive.setHex(0x555500); 
-                    } else {
-                        child.material.emissive.setHex(0x000000); 
-                    }
-                }
-            }
-        });
+        enemyData.visual.setAfflictions(afflictions);
     }
 
     public removeEnemy(id: string) {

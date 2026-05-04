@@ -1,15 +1,9 @@
 import { ITEM_DB } from "../ItemDatabase";
-import { QUEST_DB } from "../QuestDatabase";
+import { QUEST_DB as TUTORIAL_QUEST_DB } from "../QuestDatabase";
+import { NPC_QUEST_DB } from "../NPCQuestDatabase";
 
-
-// --- EXPORTED STATE ---
-export let isQuestUIOpen = false;
-
-// ==========================================
-// GLOBAL UI UTILITIES & STYLES
-// ==========================================
-
-export function injectGlobalChunkyStyles() {
+// --- GLOBAL LUXURY FUI STYLES INJECTION ---
+function injectGlobalChunkyStyles() {
     if (!document.getElementById("chunky-ui-styles")) {
         const style = document.createElement("style");
         style.id = "chunky-ui-styles";
@@ -75,15 +69,6 @@ export function injectGlobalChunkyStyles() {
             .btn-red { border-color: var(--fui-danger); color: #ff4444; }
             .btn-red:hover:not(:disabled) { background: var(--fui-danger); color: white; box-shadow: 0 0 15px rgba(139, 0, 0, 0.6); }
             
-            .btn-blue { border-color: var(--fui-cyan); color: var(--fui-cyan); }
-            .btn-blue:hover:not(:disabled) { background: var(--fui-cyan); color: var(--fui-bg); box-shadow: 0 0 15px rgba(0, 229, 255, 0.4); }
-
-            .btn-gold { border-color: var(--fui-gold); color: var(--fui-gold); background: rgba(212,175,55,0.1); }
-            .btn-gold:hover:not(:disabled) { background: var(--fui-gold); color: var(--fui-bg); }
-
-            .btn-slate { border-color: var(--fui-text-dim); color: var(--fui-text-dim); }
-            .btn-slate:hover:not(:disabled) { background: var(--fui-text-dim); color: var(--fui-bg); }
-
             .btn-close-chunky {
                 background: transparent; border: 1px solid var(--fui-danger); border-radius: 4px;
                 width: 36px; height: 36px; color: #ff4444; font-weight: 900;
@@ -98,110 +83,18 @@ export function injectGlobalChunkyStyles() {
             .chunky-panel {
                 background: var(--fui-panel); border-radius: 4px; padding: 15px; border: 1px solid var(--fui-gold-dim);
             }
-
-            /* Custom Scrollbar for FUI */
-            ::-webkit-scrollbar { width: 6px; }
-            ::-webkit-scrollbar-track { background: var(--fui-bg); }
-            ::-webkit-scrollbar-thumb { background: var(--fui-gold-dim); border-radius: 3px; }
-            ::-webkit-scrollbar-thumb:hover { background: var(--fui-gold); }
-
-            /* --- HUD STYLES --- */
-            #chunky-hud-container {
-                position: fixed;
-                top: 20px;
-                left: 20px;
-                display: flex;
-                flex-direction: column;
-                gap: 12px;
-                z-index: 50;
-                font-family: 'Nunito', sans-serif;
-                pointer-events: none; 
-            }
-            .hud-bar-bg {
-                width: 250px;
-                height: 28px;
-                background: rgba(0,0,0,0.6);
-                border: 1px solid var(--fui-gold-dim);
-                border-radius: 2px;
-                position: relative;
-                overflow: hidden;
-                box-shadow: 0 4px 10px rgba(0,0,0,0.5);
-            }
-            .hud-bar-fill {
-                height: 100%;
-                transition: width 0.2s ease-out;
-                position: relative;
-            }
-            .hud-bar-fill::after {
-                content: '';
-                position: absolute;
-                top: 0; left: 0; right: 0; bottom: 0;
-                background: linear-gradient(180deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0) 50%, rgba(0,0,0,0.2) 100%);
-            }
-            .hud-icon {
-                position: absolute;
-                left: -15px;
-                top: -8px;
-                font-size: 30px;
-                filter: drop-shadow(0 2px 4px rgba(0,0,0,0.8));
-                z-index: 2;
-            }
-            .hud-text {
-                position: absolute;
-                right: 12px;
-                top: 50%;
-                transform: translateY(-50%);
-                color: var(--fui-text);
-                font-weight: 900;
-                font-size: 12px;
-                letter-spacing: 1px;
-                text-shadow: 1px 1px 2px black;
-                z-index: 2;
-            }
-            .fill-hp { background: var(--fui-danger); border-right: 1px solid #ff4444; }
-            .fill-mp { background: var(--fui-cyan); border-right: 1px solid #fff; }
-            .fill-stamina { background: var(--fui-gold); border-right: 1px solid #fff; z-index: 1;}
-            .fill-hunger-cap { 
-                position: absolute; 
-                right: 0; top: 0; height: 100%; 
-                background: repeating-linear-gradient(45deg, #3a2e2b, #3a2e2b 5px, #2a2422 5px, #2a2422 10px); 
-                z-index: 0;
-            }
-
-            /* --- RESPONSIVE MODAL LAYOUTS --- */
-            .responsive-split-container {
-                display: flex;
-                gap: 30px;
-            }
-
-            @media (max-width: 800px) {
-                .responsive-split-container {
-                    flex-direction: column;
-                    gap: 15px;
-                }
-                #inv-equip-container {
-                    flex: auto !important;
-                    width: 100%;
-                    grid-template-columns: repeat(3, 1fr) !important;
-                }
-                .chest-panel-half {
-                    flex: auto !important;
-                    width: 100%;
-                }
-                .modal-chunky {
-                    padding: 15px !important;
-                }
-                .hud-bar-bg { width: 200px; }
-            }
-
-            @media (max-width: 500px) {
-                #inv-equip-container {
-                    grid-template-columns: repeat(2, 1fr) !important;
-                }
-            }
         `;
         document.head.appendChild(style);
     }
+}
+
+// --- EXPORTED STATE ---
+export let isQuestUIOpen = false;
+
+// --- UNIFIED QUEST LOOKUP ---
+// This safely checks the NPC database first, then falls back to the Tutorial database.
+function getQuestDef(questId: string) {
+    return NPC_QUEST_DB[questId] || TUTORIAL_QUEST_DB[questId] || null;
 }
 
 // --- QUEST ACCEPT MODAL ---
@@ -230,31 +123,42 @@ export function openQuestUI(activeRoom: any, keys: any, playerName: string, ques
         document.body.appendChild(modal);
     }
 
-    // Look up the quest details
-    const questDef = QUEST_DB[questId] || {
+    // Look up the quest details using the unified helper
+    const questDef = getQuestDef(questId) || {
         title: "Unknown Quest",
         dialogue: "I have a task for you...",
-        objectives: [{ requiredAmount: 1 }]
+        objectives: [{ requiredAmount: 1 }],
+        rewards: { coins: 0, exp: 0 }
     };
 
+    // Safely parse the dialogue to replace the hud-key spans with FUI cyan styling
+    const parsedDialogue = questDef.dialogue
+        .replace(/<span class='hud-key'>/g, "<span style='color: var(--fui-cyan); font-weight: 900; letter-spacing: 1px;'>")
+        .replace(/<\/span>/g, "</span>");
+
     modal.innerHTML = `
-      <div style="display:flex; justify-content:space-between; align-items:center; border-bottom: 4px solid #334155; padding-bottom: 15px; margin-bottom: 20px;">
-        <h2 style="margin:0; color:#38bdf8; font-size: 26px; font-weight: 900;">New Quest!</h2>
+      <div style="display:flex; justify-content:space-between; align-items:center; border-bottom: 1px solid var(--fui-gold-dim); padding-bottom: 15px; margin-bottom: 20px;">
+        <h2 style="margin:0; color:var(--fui-gold); font-size: 20px; font-weight: 900; letter-spacing: 2px;">NEW CONTRACT</h2>
         <button id="close-quest-btn" class="btn-close-chunky">&times;</button>
       </div>
-      <div class="chunky-panel" style="margin-bottom: 20px; text-align: center; font-size: 18px; color: #f8fafc;">
-        <div style="font-size: 40px; margin-bottom: 10px;">📜</div>
+      <div class="chunky-panel" style="margin-bottom: 20px; text-align: center; font-size: 14px; color: var(--fui-text); letter-spacing: 1px; line-height: 1.6;">
+        <div style="font-size: 40px; margin-bottom: 10px; filter: drop-shadow(0 0 10px var(--fui-gold-dim));">📜</div>
         <div id="quest-dialogue-container">
-            ${questDef.dialogue.replace("<span class='hud-key'>", "").replace("</span>", "")}
+            ${parsedDialogue}
         </div>
       </div>
-      <div class="chunky-panel" style="margin-bottom: 20px; background: #0f172a; border-color: #1e293b;">
-        <div style="font-weight: 900; color: #f59e0b; margin-bottom: 5px; font-size: 14px; text-transform: uppercase;">Your Mission:</div>
-        <div style="color: #fff; font-size: 18px; font-weight: 700;">${questDef.title}</div>
+      <div class="chunky-panel" style="margin-bottom: 20px; background: rgba(0,0,0,0.4); border-color: var(--fui-cyan);">
+        <div style="font-weight: 900; color: var(--fui-cyan); margin-bottom: 5px; font-size: 10px; text-transform: uppercase; letter-spacing: 2px;">OBJECTIVE:</div>
+        <div style="color: white; font-size: 16px; font-weight: 900; letter-spacing: 1px;">${questDef.title}</div>
+        
+        <div style="font-weight: 900; color: var(--fui-gold); margin-top: 15px; margin-bottom: 5px; font-size: 10px; text-transform: uppercase; letter-spacing: 2px;">REWARDS:</div>
+        <div style="color: var(--fui-text); font-weight: 700; font-size: 12px; letter-spacing: 1px;">
+            💰 ${questDef.rewards?.coins || 0} CR <span style="color:var(--fui-gold-dim); margin: 0 5px;">|</span> ⭐ ${questDef.rewards?.exp || 0} EXP
+        </div>
       </div>
       <div style="display:flex; gap: 15px;">
-          <button id="accept-quest-btn" class="btn-chunky btn-green" style="flex: 1; padding: 15px;">Accept</button>
-          <button id="decline-quest-btn" class="btn-chunky btn-red" style="flex: 1; padding: 15px;">Decline</button>
+          <button id="accept-quest-btn" class="btn-chunky btn-green" style="flex: 1; padding: 15px;">ACCEPT</button>
+          <button id="decline-quest-btn" class="btn-chunky btn-red" style="flex: 1; padding: 15px;">DECLINE</button>
       </div>
     `;
 
@@ -287,7 +191,7 @@ export function renderQuestTracker(me: any) {
         tracker.style.flexDirection = "column";
         tracker.style.gap = "15px";
         tracker.style.zIndex = "40";
-        tracker.style.fontFamily = "'Nunito', 'Segoe UI Rounded', sans-serif";
+        tracker.style.fontFamily = "'Nunito', sans-serif";
         tracker.style.pointerEvents = "none";
         document.body.appendChild(tracker);
     }
@@ -295,23 +199,26 @@ export function renderQuestTracker(me: any) {
     let html = "";
     if (me && me.activeQuests && me.activeQuests.size > 0) {
         me.activeQuests.forEach((qState: any, qId: string) => {
-            const def = QUEST_DB[qId];
+            
+            // Use the unified helper here to pull the correct DB info
+            const def = getQuestDef(qId);
+            
             if (def) {
                 const reqAmt = def.objectives[0]?.requiredAmount || 1;
                 const curAmt = qState.currentAmount || 0;
                 const pct = Math.min(100, (curAmt / reqAmt) * 100);
 
                 html += `
-                    <div style="background: #1e293b; border: 4px solid #38bdf8; border-radius: 20px; padding: 15px; width: 280px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); pointer-events: auto;">
-                        <div style="color: #fde047; font-size: 18px; font-weight: 900; text-transform: uppercase; border-bottom: 4px solid #334155; padding-bottom: 8px; margin-bottom: 10px; display: flex; align-items: center; gap: 8px;">
-                            <span style="font-size: 24px;">📜</span> ${def.title}
+                    <div style="background: var(--fui-bg); border: 2px solid var(--fui-gold); border-radius: 4px; padding: 15px; width: 280px; box-shadow: 0 10px 25px rgba(0,0,0,0.8), inset 0 0 15px rgba(212,175,55,0.05); pointer-events: auto;">
+                        <div style="color: var(--fui-gold); font-size: 14px; font-weight: 900; text-transform: uppercase; border-bottom: 1px solid var(--fui-gold-dim); padding-bottom: 8px; margin-bottom: 10px; display: flex; align-items: center; gap: 8px; letter-spacing: 1px;">
+                            <span style="font-size: 18px; filter: drop-shadow(0 0 5px var(--fui-gold-dim));">📜</span> ${def.title}
                         </div>
-                        <div style="background: #0f172a; padding: 10px; border-radius: 12px; border: 3px solid #334155;">
-                            <div style="color: #38bdf8; font-size: 12px; font-weight: 900; margin-bottom: 6px; text-transform: uppercase;">Progress:</div>
-                            <div style="width: 100%; height: 14px; background: #1e293b; border-radius: 7px; overflow: hidden; border: 2px solid #475569;">
-                                <div style="width: ${pct}%; height: 100%; background: #22c55e; transition: width 0.3s ease;"></div>
+                        <div style="background: rgba(0,0,0,0.4); padding: 10px; border-radius: 4px; border: 1px solid var(--fui-gold-dim);">
+                            <div style="color: var(--fui-cyan); font-size: 10px; font-weight: 900; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 1px;">PROGRESS:</div>
+                            <div style="width: 100%; height: 8px; background: var(--fui-bg); border-radius: 2px; overflow: hidden; border: 1px solid var(--fui-gold-dim);">
+                                <div style="width: ${pct}%; height: 100%; background: var(--fui-cyan); transition: width 0.3s ease; box-shadow: 0 0 10px var(--fui-cyan);"></div>
                             </div>
-                            <div style="text-align: right; color: #fff; font-size: 14px; font-weight: 900; margin-top: 6px;">
+                            <div style="text-align: right; color: var(--fui-text); font-size: 12px; font-weight: 900; margin-top: 6px; letter-spacing: 1px;">
                                 ${curAmt} / ${reqAmt}
                             </div>
                         </div>

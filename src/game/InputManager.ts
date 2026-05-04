@@ -1,3 +1,6 @@
+// Removed old Colyseus 0.14 primitive teardown patch.
+// If primitive onRemove crashes return, check package versions instead of patching global prototypes.
+
 import * as THREE from "three";
 import { 
     attemptAttack, 
@@ -21,11 +24,14 @@ import {
 } from "../ui/AbilityUI";
 
 import { 
-    openQuestUI, openTeleportUI, openCasinoUI, openInventoryUI, 
+    openTeleportUI, openCasinoUI, openInventoryUI, 
     openChestUI, openShopUI, openBlueprintSelector, openMirrorUI,
-    isQuestUIOpen, isTeleportUIOpen, isCasinoUIOpen, isInventoryUIOpen,
+    isTeleportUIOpen, isCasinoUIOpen, isInventoryUIOpen,
     isChestUIOpen, isShopUIOpen, isMirrorUIOpen
 } from "../ui/ModalManager";
+
+// --- QUEST UI IMPORTS ---
+import { openQuestUI, isQuestUIOpen } from "../ui/QuestUI";
 
 import { isWorldMapOpen, setIsWorldMapOpen, addGameEvent, openCraftingMenu, openStoreMenu } from "../ui/HUDManager";
 

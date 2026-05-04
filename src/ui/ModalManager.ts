@@ -1,85 +1,113 @@
 import { ITEM_DB } from "../ItemDatabase";
 
 // --- EXPORTED UI STATE ---
-export let isQuestUIOpen = false;
 export let isTeleportUIOpen = false;
-
 export let isInventoryUIOpen = false;
 export let isChestUIOpen = false;
 export let isShopUIOpen = false;
 export let isEventInviteOpen = false;
-export let isMirrorUIOpen = false; // --- ADDED FOR MIRROR ---
+export let isMirrorUIOpen = false;
+export let isCasinoUIOpen = false;
 
 export let activeChestId: string | null = null;
 export let activeStallType: string | null = null;
 
-// --- GLOBAL CHUNKY STYLES INJECTION ---
+// --- GLOBAL LUXURY FUI STYLES INJECTION ---
 function injectGlobalChunkyStyles() {
     if (!document.getElementById("chunky-ui-styles")) {
         const style = document.createElement("style");
         style.id = "chunky-ui-styles";
         style.innerHTML = `
-            @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@700;900&display=swap');
+            @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;900&display=swap');
             
+            /* High-Contrast Warm Luxury FUI Palette */
+            :root {
+                --fui-bg: #1a1514;
+                --fui-panel: rgba(212, 175, 55, 0.05);
+                --fui-gold: #d4af37;
+                --fui-gold-dim: rgba(212, 175, 55, 0.3);
+                --fui-text: #f3e5ab;
+                --fui-text-dim: #a89f88;
+                --fui-danger: #8b0000;
+                --fui-cyan: #00E5FF;
+            }
+
             .modal-chunky {
-                font-family: 'Nunito', 'Segoe UI Rounded', sans-serif;
-                background: #1e293b;
-                border: 4px solid #38bdf8;
-                border-radius: 24px;
-                box-shadow: 0 15px 40px rgba(0,0,0,0.4);
-                color: white;
+                font-family: 'Nunito', 'Segoe UI', sans-serif;
+                background: var(--fui-bg);
+                border: 2px solid var(--fui-gold);
+                border-radius: 8px;
+                box-shadow: 0 20px 50px rgba(0,0,0,0.9), inset 0 0 30px rgba(212, 175, 55, 0.05);
+                color: var(--fui-text);
                 box-sizing: border-box;
                 max-width: 95vw;
                 max-height: 90vh;
                 overflow-y: auto;
+                text-transform: uppercase;
+                letter-spacing: 0.5px;
             }
             .btn-chunky {
-                border: none;
-                border-radius: 16px;
+                border: 1px solid var(--fui-gold);
+                border-radius: 4px;
                 font-weight: 900;
-                font-size: 16px;
+                font-size: 14px;
                 cursor: pointer;
-                transition: transform 0.1s, box-shadow 0.1s;
+                transition: all 0.2s ease;
                 text-transform: uppercase;
                 font-family: 'Nunito', sans-serif;
-                letter-spacing: 1px;
+                letter-spacing: 2px;
                 display: flex;
                 justify-content: center;
                 align-items: center;
                 gap: 8px;
+                background: var(--fui-panel);
+                color: var(--fui-gold);
+                box-shadow: inset 0 0 0 rgba(212, 175, 55, 0);
+            }
+            .btn-chunky:hover:not(:disabled) {
+                background: var(--fui-gold);
+                color: var(--fui-bg);
+                box-shadow: 0 0 15px rgba(212, 175, 55, 0.4);
             }
             .btn-chunky:active:not(:disabled) {
-                transform: translateY(6px);
+                transform: scale(0.98);
             }
-            .btn-green { background: #22c55e; color: white; box-shadow: 0 6px 0 #16a34a; }
-            .btn-green:active:not(:disabled) { box-shadow: 0 0px 0 #16a34a; }
             
-            .btn-red { background: #ef4444; color: white; box-shadow: 0 6px 0 #b91c1c; }
-            .btn-red:active:not(:disabled) { box-shadow: 0 0px 0 #b91c1c; }
+            .btn-green { border-color: #22c55e; color: #22c55e; }
+            .btn-green:hover:not(:disabled) { background: #22c55e; color: var(--fui-bg); box-shadow: 0 0 15px rgba(34, 197, 94, 0.4); }
             
-            .btn-blue { background: #3b82f6; color: white; box-shadow: 0 6px 0 #2563eb; }
-            .btn-blue:active:not(:disabled) { box-shadow: 0 0px 0 #2563eb; }
+            .btn-red { border-color: var(--fui-danger); color: #ff4444; }
+            .btn-red:hover:not(:disabled) { background: var(--fui-danger); color: white; box-shadow: 0 0 15px rgba(139, 0, 0, 0.6); }
+            
+            .btn-blue { border-color: var(--fui-cyan); color: var(--fui-cyan); }
+            .btn-blue:hover:not(:disabled) { background: var(--fui-cyan); color: var(--fui-bg); box-shadow: 0 0 15px rgba(0, 229, 255, 0.4); }
 
-            .btn-gold { background: #f59e0b; color: white; box-shadow: 0 6px 0 #d97706; }
-            .btn-gold:active:not(:disabled) { box-shadow: 0 0px 0 #d97706; }
+            .btn-gold { border-color: var(--fui-gold); color: var(--fui-gold); background: rgba(212,175,55,0.1); }
+            .btn-gold:hover:not(:disabled) { background: var(--fui-gold); color: var(--fui-bg); }
 
-            .btn-slate { background: #475569; color: white; box-shadow: 0 6px 0 #334155; }
-            .btn-slate:active:not(:disabled) { box-shadow: 0 0px 0 #334155; }
+            .btn-slate { border-color: var(--fui-text-dim); color: var(--fui-text-dim); }
+            .btn-slate:hover:not(:disabled) { background: var(--fui-text-dim); color: var(--fui-bg); }
 
             .btn-close-chunky {
-                background: #ef4444; box-shadow: 0 4px 0 #b91c1c; border-radius: 50%;
-                width: 36px; height: 36px; color: white; border: none; font-weight: 900;
+                background: transparent; border: 1px solid var(--fui-danger); border-radius: 4px;
+                width: 36px; height: 36px; color: #ff4444; font-weight: 900;
                 cursor: pointer; display: flex; align-items: center; justify-content: center;
-                font-size: 20px; transition: transform 0.1s, box-shadow 0.1s;
+                font-size: 20px; transition: all 0.2s ease;
                 flex-shrink: 0;
             }
-            .btn-close-chunky:active {
-                transform: translateY(4px); box-shadow: 0 0px 0 #b91c1c;
+            .btn-close-chunky:hover {
+                background: var(--fui-danger); color: white; box-shadow: 0 0 10px rgba(139, 0, 0, 0.6);
             }
             
             .chunky-panel {
-                background: #334155; border-radius: 16px; padding: 15px; border: 3px solid #475569;
+                background: var(--fui-panel); border-radius: 4px; padding: 15px; border: 1px solid var(--fui-gold-dim);
             }
+
+            /* Custom Scrollbar for FUI */
+            ::-webkit-scrollbar { width: 6px; }
+            ::-webkit-scrollbar-track { background: var(--fui-bg); }
+            ::-webkit-scrollbar-thumb { background: var(--fui-gold-dim); border-radius: 3px; }
+            ::-webkit-scrollbar-thumb:hover { background: var(--fui-gold); }
 
             /* --- HUD STYLES --- */
             #chunky-hud-container {
@@ -90,41 +118,36 @@ function injectGlobalChunkyStyles() {
                 flex-direction: column;
                 gap: 12px;
                 z-index: 50;
-                font-family: 'Nunito', 'Segoe UI Rounded', sans-serif;
+                font-family: 'Nunito', sans-serif;
                 pointer-events: none; 
             }
             .hud-bar-bg {
                 width: 250px;
-                height: 32px;
-                background: #1e293b;
-                border: 4px solid #475569;
-                border-radius: 16px;
+                height: 28px;
+                background: rgba(0,0,0,0.6);
+                border: 1px solid var(--fui-gold-dim);
+                border-radius: 2px;
                 position: relative;
                 overflow: hidden;
-                box-shadow: 0 8px 15px rgba(0,0,0,0.3);
+                box-shadow: 0 4px 10px rgba(0,0,0,0.5);
             }
             .hud-bar-fill {
                 height: 100%;
-                border-radius: 10px;
                 transition: width 0.2s ease-out;
                 position: relative;
             }
             .hud-bar-fill::after {
                 content: '';
                 position: absolute;
-                top: 2px;
-                left: 2px;
-                right: 2px;
-                height: 8px;
-                background: rgba(255, 255, 255, 0.3);
-                border-radius: 6px;
+                top: 0; left: 0; right: 0; bottom: 0;
+                background: linear-gradient(180deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0) 50%, rgba(0,0,0,0.2) 100%);
             }
             .hud-icon {
                 position: absolute;
                 left: -15px;
-                top: -10px;
-                font-size: 36px;
-                filter: drop-shadow(0 4px 0 rgba(0,0,0,0.4));
+                top: -8px;
+                font-size: 30px;
+                filter: drop-shadow(0 2px 4px rgba(0,0,0,0.8));
                 z-index: 2;
             }
             .hud-text {
@@ -132,19 +155,20 @@ function injectGlobalChunkyStyles() {
                 right: 12px;
                 top: 50%;
                 transform: translateY(-50%);
-                color: white;
+                color: var(--fui-text);
                 font-weight: 900;
-                font-size: 14px;
-                text-shadow: 0 2px 0 rgba(0,0,0,0.5);
+                font-size: 12px;
+                letter-spacing: 1px;
+                text-shadow: 1px 1px 2px black;
                 z-index: 2;
             }
-            .fill-hp { background: #ef4444; border-right: 2px solid #b91c1c; }
-            .fill-mp { background: #3b82f6; border-right: 2px solid #2563eb; }
-            .fill-stamina { background: #eab308; border-right: 2px solid #b45309; z-index: 1;}
+            .fill-hp { background: var(--fui-danger); border-right: 1px solid #ff4444; }
+            .fill-mp { background: var(--fui-cyan); border-right: 1px solid #fff; }
+            .fill-stamina { background: var(--fui-gold); border-right: 1px solid #fff; z-index: 1;}
             .fill-hunger-cap { 
                 position: absolute; 
                 right: 0; top: 0; height: 100%; 
-                background: repeating-linear-gradient(45deg, #7f1d1d, #7f1d1d 10px, #991b1b 10px, #991b1b 20px); 
+                background: repeating-linear-gradient(45deg, #3a2e2b, #3a2e2b 5px, #2a2422 5px, #2a2422 10px); 
                 z-index: 0;
             }
 
@@ -191,7 +215,6 @@ export function renderChunkyHUD(player: any) {
 
     let hud = document.getElementById("chunky-hud-container");
     
-    // Create the HUD structure if it doesn't exist yet
     if (!hud) {
         hud = document.createElement("div");
         hud.id = "chunky-hud-container";
@@ -212,7 +235,7 @@ export function renderChunkyHUD(player: any) {
             </div>
             <div style="position: relative; margin-left: 15px;" title="Eat food to restore your maximum stamina!">
                 <div class="hud-icon">🍗</div>
-                <div class="hud-bar-bg" style="border-color: #b45309;">
+                <div class="hud-bar-bg">
                     <div id="hud-hunger-fill" class="fill-hunger-cap" style="width: 0%;"></div>
                     <div id="hud-stamina-fill" class="hud-bar-fill fill-stamina" style="width: 100%;"></div>
                     <div id="hud-stamina-text" class="hud-text">100 / 100</div>
@@ -222,7 +245,6 @@ export function renderChunkyHUD(player: any) {
         document.body.appendChild(hud);
     }
 
-    // Update existing HUD elements without recreating the DOM
     const hpPct = Math.max(0, Math.min(100, (player.hp / player.maxHp) * 100));
     const mpPct = Math.max(0, Math.min(100, (player.mp / player.maxMp) * 100));
     const staminaPct = Math.max(0, Math.min(100, (player.stamina / player.maxStamina) * 100));
@@ -252,87 +274,7 @@ export function renderChunkyHUD(player: any) {
     }
 }
 
-// --- EXPORTED MODAL FUNCTIONS ---
-export function openQuestUI(activeRoom: any, keys: any, playerName: string, questId: string = "protector_1_wolves") {
-    if (isQuestUIOpen || !activeRoom) return;
-    isQuestUIOpen = true;
-    injectGlobalChunkyStyles();
-
-    for (const key in keys) {
-        keys[key as keyof typeof keys] = false;
-    }
-
-    let modal = document.getElementById("quest-modal");
-    if (!modal) {
-        modal = document.createElement("div");
-        modal.id = "quest-modal";
-        modal.className = "modal-chunky";
-        modal.style.position = "fixed"; 
-        modal.style.top = "50%"; 
-        modal.style.left = "50%";
-        modal.style.transform = "translate(-50%, -50%)"; 
-        modal.style.padding = "30px"; 
-        modal.style.zIndex = "1000"; 
-        modal.style.width = "450px";
-        document.body.appendChild(modal);
-    }
-
-    // Look up the quest details from our DB (Fallback to defaults if not found)
-    const questDef = ITEM_DB[questId] || { // Note: Assuming QUEST_DB is imported or accessible here, using fallback text if not
-        title: "New Quest!",
-        dialogue: `"Hey, <span id="quest-player-name" style="color: #f59e0b; font-weight: 900;"></span>! The wilderness is crawling with monsters. We need your help to clear them out. Can we count on you?"`,
-        targetAmt: 5,
-        targetName: "Enemies",
-        rewards: { coins: 250, exp: 500 }
-    };
-
-    modal.innerHTML = `
-      <div style="display:flex; justify-content:space-between; align-items:center; border-bottom: 4px solid #334155; padding-bottom: 15px; margin-bottom: 20px;">
-        <h2 style="margin:0; color:#38bdf8; font-size: 26px; font-weight: 900;">New Quest!</h2>
-        <button id="close-quest-btn" class="btn-close-chunky">&times;</button>
-      </div>
-      <div class="chunky-panel" style="margin-bottom: 20px; text-align: center; font-size: 18px; color: #f8fafc;">
-        <div style="font-size: 40px; margin-bottom: 10px;">📜</div>
-        <div id="quest-dialogue-container"></div>
-      </div>
-      <div class="chunky-panel" style="margin-bottom: 20px; background: #0f172a; border-color: #1e293b;">
-        <div style="font-weight: 900; color: #f59e0b; margin-bottom: 5px; font-size: 14px; text-transform: uppercase;">Your Mission:</div>
-        <div style="color: #fff; font-size: 18px; font-weight: 700;">Complete Objectives</div>
-        
-        <div style="font-weight: 900; color: #38bdf8; margin-top: 15px; margin-bottom: 5px; font-size: 14px; text-transform: uppercase;">Rewards:</div>
-        <div style="color: #fff; font-weight: 700;">💰 Rewards Pending <span style="color:#64748b; margin: 0 5px;">|</span> ⭐ Experience</div>
-      </div>
-      <div style="display:flex; gap: 15px;">
-          <button id="accept-quest-btn" class="btn-chunky btn-green" style="flex: 1; padding: 15px;">Accept</button>
-          <button id="decline-quest-btn" class="btn-chunky btn-red" style="flex: 1; padding: 15px;">Decline</button>
-      </div>
-    `;
-
-    // Safely insert the dynamic dialogue text
-    const dialogueContainer = document.getElementById("quest-dialogue-container");
-    if (dialogueContainer) {
-        // Use default dialogue string if QUEST_DB isn't mapped properly in ModalManager yet
-        dialogueContainer.innerHTML = `"Hey, <span style="color: #f59e0b; font-weight: 900;">${playerName}</span>! The wilderness is crawling with monsters. We need your help to clear them out. Can we count on you?"`;
-    }
-
-    document.getElementById("close-quest-btn")!.onclick = () => {
-        isQuestUIOpen = false;
-        document.body.removeChild(modal!);
-    };
-
-    document.getElementById("decline-quest-btn")!.onclick = () => {
-        isQuestUIOpen = false;
-        document.body.removeChild(modal!);
-    };
-
-    document.getElementById("accept-quest-btn")!.onclick = () => {
-        // We now send the specific questId passed into the function!
-        activeRoom.send("acceptQuest", { questId: questId });
-        isQuestUIOpen = false;
-        document.body.removeChild(modal!);
-    };
-}
-
+// --- TELEPORT UI ---
 export function openTeleportUI(activeRoom: any, keys: any) {
     if (isTeleportUIOpen || !activeRoom) return;
     isTeleportUIOpen = true;
@@ -359,15 +301,15 @@ export function openTeleportUI(activeRoom: any, keys: any) {
     }
 
     modal.innerHTML = `
-      <div style="display:flex; justify-content:space-between; align-items:center; border-bottom: 4px solid #334155; padding-bottom: 15px; margin-bottom: 20px;">
-        <h2 style="margin:0; color:#38bdf8; font-size: 26px; font-weight: 900;">Fast Travel</h2>
+      <div style="display:flex; justify-content:space-between; align-items:center; border-bottom: 1px solid var(--fui-gold-dim); padding-bottom: 15px; margin-bottom: 20px;">
+        <h2 style="margin:0; color:var(--fui-gold); font-size: 20px; font-weight: 900; letter-spacing: 2px;">Fast Travel Network</h2>
         <button id="close-teleport-btn" class="btn-close-chunky">&times;</button>
       </div>
-      <div style="display:flex; flex-direction:column; gap:20px; margin-bottom: 10px;">
-          <button id="tp-town" class="btn-chunky btn-gold" style="padding: 20px; font-size: 18px; display: flex; flex-direction: column; gap: 5px;">
+      <div style="display:flex; flex-direction:column; gap:15px; margin-bottom: 10px;">
+          <button id="tp-town" class="btn-chunky btn-gold" style="padding: 15px; display: flex; flex-direction: column; gap: 5px;">
               <span style="font-size: 24px;">🏰</span> Town of Beginnings
           </button>
-          <button id="tp-elven" class="btn-chunky btn-green" style="padding: 20px; font-size: 18px; display: flex; flex-direction: column; gap: 5px;">
+          <button id="tp-elven" class="btn-chunky btn-cyan" style="padding: 15px; display: flex; flex-direction: column; gap: 5px; border-color: var(--fui-cyan); color: var(--fui-cyan);">
               <span style="font-size: 24px;">✨</span> The Elven Kingdom
           </button>
       </div>
@@ -391,15 +333,15 @@ export function openTeleportUI(activeRoom: any, keys: any) {
     };
 }
 
-// --- EXPORTED UI STATE ---
-export let isCasinoUIOpen = false;
-
+// --- CASINO UI ---
 export function openCasinoUI(activeRoom: any, keys: any, gameType: string) {
     if (isCasinoUIOpen || !activeRoom) return;
     isCasinoUIOpen = true;
     
     if (typeof (window as any).injectGlobalChunkyStyles === "function") {
         (window as any).injectGlobalChunkyStyles();
+    } else {
+        injectGlobalChunkyStyles();
     }
 
     for (const key in keys) keys[key as keyof typeof keys] = false;
@@ -433,12 +375,13 @@ export function openCasinoUI(activeRoom: any, keys: any, gameType: string) {
             
             /* Quick Bet Buttons */
             .quick-bet-btn {
-                background: #334155; border: 2px solid #475569; color: #cbd5e1;
-                border-radius: 8px; padding: 5px 10px; font-weight: 900; font-size: 12px;
-                cursor: pointer; transition: all 0.1s; flex: 1; font-family: 'Nunito', sans-serif;
+                background: transparent; border: 1px solid var(--fui-gold-dim); color: var(--fui-text);
+                border-radius: 4px; padding: 5px 10px; font-weight: 900; font-size: 10px;
+                cursor: pointer; transition: all 0.2s; flex: 1; font-family: 'Nunito', sans-serif;
+                letter-spacing: 1px; text-transform: uppercase;
             }
-            .quick-bet-btn:hover { background: #475569; color: #fff; }
-            .quick-bet-btn:active { transform: translateY(2px); }
+            .quick-bet-btn:hover { background: var(--fui-gold); color: var(--fui-bg); }
+            .quick-bet-btn:active { transform: scale(0.95); }
         `;
         document.head.appendChild(style);
     }
@@ -452,8 +395,6 @@ export function openCasinoUI(activeRoom: any, keys: any, gameType: string) {
         modal.style.top = "50%"; 
         modal.style.left = "50%";
         modal.style.transform = "translate(-50%, -50%)"; 
-        modal.style.background = "#4c1d95"; 
-        modal.style.borderColor = "#f472b6";
         modal.style.padding = "30px"; 
         modal.style.zIndex = "1000"; 
         modal.style.width = "400px";
@@ -470,42 +411,42 @@ export function openCasinoUI(activeRoom: any, keys: any, gameType: string) {
     if (gameType === "Coin Toss") {
         visualArea = `
             <div style="height: 120px; display: flex; align-items: center; justify-content: center; perspective: 800px;">
-                <div id="2d-coin" style="width: 80px; height: 80px; border-radius: 50%; background: #f59e0b; border: 6px solid #fde68a; box-shadow: 0 10px 0 #b45309; display: flex; align-items: center; justify-content: center; font-size: 40px; font-weight: 900; color: white;">💰</div>
+                <div id="2d-coin" style="width: 80px; height: 80px; border-radius: 50%; background: radial-gradient(circle, var(--fui-gold) 0%, #8b6508 100%); border: 2px solid #fff; box-shadow: 0 0 20px rgba(212,175,55,0.5); display: flex; align-items: center; justify-content: center; font-size: 40px;">💰</div>
             </div>`;
         customInputs = `
             <div style="margin: 15px 0; display:flex; justify-content:center; gap:15px;">
-                <button id="btn-heads" class="btn-chunky btn-blue" style="flex:1; padding: 15px;">HEADS</button>
+                <button id="btn-heads" class="btn-chunky btn-cyan" style="flex:1; padding: 15px; border-color: var(--fui-cyan); color: var(--fui-cyan);">HEADS</button>
                 <button id="btn-tails" class="btn-chunky btn-red" style="flex:1; padding: 15px;">TAILS</button>
             </div>
         `;
     } else if (gameType === "Roulette") {
         visualArea = `
             <div style="height: 140px; display: flex; align-items: center; justify-content: center; overflow: hidden;">
-                <div id="2d-roulette" style="width: 120px; height: 120px; border-radius: 50%; border: 8px solid #334155; background: repeating-conic-gradient(#ef4444 0 18deg, #1e293b 18deg 36deg); box-shadow: 0 10px 0 #0f172a; display: flex; align-items: center; justify-content: center; position: relative;">
-                    <div style="width: 60px; height: 60px; background: #e2e8f0; border-radius: 50%; border: 4px solid #94a3b8;"></div>
-                    <div style="position: absolute; top: 10px; width: 14px; height: 14px; background: white; border-radius: 50%; box-shadow: 0 0 10px white;"></div>
+                <div id="2d-roulette" style="width: 120px; height: 120px; border-radius: 50%; border: 4px solid var(--fui-gold); background: repeating-conic-gradient(#8b0000 0 18deg, #1a1514 18deg 36deg); box-shadow: 0 0 20px rgba(212,175,55,0.2); display: flex; align-items: center; justify-content: center; position: relative;">
+                    <div style="width: 60px; height: 60px; background: var(--fui-bg); border-radius: 50%; border: 2px solid var(--fui-gold-dim);"></div>
+                    <div style="position: absolute; top: 10px; width: 10px; height: 10px; background: white; border-radius: 50%; box-shadow: 0 0 10px white;"></div>
                 </div>
             </div>`;
         customInputs = `
-            <select id="roulette-guess" style="width: 100%; padding: 15px; font-size: 16px; font-weight: bold; margin: 15px 0; background: #334155; color: white; border: 4px solid #f472b6; border-radius: 16px; outline: none; font-family: 'Nunito', sans-serif; cursor: pointer;">
+            <select id="roulette-guess" style="width: 100%; padding: 15px; font-size: 14px; font-weight: 900; margin: 15px 0; background: var(--fui-bg); color: var(--fui-text); border: 1px solid var(--fui-gold); border-radius: 4px; outline: none; font-family: 'Nunito', sans-serif; cursor: pointer; text-transform: uppercase;">
                 <option value="red">🔴 Red (2x Multiplier)</option>
                 <option value="black">⚫ Black (2x Multiplier)</option>
                 <option value="0">🟢 Zero (35x Multiplier)</option>
                 <option value="7">⭐ Lucky 7 (35x Multiplier)</option>
             </select>
-            <button id="btn-play" class="btn-chunky btn-green" style="width: 100%; padding: 15px;">SPIN THE WHEEL!</button>
+            <button id="btn-play" class="btn-chunky btn-gold" style="width: 100%; padding: 15px;">SPIN THE WHEEL!</button>
         `;
     } else if (gameType === "Slot Machine") {
         visualArea = `
             <div style="height: 120px; display: flex; align-items: center; justify-content: center;">
-                <div style="background: #1e293b; border: 6px solid #475569; border-radius: 16px; padding: 15px; display: flex; gap: 15px; box-shadow: inset 0 10px 20px rgba(0,0,0,0.5);">
-                    <div id="2d-slot-1" style="width: 60px; height: 70px; background: #f8fafc; border-radius: 12px; font-size: 40px; display: flex; align-items: center; justify-content: center; box-shadow: inset 0 5px 10px rgba(0,0,0,0.2); border-bottom: 4px solid #cbd5e1;">🍒</div>
-                    <div id="2d-slot-2" style="width: 60px; height: 70px; background: #f8fafc; border-radius: 12px; font-size: 40px; display: flex; align-items: center; justify-content: center; box-shadow: inset 0 5px 10px rgba(0,0,0,0.2); border-bottom: 4px solid #cbd5e1;">🍋</div>
-                    <div id="2d-slot-3" style="width: 60px; height: 70px; background: #f8fafc; border-radius: 12px; font-size: 40px; display: flex; align-items: center; justify-content: center; box-shadow: inset 0 5px 10px rgba(0,0,0,0.2); border-bottom: 4px solid #cbd5e1;">💎</div>
+                <div style="background: var(--fui-bg); border: 2px solid var(--fui-gold); border-radius: 4px; padding: 15px; display: flex; gap: 15px; box-shadow: inset 0 10px 20px rgba(0,0,0,0.8);">
+                    <div id="2d-slot-1" style="width: 60px; height: 70px; background: #2a2422; border-radius: 4px; font-size: 40px; display: flex; align-items: center; justify-content: center; border-bottom: 2px solid var(--fui-gold-dim);">🍒</div>
+                    <div id="2d-slot-2" style="width: 60px; height: 70px; background: #2a2422; border-radius: 4px; font-size: 40px; display: flex; align-items: center; justify-content: center; border-bottom: 2px solid var(--fui-gold-dim);">🍋</div>
+                    <div id="2d-slot-3" style="width: 60px; height: 70px; background: #2a2422; border-radius: 4px; font-size: 40px; display: flex; align-items: center; justify-content: center; border-bottom: 2px solid var(--fui-gold-dim);">💎</div>
                 </div>
             </div>`;
         customInputs = `
-            <button id="btn-play" class="btn-chunky btn-gold" style="width: 100%; padding: 20px; font-size: 20px; margin-top: 15px;">🎰 PULL LEVER!</button>
+            <button id="btn-play" class="btn-chunky btn-gold" style="width: 100%; padding: 15px; font-size: 16px; margin-top: 15px;">🎰 PULL LEVER!</button>
         `;
     } else if (gameType === "Blackjack") {
         visualArea = `
@@ -515,7 +456,7 @@ export function openCasinoUI(activeRoom: any, keys: any, gameType: string) {
             </div>`;
         customInputs = `
             <div id="bj-start-controls">
-                <button id="btn-play" class="btn-chunky btn-blue" style="width: 100%; padding: 15px; margin-top: 15px;">🃏 DEAL CARDS!</button>
+                <button id="btn-play" class="btn-chunky btn-cyan" style="width: 100%; padding: 15px; margin-top: 15px; border-color: var(--fui-cyan); color: var(--fui-cyan);">🃏 DEAL CARDS!</button>
             </div>
             <div id="bj-action-controls" style="display: none; gap: 10px; margin-top: 15px;">
                 <button id="btn-hit" class="btn-chunky btn-green" style="flex: 1; padding: 15px;">👇 HIT</button>
@@ -525,36 +466,35 @@ export function openCasinoUI(activeRoom: any, keys: any, gameType: string) {
     }
 
     modal.innerHTML = `
-      <div style="display:flex; justify-content:space-between; align-items:center; border-bottom: 4px solid rgba(255,255,255,0.2); padding-bottom: 10px; margin-bottom: 15px;">
-        <h2 style="margin:0; color:#fbcfe8; font-size: 26px; font-weight: 900;">${gameType}</h2>
-        <button id="close-casino-btn" class="btn-close-chunky" style="background:#db2777; box-shadow: 0 4px 0 #9d174d;">&times;</button>
+      <div style="display:flex; justify-content:space-between; align-items:center; border-bottom: 1px solid var(--fui-gold-dim); padding-bottom: 10px; margin-bottom: 15px;">
+        <h2 style="margin:0; color:var(--fui-gold); font-size: 20px; font-weight: 900; letter-spacing: 2px;">${gameType}</h2>
+        <button id="close-casino-btn" class="btn-close-chunky">&times;</button>
       </div>
       
-      <div class="chunky-panel" style="background: rgba(0,0,0,0.2); border: none; margin-bottom: 15px;">
-        <span style="font-size: 16px; color: #fdf2f8;">Your Coins:</span> 
-        <span id="casino-balance" style="font-size: 20px; color: #fde047; font-weight: 900;">${me.coins}</span>
+      <div class="chunky-panel" style="margin-bottom: 15px; text-align: center;">
+        <span style="font-size: 12px; color: var(--fui-text-dim);">AVAILABLE FUNDS:</span> 
+        <span id="casino-balance" style="font-size: 16px; color: var(--fui-gold); font-weight: 900;">${me.coins} CR</span>
       </div>
 
       ${visualArea}
   
-      <div class="chunky-panel" style="background: #3b0764; border-color: #581c87; text-align: left; margin-top: 15px;">
+      <div class="chunky-panel" style="text-align: left; margin-top: 15px;">
         <div style="display: flex; justify-content: space-between; align-items: center;">
-            <label style="color: #fbcfe8; font-weight: 900; font-size: 14px;">SET BET:</label>
-            <div style="display: flex; gap: 5px; width: 60%;">
+            <label style="color: var(--fui-text); font-weight: 900; font-size: 12px; letter-spacing: 1px;">WAGER AMOUNT:</label>
+            <div style="display: flex; gap: 5px; width: 50%;">
                 <button class="quick-bet-btn" data-amt="min">MIN</button>
                 <button class="quick-bet-btn" data-amt="half">1/2</button>
                 <button class="quick-bet-btn" data-amt="max">MAX</button>
             </div>
         </div>
-        <input type="number" id="bet-amount" value="50" min="1" max="${me.coins}" style="width: 100%; padding: 12px; font-size: 18px; font-weight: bold; margin-top: 8px; background: #fff; color: #1e293b; border: 4px solid #a855f7; border-radius: 12px; box-sizing: border-box; font-family: 'Nunito', sans-serif; text-align: center;" />
+        <input type="number" id="bet-amount" value="50" min="1" max="${me.coins}" style="width: 100%; padding: 10px; font-size: 16px; font-weight: 900; margin-top: 10px; background: var(--fui-bg); color: var(--fui-gold); border: 1px solid var(--fui-gold); border-radius: 4px; box-sizing: border-box; font-family: 'Nunito', sans-serif; text-align: center; outline: none;" />
       </div>
   
       ${customInputs}
   
-      <div id="casino-result" style="margin-top: 20px; font-size: 18px; font-weight: 900; min-height: 24px; color: #fff;"></div>
+      <div id="casino-result" style="margin-top: 15px; font-size: 14px; font-weight: 900; min-height: 20px; color: var(--fui-text); letter-spacing: 1px;"></div>
     `;
 
-    // Hook up Quick Bet logic
     const betInput = document.getElementById("bet-amount") as HTMLInputElement;
     document.querySelectorAll(".quick-bet-btn").forEach(btn => {
         (btn as HTMLElement).onclick = (e) => {
@@ -576,7 +516,7 @@ export function openCasinoUI(activeRoom: any, keys: any, gameType: string) {
 
     const start2DAnimation = (game: string) => {
         const r = document.getElementById("casino-result");
-        if (r) r.innerHTML = "Processing...";
+        if (r) r.innerHTML = "PROCESSING LOGIC...";
 
         if ((window as any).casinoAnimInterval) clearInterval((window as any).casinoAnimInterval);
 
@@ -619,13 +559,13 @@ export function openCasinoUI(activeRoom: any, keys: any, gameType: string) {
             const dealer = document.getElementById("2d-bj-dealer");
             const player = document.getElementById("2d-bj-player");
             if (dealer && player) {
-                dealer.innerHTML = `<div class="dealing" style="width:40px; height:55px; background:white; border:3px solid #cbd5e1; border-radius:8px; display:flex; align-items:center; justify-content:center; color:#1e293b; font-weight:900; font-size: 20px; box-shadow: 0 4px 0 rgba(0,0,0,0.2);">?</div>`;
-                player.innerHTML = `<div class="dealing" style="width:40px; height:55px; background:white; border:3px solid #cbd5e1; border-radius:8px; display:flex; align-items:center; justify-content:center; color:#1e293b; font-weight:900; font-size: 20px; box-shadow: 0 4px 0 rgba(0,0,0,0.2);">?</div>`;
+                const cardHtml = `<div class="dealing" style="width:30px; height:45px; background:var(--fui-bg); border:1px solid var(--fui-gold); border-radius:4px; display:flex; align-items:center; justify-content:center; color:var(--fui-gold); font-weight:900; font-size: 16px;">?</div>`;
+                dealer.innerHTML = cardHtml;
+                player.innerHTML = cardHtml;
             }
         }
     };
 
-    // Fix Network Payloads to map directly to the specific Colyseus handlers
     if (gameType === "Coin Toss") {
         document.getElementById("btn-heads")!.onclick = () => { 
             start2DAnimation(gameType); 
@@ -653,27 +593,21 @@ export function openCasinoUI(activeRoom: any, keys: any, gameType: string) {
         document.getElementById("btn-play")!.onclick = () => { 
             start2DAnimation(gameType); 
             activeRoom.send("blackjack_start", { bet: getBet() });
-            
-            // Immediately toggle UI to action phase to feel responsive while server spins up
             document.getElementById("bj-start-controls")!.style.display = "none";
             document.getElementById("bj-action-controls")!.style.display = "flex";
             betInput.disabled = true; 
         };
-        
         document.getElementById("btn-hit")!.onclick = () => {
             activeRoom.send("blackjack_action", { action: "hit" });
         };
-        
         document.getElementById("btn-stand")!.onclick = () => {
             activeRoom.send("blackjack_action", { action: "stand" });
-            // Re-enable starting state for next round
             document.getElementById("bj-action-controls")!.style.display = "none";
             document.getElementById("bj-start-controls")!.style.display = "block";
             betInput.disabled = false;
         };
     }
 }
-
 
 // --- INVENTORY UI ---
 export function openInventoryUI(activeRoom: any, keys: any, playerClass: string) {
@@ -699,11 +633,11 @@ export function openInventoryUI(activeRoom: any, keys: any, playerClass: string)
         modal.style.width = "750px"; 
         
         modal.innerHTML = `
-            <div style="display:flex; justify-content:space-between; align-items:center; border-bottom: 4px solid #334155; padding-bottom: 15px; margin-bottom: 20px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; border-bottom: 1px solid var(--fui-gold-dim); padding-bottom: 15px; margin-bottom: 20px;">
                 <div>
-                    <h2 style="margin:0; color:#38bdf8; font-size: 26px; font-weight: 900;"><span id="inv-player-name"></span>'s Backpack</h2>
-                    <div style="margin-top: 6px; font-size: 14px; color: #94a3b8; font-weight: 700;">
-                        🏅 <span id="inv-player-rank"></span> <span style="margin: 0 5px;">|</span> Level <span id="inv-player-level"></span> <span style="margin: 0 5px;">|</span> Class: <span id="inv-player-class"></span>
+                    <h2 style="margin:0; color:var(--fui-gold); font-size: 22px; font-weight: 900; letter-spacing: 2px;"><span id="inv-player-name"></span>'S INVENTORY</h2>
+                    <div style="margin-top: 6px; font-size: 12px; color: var(--fui-text-dim); font-weight: 700; letter-spacing: 1px;">
+                        RANK: <span id="inv-player-rank"></span> <span style="margin: 0 5px; color: var(--fui-gold-dim);">|</span> LVL: <span id="inv-player-level"></span> <span style="margin: 0 5px; color: var(--fui-gold-dim);">|</span> CLS: <span id="inv-player-class"></span>
                     </div>
                 </div>
                 <button id="close-inv-btn" class="btn-close-chunky">&times;</button>
@@ -713,8 +647,8 @@ export function openInventoryUI(activeRoom: any, keys: any, playerClass: string)
                 </div>
                 <div style="flex:1;">
                     <div class="chunky-panel" style="margin-bottom: 15px; padding: 10px 15px; display: flex; justify-content: space-between; align-items: center;">
-                        <span style="font-weight: 900; color: #94a3b8;">Wallet:</span>
-                        <span style="font-size: 20px; color: #f59e0b; font-weight: 900;">💰 <span id="inv-player-coins"></span></span>
+                        <span style="font-weight: 900; color: var(--fui-text-dim); font-size: 12px;">CREDITS:</span>
+                        <span style="font-size: 16px; color: var(--fui-gold); font-weight: 900;">CR <span id="inv-player-coins"></span></span>
                     </div>
                     <div id="inventory-list-container" style="display:flex; flex-direction:column; gap:10px; max-height:350px; overflow-y:auto; padding-right:10px;">
                     </div>
@@ -752,11 +686,11 @@ export function refreshInventoryUI(activeRoom: any, playerClass: string) {
     const me = activeRoom.state.players.get(activeRoom.sessionId);
     if (!me) return;
 
-    let rankColor = "#94a3b8"; 
-    if (me.rank === "Bronze") rankColor = "#b45309";
-    if (me.rank === "Silver") rankColor = "#cbd5e1";
-    if (me.rank === "Gold") rankColor = "#f59e0b";
-    if (me.rank === "Diamond") rankColor = "#38bdf8";
+    let rankColor = "var(--fui-text-dim)"; 
+    if (me.rank === "Bronze") rankColor = "#cd7f32";
+    if (me.rank === "Silver") rankColor = "#c0c0c0";
+    if (me.rank === "Gold") rankColor = "#d4af37";
+    if (me.rank === "Diamond") rankColor = "#b9f2ff";
 
     document.getElementById("inv-player-name")!.textContent = me.name;
     const rankEl = document.getElementById("inv-player-rank")!;
@@ -768,14 +702,14 @@ export function refreshInventoryUI(activeRoom: any, playerClass: string) {
 
     const getEquipSlotHTML = (itemName: string, placeholder: string, label: string) => {
         const item = ITEM_DB[itemName];
-        const borderCol = item ? '#22c55e' : '#475569';
-        const bgCol = item ? '#166534' : '#1e293b';
+        const borderCol = item ? 'var(--fui-cyan)' : 'var(--fui-gold-dim)';
+        const bgCol = item ? 'rgba(0, 229, 255, 0.1)' : 'var(--fui-bg)';
         return `
             <div style="display:flex; flex-direction:column; align-items:center; gap:5px; width: 100%;">
-                <div class="equip-slot" style="width:64px; height:64px; background:${bgCol}; border:4px solid ${borderCol}; border-radius:16px; display:flex; justify-content:center; align-items:center; font-size:32px; position:relative; box-shadow: inset 0 4px 8px rgba(0,0,0,0.3);">
-                    ${item ? item.icon : `<span style="opacity:0.3; filter: grayscale(1);">${placeholder}</span>`}
+                <div class="equip-slot" style="width:64px; height:64px; background:${bgCol}; border:1px solid ${borderCol}; border-radius:4px; display:flex; justify-content:center; align-items:center; font-size:32px; position:relative; box-shadow: inset 0 0 15px rgba(0,0,0,0.8);">
+                    ${item ? item.icon : `<span style="opacity:0.2; filter: grayscale(1);">${placeholder}</span>`}
                 </div>
-                <span style="font-size:12px; font-weight: 900; color:#94a3b8; text-transform:uppercase;">${label}</span>
+                <span style="font-size:10px; font-weight: 900; color:var(--fui-text-dim); text-transform:uppercase; letter-spacing: 1px;">${label}</span>
             </div>
         `;
     };
@@ -787,7 +721,7 @@ export function refreshInventoryUI(activeRoom: any, playerClass: string) {
         ${getEquipSlotHTML(me.equippedItem, "🗡️", "Weapon")}
         ${getEquipSlotHTML(me.equipLegs, "👖", "Legs")}
         ${getEquipSlotHTML(me.equipOffHand, "🛡️", "Off Hand")}
-        <div style="grid-column: span 2; display:flex; justify-content:center; width: 100%;" class="feet-equip-slot-wrapper">
+        <div style="grid-column: span 2; display:flex; justify-content:center; width: 100%;">
             ${getEquipSlotHTML(me.equipFeet, "👞", "Feet")}
         </div>
     `;
@@ -805,22 +739,22 @@ export function refreshInventoryUI(activeRoom: any, playerClass: string) {
         listHtml += `
             <div class="chunky-panel" style="display:flex; justify-content:space-between; align-items:center; padding:12px 15px; margin: 0;">
                 <div style="flex-grow:1;">
-                    <div style="font-weight:900; font-size:16px; color:#fff;">
-                        <span style="font-size: 20px; margin-right: 5px;">${icon}</span> 
+                    <div style="font-weight:900; font-size:14px; color:var(--fui-text); letter-spacing: 1px;">
+                        <span style="font-size: 16px; margin-right: 5px;">${icon}</span> 
                         ${item.name} 
-                        <span style="color:#38bdf8; background: #0f172a; padding: 2px 8px; border-radius: 8px; margin-left: 5px; font-size: 14px;">x${item.quantity}</span>
+                        <span style="color:var(--fui-bg); background: var(--fui-gold); padding: 2px 6px; border-radius: 2px; margin-left: 5px; font-size: 10px;">x${item.quantity}</span>
                     </div>
-                    <div style="font-size:12px; font-weight: 700; color:#94a3b8; margin-top: 4px; text-transform: capitalize;">${dbItem?.type || 'item'}</div>
+                    <div style="font-size:10px; font-weight: 700; color:var(--fui-text-dim); margin-top: 4px; text-transform: uppercase;">${dbItem?.type || 'item'}</div>
                 </div>
                 <div style="display:flex; gap: 8px;">
-                    <button class="btn-chunky btn-green equip-btn" data-itemname="${name}" style="padding: 10px 15px; font-size: 12px;">Equip</button>
-                    <button class="btn-chunky btn-blue use-btn" data-itemname="${name}" style="padding: 10px 15px; font-size: 12px;">Use</button>
+                    <button class="btn-chunky btn-green equip-btn" data-itemname="${name}" style="padding: 6px 12px; font-size: 10px;">Equip</button>
+                    <button class="btn-chunky btn-blue use-btn" data-itemname="${name}" style="padding: 6px 12px; font-size: 10px;">Use</button>
                 </div>
             </div>
         `;
     });
 
-    if (!hasItems) listHtml = `<div style="text-align:center; color:#64748b; padding: 30px; font-weight: 900; font-size: 18px;">Backpack is Empty!</div>`;
+    if (!hasItems) listHtml = `<div style="text-align:center; color:var(--fui-text-dim); padding: 30px; font-weight: 900; font-size: 14px; letter-spacing: 1px;">INVENTORY EMPTY</div>`;
     listContainer.innerHTML = listHtml;
     listContainer.scrollTop = currentScroll; 
 }
@@ -849,17 +783,17 @@ export function openChestUI(activeRoom: any, keys: any, chestId: string) {
         modal.style.width = "750px";
         
         modal.innerHTML = `
-            <div style="display:flex; justify-content:space-between; align-items:center; border-bottom: 4px solid #334155; padding-bottom: 15px; margin-bottom: 20px;">
-                <h2 style="margin:0; color:#38bdf8; font-size: 26px; font-weight: 900;">Storage Chest</h2>
+            <div style="display:flex; justify-content:space-between; align-items:center; border-bottom: 1px solid var(--fui-gold-dim); padding-bottom: 15px; margin-bottom: 20px;">
+                <h2 style="margin:0; color:var(--fui-gold); font-size: 20px; font-weight: 900; letter-spacing: 2px;">SECURE STORAGE</h2>
                 <button id="close-chest-btn" class="btn-close-chunky">&times;</button>
             </div>
             <div class="responsive-split-container">
                 <div class="chunky-panel chest-panel-half" style="flex: 1;">
-                    <h3 style="color: #38bdf8; margin-top: 0; font-weight: 900;">🎒 Your Backpack</h3>
+                    <h3 style="color: var(--fui-cyan); margin-top: 0; font-weight: 900; font-size: 14px; letter-spacing: 1px;">🎒 LOCAL INVENTORY</h3>
                     <div id="chest-backpack-container" style="display:flex; flex-direction:column; gap:10px; max-height:300px; overflow-y:auto; padding-right: 5px;"></div>
                 </div>
                 <div class="chunky-panel chest-panel-half" style="flex: 1;">
-                    <h3 style="color: #f59e0b; margin-top: 0; font-weight: 900;">🧰 Chest Contents</h3>
+                    <h3 style="color: var(--fui-gold); margin-top: 0; font-weight: 900; font-size: 14px; letter-spacing: 1px;">🧰 CONTAINER CONTENTS</h3>
                     <div id="chest-contents-container" style="display:flex; flex-direction:column; gap:10px; max-height:300px; overflow-y:auto; padding-right: 5px;"></div>
                 </div>
             </div>
@@ -916,13 +850,13 @@ export function refreshChestUI(activeRoom: any) {
         const dbItem = ITEM_DB[name];
         const icon = dbItem ? dbItem.icon : "📦";
         bpHTML += `
-            <div style="display:flex; justify-content:space-between; align-items:center; background:#1e293b; padding:12px; border-radius:12px; border:2px solid #475569;">
-                <div style="font-weight:900; font-size:14px;">${icon} ${item.name} <span style="color:#38bdf8;">x${item.quantity}</span></div>
-                <button class="btn-chunky btn-blue deposit-btn" data-itemname="${name}" style="padding:8px 12px; font-size: 12px;">Deposit</button>
+            <div style="display:flex; justify-content:space-between; align-items:center; background:var(--fui-bg); padding:10px; border-radius:4px; border:1px solid var(--fui-gold-dim);">
+                <div style="font-weight:900; font-size:12px; color:var(--fui-text);">${icon} ${item.name} <span style="color:var(--fui-cyan);">x${item.quantity}</span></div>
+                <button class="btn-chunky btn-blue deposit-btn" data-itemname="${name}" style="padding:6px 10px; font-size: 10px;">Deposit</button>
             </div>
         `;
     });
-    if (me.inventory.size === 0) bpHTML = `<div style="text-align:center; color:#64748b; font-weight:900; padding: 20px;">Empty</div>`;
+    if (me.inventory.size === 0) bpHTML = `<div style="text-align:center; color:var(--fui-text-dim); font-weight:900; font-size:12px; padding: 20px;">EMPTY</div>`;
     
     let chHTML = "";
     if (chest.inventory) {
@@ -930,15 +864,15 @@ export function refreshChestUI(activeRoom: any) {
             const dbItem = ITEM_DB[name];
             const icon = dbItem ? dbItem.icon : "📦";
             chHTML += `
-                <div style="display:flex; justify-content:space-between; align-items:center; background:#1e293b; padding:12px; border-radius:12px; border:2px solid #475569;">
-                    <div style="font-weight:900; font-size:14px;">${icon} ${item.name} <span style="color:#f59e0b;">x${item.quantity}</span></div>
-                    <button class="btn-chunky btn-gold withdraw-btn" data-itemname="${name}" style="padding:8px 12px; font-size: 12px; color: #1e293b;">Withdraw</button>
+                <div style="display:flex; justify-content:space-between; align-items:center; background:var(--fui-bg); padding:10px; border-radius:4px; border:1px solid var(--fui-gold-dim);">
+                    <div style="font-weight:900; font-size:12px; color:var(--fui-text);">${icon} ${item.name} <span style="color:var(--fui-gold);">x${item.quantity}</span></div>
+                    <button class="btn-chunky btn-gold withdraw-btn" data-itemname="${name}" style="padding:6px 10px; font-size: 10px;">Withdraw</button>
                 </div>
             `;
         });
-        if (chest.inventory.size === 0) chHTML = `<div style="text-align:center; color:#64748b; font-weight:900; padding: 20px;">Empty</div>`;
+        if (chest.inventory.size === 0) chHTML = `<div style="text-align:center; color:var(--fui-text-dim); font-weight:900; font-size:12px; padding: 20px;">EMPTY</div>`;
     } else {
-        chHTML = `<div style="text-align:center; color:#64748b; font-weight:900; padding: 20px;">Empty</div>`;
+        chHTML = `<div style="text-align:center; color:var(--fui-text-dim); font-weight:900; font-size:12px; padding: 20px;">EMPTY</div>`;
     }
 
     bpContainer.innerHTML = bpHTML;
@@ -973,10 +907,10 @@ export function openShopUI(activeRoom: any, keys: any, stallType: string) {
         modal.style.width = "500px";
         
         modal.innerHTML = `
-            <div style="display:flex; justify-content:space-between; align-items:center; border-bottom: 4px solid #334155; padding-bottom: 15px; margin-bottom: 20px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; border-bottom: 1px solid var(--fui-gold-dim); padding-bottom: 15px; margin-bottom: 20px;">
                 <div>
-                    <h2 id="shop-title" style="margin:0; color:#f59e0b; font-size: 26px; font-weight: 900;"></h2>
-                    <div id="shop-subtitle" style="margin-top: 5px; font-size: 14px; font-weight: 900;"></div>
+                    <h2 id="shop-title" style="margin:0; color:var(--fui-gold); font-size: 20px; font-weight: 900; letter-spacing: 2px;"></h2>
+                    <div id="shop-subtitle" style="margin-top: 5px; font-size: 10px; font-weight: 900; letter-spacing: 1px;"></div>
                 </div>
                 <button id="close-shop-btn" class="btn-close-chunky">&times;</button>
             </div>
@@ -1040,28 +974,28 @@ export function refreshShopUI(activeRoom: any) {
     if (isOwned) {
         const timeDiff = storeObj.ownershipUntil - Date.now();
         const daysLeft = Math.max(1, Math.ceil(timeDiff / (1000 * 60 * 60 * 24)));
-        leaseText = ` (Lease: ${daysLeft} days left)`;
+        leaseText = ` (Lease: ${daysLeft}d)`;
     }
 
     document.getElementById("shop-title")!.textContent = activeStallType;
     const subEl = document.getElementById("shop-subtitle")!;
-    subEl.textContent = isOwned ? `Owner: ${isMine ? 'You' : storeObj.ownerName}${leaseText}` : 'Unowned Public Store';
-    subEl.style.color = isOwned ? '#22c55e' : '#94a3b8';
+    subEl.textContent = isOwned ? `OWNER: ${isMine ? 'YOU' : storeObj.ownerName}${leaseText}` : 'UNOWNED PUBLIC KIOSK';
+    subEl.style.color = isOwned ? 'var(--fui-cyan)' : 'var(--fui-text-dim)';
 
     const vaultContainer = document.getElementById("shop-vault-container")!;
     if (isMine) {
         vaultContainer.innerHTML = `
-            <div class="chunky-panel" style="margin-bottom: 20px; border-color: #22c55e; background: #14532d;">
+            <div class="chunky-panel" style="margin-bottom: 20px; border-color: var(--fui-cyan); background: rgba(0, 229, 255, 0.05);">
                 <div style="display:flex; justify-content:space-between; align-items:center;">
-                    <span style="font-size: 18px; font-weight: 900; color: #fde047;">Vault: 💰 ${storeObj.vault}</span>
-                    <button id="collect-vault-btn" class="btn-chunky btn-green" data-storeid="${storeObj.id}" style="padding:10px 15px;">Collect</button>
+                    <span style="font-size: 14px; font-weight: 900; color: var(--fui-cyan); letter-spacing: 1px;">VAULT: CR ${storeObj.vault}</span>
+                    <button id="collect-vault-btn" class="btn-chunky btn-cyan" data-storeid="${storeObj.id}" style="padding:8px 12px; font-size:10px;">Collect</button>
                 </div>
             </div>
         `;
     } else if (!isOwned) {
         vaultContainer.innerHTML = `
-            <button id="buy-store-btn" class="btn-chunky btn-blue" data-storeid="${storeObj.id}" style="width: 100%; padding: 15px; margin-bottom: 20px;">
-                Buy Store for 1000 Coins (14 Days)
+            <button id="buy-store-btn" class="btn-chunky btn-gold" data-storeid="${storeObj.id}" style="width: 100%; padding: 15px; margin-bottom: 20px;">
+                Acquire Kiosk Rights - 1000 CR (14 Days)
             </button>
         `;
     } else {
@@ -1074,33 +1008,33 @@ export function refreshShopUI(activeRoom: any) {
 
     storeObj.inventory.forEach((item: any, name: string) => {
         const inStock = !isOwned || item.stock > 0;
-        const stockText = isOwned ? `Stock: ${item.stock}` : `Unlimited Stock`;
+        const stockText = isOwned ? `STOCK: ${item.stock}` : `UNLIMITED STOCK`;
         const dbItem = ITEM_DB[item.name];
         const icon = dbItem ? dbItem.icon : "📦";
 
         itemsHTML += `
             <div class="chunky-panel" style="display:flex; justify-content:space-between; align-items:center; padding:15px; margin: 0;">
                 <div style="padding-right: 15px; flex-grow: 1;">
-                    <div style="font-weight:900; font-size:18px; color:#fff;">${icon} ${item.name}</div>
-                    <div style="font-size:14px; color:#cbd5e1; margin-top:6px; line-height:1.4; font-weight: 700;">${item.desc}</div>
-                    <div style="font-size:12px; color:#38bdf8; margin-top:8px; font-weight:900;">${stockText}</div>
+                    <div style="font-weight:900; font-size:14px; color:var(--fui-text); letter-spacing: 1px;">${icon} ${item.name}</div>
+                    <div style="font-size:10px; color:var(--fui-text-dim); margin-top:6px; line-height:1.4; font-weight: 700;">${item.desc}</div>
+                    <div style="font-size:10px; color:var(--fui-cyan); margin-top:8px; font-weight:900;">${stockText}</div>
                 </div>
         `;
 
         if (isMine) {
             itemsHTML += `
                 <div style="display:flex; flex-direction:column; gap: 10px;">
-                    <button class="btn-chunky btn-blue restock-btn" data-storeid="${storeObj.id}" data-itemname="${name}" style="padding:10px 15px; font-size: 12px;">
-                        Restock (+1) - ${item.wholesalePrice}c
+                    <button class="btn-chunky btn-blue restock-btn" data-storeid="${storeObj.id}" data-itemname="${name}" style="padding:8px 12px; font-size: 10px;">
+                        Restock (+1) - ${item.wholesalePrice} CR
                     </button>
-                    <div style="text-align: right; color: #f59e0b; font-size: 14px; font-weight:900;">Sells for: ${item.price}</div>
+                    <div style="text-align: right; color: var(--fui-gold); font-size: 10px; font-weight:900; letter-spacing: 1px;">SELLS FOR: ${item.price} CR</div>
                 </div>
             `;
         } else {
             const btnClass = inStock ? "btn-gold" : "btn-slate";
             itemsHTML += `
-                <button class="btn-chunky ${btnClass} buy-btn" data-storeid="${storeObj.id}" data-itemname="${name}" ${inStock ? '' : 'disabled'} style="padding:12px 20px; color: #1e293b; white-space: nowrap;">
-                    ${inStock ? `Buy - ${item.price}c` : 'Sold Out'}
+                <button class="btn-chunky ${btnClass} buy-btn" data-storeid="${storeObj.id}" data-itemname="${name}" ${inStock ? '' : 'disabled'} style="padding:10px 16px; white-space: nowrap; font-size: 12px;">
+                    ${inStock ? `BUY - ${item.price} CR` : 'SOLD OUT'}
                 </button>
             `;
         }
@@ -1134,21 +1068,21 @@ export function openBlueprintSelector(activeScene: any, keys: any) {
     modal.style.textAlign = "center";
 
     modal.innerHTML = `
-      <h2 style="margin:0 0 10px 0; color:#38bdf8; font-weight: 900; font-size: 26px;">Select Blueprint</h2>
-      <p style="color:#cbd5e1; font-size:16px; margin-bottom: 25px; font-weight: 700;">What do you want to build?</p>
+      <h2 style="margin:0 0 10px 0; color:var(--fui-gold); font-weight: 900; font-size: 20px; letter-spacing: 2px;">SELECT SCHEMATIC</h2>
+      <p style="color:var(--fui-text-dim); font-size:12px; margin-bottom: 25px; font-weight: 700; letter-spacing: 1px;">INITIALIZE CONSTRUCTION SEQUENCE</p>
       
       <div style="display:flex; flex-direction:column; gap:15px;">
-        <button id="bp-house" class="btn-chunky btn-blue" style="padding: 20px; font-size: 18px;">
+        <button id="bp-house" class="btn-chunky btn-blue" style="padding: 15px; font-size: 14px;">
             🏡 House (10 Mats)
         </button>
-        <button id="bp-farm" class="btn-chunky btn-green" style="padding: 20px; font-size: 18px;">
+        <button id="bp-farm" class="btn-chunky btn-green" style="padding: 15px; font-size: 14px;">
             🌾 Farm (5 Mats)
         </button>
-        <button id="bp-shop" class="btn-chunky btn-gold" style="padding: 20px; font-size: 18px; color: #1e293b;">
-            🏪 Shop (20 Mats)
+        <button id="bp-shop" class="btn-chunky btn-gold" style="padding: 15px; font-size: 14px;">
+            🏪 Kiosk (20 Mats)
         </button>
       </div>
-      <button id="close-bp-btn" class="btn-chunky btn-red" style="margin-top: 25px; padding:15px; width:100%;">Cancel</button>
+      <button id="close-bp-btn" class="btn-chunky btn-red" style="margin-top: 25px; padding:15px; width:100%;">ABORT</button>
     `;
 
     document.body.appendChild(modal);
@@ -1180,48 +1114,49 @@ export async function showCharacterCreation(): Promise<{ classId: string, pathwa
     const container = document.createElement("div");
     container.style.position = "fixed"; container.style.top = "0"; container.style.left = "0";
     container.style.width = "100vw"; container.style.height = "100vh";
-    container.style.background = "#0f172a"; 
+    container.style.background = "radial-gradient(circle at center, #2a2422 0%, #1a1514 100%)"; 
     container.style.zIndex = "9999"; container.style.display = "flex";
     container.style.flexDirection = "column"; container.style.alignItems = "center";
     container.style.justifyContent = "center"; 
-    container.style.fontFamily = "'Nunito', 'Segoe UI Rounded', sans-serif";
+    container.style.fontFamily = "'Nunito', sans-serif";
     container.style.padding = "20px";
     container.style.boxSizing = "border-box";
     container.style.overflowY = "auto";
 
     const title = document.createElement("h1");
-    title.innerText = "CHOOSE YOUR CLASS!";
-    title.style.color = "white"; title.style.fontSize = "clamp(30px, 5vw, 50px)"; title.style.marginBottom = "40px";
+    title.innerText = "INITIALIZE PROFILE";
+    title.style.color = "#d4af37"; title.style.fontSize = "clamp(24px, 4vw, 40px)"; title.style.marginBottom = "40px";
     title.style.fontWeight = "900";
+    title.style.letterSpacing = "4px";
     title.style.textAlign = "center";
-    title.style.textShadow = "0 6px 0 rgba(0,0,0,0.5)";
+    title.style.textShadow = "0 0 20px rgba(212,175,55,0.4)";
     container.appendChild(title);
 
     const cardRow = document.createElement("div");
     cardRow.style.display = "flex"; 
     cardRow.style.gap = "30px";
-    cardRow.style.flexWrap = "wrap"; // Added wrap for mobile
+    cardRow.style.flexWrap = "wrap";
     cardRow.style.justifyContent = "center";
     container.appendChild(cardRow);
 
     const classes = [
-      { id: "duelist", name: "Duelist", desc: "Fast hits, high mobility. Dash around the battlefield!", color: "#f59e0b", icon: "⚔️", shadow: "#d97706" },
-      { id: "vanguard", name: "Vanguard", desc: "Heavy armor tank. Take hits and protect your friends!", color: "#3b82f6", icon: "🛡️", shadow: "#2563eb" },
-      { id: "arcanist", name: "Arcanist", desc: "Ranged magic attacks. Stay back and blow things up!", color: "#d946ef", icon: "🪄", shadow: "#c026d3" }
+      { id: "duelist", name: "Duelist", desc: "High mobility and rapid strike capabilities.", color: "#d4af37", icon: "⚔️", shadow: "rgba(212,175,55,0.2)" },
+      { id: "vanguard", name: "Vanguard", desc: "Heavy shielding and defensive algorithms.", color: "#00E5FF", icon: "🛡️", shadow: "rgba(0,229,255,0.2)" },
+      { id: "arcanist", name: "Arcanist", desc: "Long-range tactical energy projection.", color: "#8b5cf6", icon: "🪄", shadow: "rgba(139,92,246,0.2)" }
     ];
 
     const pathways = [
-      { id: "shadow", name: "Shadow", desc: "Sneaky strikes and burst damage.", color: "#8b5cf6", icon: "🌑", shadow: "#7c3aed" },
-      { id: "light", name: "Light", desc: "Healing spells and protection.", color: "#fde047", icon: "☀️", shadow: "#eab308" },
-      { id: "berserker", name: "Berserker", desc: "Raw power and fire attacks.", color: "#ef4444", icon: "🔥", shadow: "#dc2626" },
-      { id: "nature", name: "Nature", desc: "Healing and area control.", color: "#22c55e", icon: "🌿", shadow: "#16a34a" }
+      { id: "shadow", name: "Shadow", desc: "Stealth protocols and critical burst optimization.", color: "#8b5cf6", icon: "🌑", shadow: "rgba(139,92,246,0.2)" },
+      { id: "light", name: "Light", desc: "Restoration logic and structural shielding.", color: "#d4af37", icon: "☀️", shadow: "rgba(212,175,55,0.2)" },
+      { id: "berserker", name: "Berserker", desc: "Unregulated output and thermal attacks.", color: "#ff4444", icon: "🔥", shadow: "rgba(255,68,68,0.2)" },
+      { id: "nature", name: "Nature", desc: "Biometric healing and area denial systems.", color: "#22c55e", icon: "🌿", shadow: "rgba(34,197,94,0.2)" }
     ];
 
     const auras = [
-        { id: "tyrant", name: "Tyrant", desc: "Slows and weakens nearby enemies.", color: "#ef4444", icon: "💥", shadow: "#dc2626" },
-        { id: "sanctuary", name: "Sanctuary", desc: "Heals and shields nearby allies.", color: "#3b82f6", icon: "🛡️", shadow: "#2563eb" },
-        { id: "void", name: "Void", desc: "Sneak up and buff your next strike.", color: "#8b5cf6", icon: "🥷", shadow: "#7c3aed" },
-        { id: "storm", name: "Storm", desc: "Periodically zaps enemies with lightning.", color: "#22c55e", icon: "🌪️", shadow: "#16a34a" }
+        { id: "tyrant", name: "Tyrant", desc: "Suppresses local hostile operational capacity.", color: "#ff4444", icon: "💥", shadow: "rgba(255,68,68,0.2)" },
+        { id: "sanctuary", name: "Sanctuary", desc: "Broadcasts continuous regeneration pulses.", color: "#00E5FF", icon: "🛡️", shadow: "rgba(0,229,255,0.2)" },
+        { id: "void", name: "Void", desc: "Obscures signature and amplifies next strike.", color: "#8b5cf6", icon: "🥷", shadow: "rgba(139,92,246,0.2)" },
+        { id: "storm", name: "Storm", desc: "Generates intermittent high-voltage discharges.", color: "#22c55e", icon: "🌪️", shadow: "rgba(34,197,94,0.2)" }
     ];
 
     let selectedClass = "";
@@ -1233,38 +1168,39 @@ export async function showCharacterCreation(): Promise<{ classId: string, pathwa
         const card = document.createElement("button");
         card.style.width = "clamp(240px, 80vw, 260px)";
         card.style.height = "auto";
-        card.style.minHeight = "360px";
-        card.style.background = "#1e293b";
-        card.style.border = `6px solid ${item.color}`; 
-        card.style.borderRadius = "24px";
-        card.style.color = "white"; 
+        card.style.minHeight = "340px";
+        card.style.background = "rgba(212, 175, 55, 0.05)";
+        card.style.border = `1px solid ${item.color}`; 
+        card.style.borderRadius = "4px";
+        card.style.color = "var(--fui-text)"; 
         card.style.cursor = "pointer";
         card.style.padding = "25px"; 
         card.style.display = "flex"; 
         card.style.flexDirection = "column";
-        card.style.transition = "transform 0.1s, box-shadow 0.1s";
+        card.style.transition = "all 0.2s ease";
         card.style.fontFamily = "'Nunito', sans-serif";
-        card.style.boxShadow = `0 10px 0 ${item.shadow}`;
+        card.style.boxShadow = `inset 0 0 20px ${item.shadow}`;
 
-        card.onmousedown = () => { card.style.transform = "translateY(10px)"; card.style.boxShadow = "0 0px 0 transparent"; };
-        card.onmouseup = () => { card.style.transform = "translateY(0)"; card.style.boxShadow = `0 10px 0 ${item.shadow}`; };
-        card.onmouseleave = () => { card.style.transform = "translateY(0)"; card.style.boxShadow = `0 10px 0 ${item.shadow}`; };
+        card.onmouseover = () => { card.style.background = item.shadow; card.style.boxShadow = `0 0 20px ${item.shadow}`; };
+        card.onmouseleave = () => { card.style.background = "rgba(212, 175, 55, 0.05)"; card.style.boxShadow = `inset 0 0 20px ${item.shadow}`; };
+        card.onmousedown = () => { card.style.transform = "scale(0.98)"; };
+        card.onmouseup = () => { card.style.transform = "scale(1)"; };
 
         card.innerHTML = `
-            <div style="font-size: 60px; text-align: center; margin-bottom: 15px;">${item.icon}</div>
-            <h2 style="color: ${item.color}; margin-top: 0; text-align: center; font-weight: 900; font-size: 28px; text-transform: uppercase;">${item.name}</h2>
-            <p style="font-size: 18px; font-weight: 700; line-height: 1.4; color: #cbd5e1; flex-grow: 1; text-align: center;">${item.desc}</p>
-            <div style="font-weight: 900; font-size: 20px; padding-top: 15px; border-top: 4px solid rgba(255,255,255,0.1); text-align: center; color: white;">SELECT</div>
+            <div style="font-size: 50px; text-align: center; margin-bottom: 15px; filter: drop-shadow(0 0 10px ${item.color});">${item.icon}</div>
+            <h2 style="color: ${item.color}; margin-top: 0; text-align: center; font-weight: 900; font-size: 22px; text-transform: uppercase; letter-spacing: 2px;">${item.name}</h2>
+            <p style="font-size: 14px; font-weight: 700; line-height: 1.6; color: var(--fui-text-dim); flex-grow: 1; text-align: center; letter-spacing: 1px;">${item.desc}</p>
+            <div style="font-weight: 900; font-size: 14px; padding-top: 15px; border-top: 1px solid rgba(255,255,255,0.1); text-align: center; color: var(--fui-text); letter-spacing: 2px;">AUTHORIZE</div>
         `;
         
         card.onclick = () => {
           if (step === 1) {
             selectedClass = item.id;
-            title.innerText = `PICK A PATHWAY!`;
+            title.innerText = `DEFINE PRIMARY PATHWAY`;
             renderOptions(pathways, 2);
           } else if (step === 2) {
             selectedPathway = item.id;
-            title.innerText = `SELECT YOUR AURA!`;
+            title.innerText = `SELECT AURA SIGNATURE`;
             renderOptions(auras, 3);
           } else if (step === 3) {
             document.body.removeChild(container);
@@ -1302,16 +1238,16 @@ export function openEventInviteUI(activeRoom: any, eventName: string, targetZone
     }
 
     modal.innerHTML = `
-      <div style="display:flex; justify-content:space-between; align-items:center; border-bottom: 4px solid #334155; padding-bottom: 15px; margin-bottom: 20px;">
-        <h2 style="margin:0; color:#f59e0b; font-size: 24px; font-weight: 900;">🔥 Event Starting!</h2>
+      <div style="display:flex; justify-content:space-between; align-items:center; border-bottom: 1px solid var(--fui-gold-dim); padding-bottom: 15px; margin-bottom: 20px;">
+        <h2 style="margin:0; color:var(--fui-gold); font-size: 20px; font-weight: 900; letter-spacing: 2px;">🔥 ALERT: BREACH DETECTED</h2>
         <button id="close-event-invite-btn" class="btn-close-chunky">&times;</button>
       </div>
-      <p style="color:white; font-size:18px; margin-bottom: 25px; font-weight: 700;">
-        The <b style="color: #38bdf8;">${eventName}</b> is now open! Do you want to teleport there immediately?
+      <p style="color:var(--fui-text); font-size:14px; margin-bottom: 25px; font-weight: 700; letter-spacing: 1px; line-height: 1.5;">
+        The <b style="color: var(--fui-cyan);">${eventName}</b> protocol is active. Authorize immediate tactical insertion?
       </p>
       <div style="display:flex; gap: 15px;">
-          <button id="join-event-btn" class="btn-chunky btn-green" style="flex: 1; padding: 15px;">Join Event</button>
-          <button id="decline-event-btn" class="btn-chunky btn-slate" style="flex: 1; padding: 15px;">Skip</button>
+          <button id="join-event-btn" class="btn-chunky btn-green" style="flex: 1; padding: 15px;">ENGAGE</button>
+          <button id="decline-event-btn" class="btn-chunky btn-slate" style="flex: 1; padding: 15px;">IGNORE</button>
       </div>
     `;
 
@@ -1360,28 +1296,28 @@ export function openMirrorUI(activeRoom: any, keys: any) {
     if (!me) return;
 
     modal.innerHTML = `
-      <div style="display:flex; justify-content:space-between; align-items:center; border-bottom: 4px solid #334155; padding-bottom: 15px; margin-bottom: 20px;">
-        <h2 style="margin:0; color:#c084fc; font-size: 26px; font-weight: 900;">✨ Alteration</h2>
-        <button id="close-mirror-btn" class="btn-close-chunky" style="background:#db2777; box-shadow: 0 4px 0 #9d174d;">&times;</button>
+      <div style="display:flex; justify-content:space-between; align-items:center; border-bottom: 1px solid var(--fui-gold-dim); padding-bottom: 15px; margin-bottom: 20px;">
+        <h2 style="margin:0; color:var(--fui-cyan); font-size: 20px; font-weight: 900; letter-spacing: 2px;">✨ AESTHETIC OVERRIDE</h2>
+        <button id="close-mirror-btn" class="btn-close-chunky">&times;</button>
       </div>
       <div style="display:flex; flex-direction:column; gap:15px; text-align: left;">
         
         <div class="chunky-panel">
-            <label style="color:#fbcfe8; font-weight:900; display:block; margin-bottom:8px;">Body Type</label>
-            <select id="mirror-gender" style="width:100%; padding:10px; border-radius:8px; border:2px solid #f472b6; background:#1e293b; color:white; font-family:'Nunito', sans-serif; font-weight:bold;">
+            <label style="color:var(--fui-text); font-weight:900; display:block; margin-bottom:8px; font-size: 12px; letter-spacing: 1px;">CHASSIS TYPE</label>
+            <select id="mirror-gender" style="width:100%; padding:10px; border-radius:4px; border:1px solid var(--fui-cyan); background:var(--fui-bg); color:white; font-family:'Nunito', sans-serif; font-weight:bold; outline:none;">
                 <option value="body1" ${me.gender === 'body1' ? 'selected' : ''}>Standard Frame</option>
                 <option value="body2" ${me.gender === 'body2' ? 'selected' : ''}>Slim Frame</option>
             </select>
         </div>
 
         <div class="chunky-panel">
-            <label style="color:#fbcfe8; font-weight:900; display:block; margin-bottom:8px;">Skin Color</label>
-            <input type="color" id="mirror-skin" value="${me.skinColor || '#ffccaa'}" style="width:100%; height:40px; border-radius:8px; border:2px solid #f472b6; background:#1e293b; cursor:pointer;">
+            <label style="color:var(--fui-text); font-weight:900; display:block; margin-bottom:8px; font-size: 12px; letter-spacing: 1px;">PIGMENTATION</label>
+            <input type="color" id="mirror-skin" value="${me.skinColor || '#ffccaa'}" style="width:100%; height:40px; border-radius:4px; border:1px solid var(--fui-cyan); background:var(--fui-bg); cursor:pointer;">
         </div>
 
         <div class="chunky-panel">
-            <label style="color:#fbcfe8; font-weight:900; display:block; margin-bottom:8px;">Hair Style</label>
-            <select id="mirror-hairstyle" style="width:100%; padding:10px; border-radius:8px; border:2px solid #f472b6; background:#1e293b; color:white; font-family:'Nunito', sans-serif; font-weight:bold;">
+            <label style="color:var(--fui-text); font-weight:900; display:block; margin-bottom:8px; font-size: 12px; letter-spacing: 1px;">HAIR CONFIG</label>
+            <select id="mirror-hairstyle" style="width:100%; padding:10px; border-radius:4px; border:1px solid var(--fui-cyan); background:var(--fui-bg); color:white; font-family:'Nunito', sans-serif; font-weight:bold; outline:none;">
                 <option value="short" ${me.hairStyle === 'short' ? 'selected' : ''}>Short</option>
                 <option value="long" ${me.hairStyle === 'long' ? 'selected' : ''}>Long</option>
                 <option value="spiky" ${me.hairStyle === 'spiky' ? 'selected' : ''}>Spiky</option>
@@ -1391,16 +1327,16 @@ export function openMirrorUI(activeRoom: any, keys: any) {
         </div>
 
         <div class="chunky-panel">
-            <label style="color:#fbcfe8; font-weight:900; display:block; margin-bottom:8px;">Hair Color</label>
-            <input type="color" id="mirror-haircolor" value="${me.hairColor || '#333333'}" style="width:100%; height:40px; border-radius:8px; border:2px solid #f472b6; background:#1e293b; cursor:pointer;">
+            <label style="color:var(--fui-text); font-weight:900; display:block; margin-bottom:8px; font-size: 12px; letter-spacing: 1px;">HAIR TINT</label>
+            <input type="color" id="mirror-haircolor" value="${me.hairColor || '#333333'}" style="width:100%; height:40px; border-radius:4px; border:1px solid var(--fui-cyan); background:var(--fui-bg); cursor:pointer;">
         </div>
 
         <div class="chunky-panel">
-            <label style="color:#fbcfe8; font-weight:900; display:block; margin-bottom:8px;">Eye Color</label>
-            <input type="color" id="mirror-eyecolor" value="${me.eyeColor || '#00aaff'}" style="width:100%; height:40px; border-radius:8px; border:2px solid #f472b6; background:#1e293b; cursor:pointer;">
+            <label style="color:var(--fui-text); font-weight:900; display:block; margin-bottom:8px; font-size: 12px; letter-spacing: 1px;">OPTIC TINT</label>
+            <input type="color" id="mirror-eyecolor" value="${me.eyeColor || '#00aaff'}" style="width:100%; height:40px; border-radius:4px; border:1px solid var(--fui-cyan); background:var(--fui-bg); cursor:pointer;">
         </div>
 
-        <button id="save-mirror-btn" class="btn-chunky btn-green" style="padding:15px; margin-top:10px;">✨ Transform</button>
+        <button id="save-mirror-btn" class="btn-chunky btn-cyan" style="padding:15px; margin-top:10px;">APPLY OVERRIDES</button>
       </div>
     `;
 

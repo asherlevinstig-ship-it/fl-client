@@ -2,6 +2,7 @@ import { ITEM_DB } from "../ItemDatabase";
 import { distance } from "../game/CollisionSystem";
 import { CRAFTING_RECIPES, STORE_RECIPES } from "../RecipeDatabase";
 import { setAbilityUIRoom } from "./AbilityUI";
+import { closeAllModals } from "./ModalManager"; // Unified Z-Index overlap solver
 
 // --- EXPORTED HUD STATE ---
 export let isWorldMapOpen = false;
@@ -37,6 +38,24 @@ export function setIsRoutingToMarker(val: boolean) { isRoutingToMarker = val; }
 
 export function setMyMapMarker(marker: { x: number, z: number } | null) {
     myMapMarker = marker;
+}
+
+// --- UNIFIED MODAL CLOSER FOR HUD ---
+// Ties into the ModalManager to prevent any cross-system UI overlaps
+export function closeAllHUDModals() {
+    closeAllModals(); 
+    const hudModals = [
+        "crafting-modal", 
+        "store-management-modal", 
+        "world-map-modal", 
+        "meditation-ui", 
+        "team-manager-modal"
+    ];
+    hudModals.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.style.display = "none";
+    });
+    isWorldMapOpen = false;
 }
 
 // --- ZONE POPUP STATE ---
@@ -574,14 +593,40 @@ export function ensureOverlay(getActiveRoom: () => any, getActionContext: () => 
         document.body.appendChild(globalEventBanner);
     }
 
+    // 3.5 DYNAMIC PROMPTS CONTAINER (Fixes overlapping of bottom popups)
+    let dynamicPrompts = document.getElementById("hud-dynamic-prompts");
+    if (!dynamicPrompts) {
+        dynamicPrompts = document.createElement("div");
+        dynamicPrompts.id = "hud-dynamic-prompts";
+        dynamicPrompts.style.position = "fixed";
+        dynamicPrompts.style.bottom = "220px";
+        dynamicPrompts.style.left = "50%";
+        dynamicPrompts.style.transform = "translateX(-50%)";
+        dynamicPrompts.style.display = "flex";
+        dynamicPrompts.style.flexDirection = "column-reverse";
+        dynamicPrompts.style.gap = "15px";
+        dynamicPrompts.style.alignItems = "center";
+        dynamicPrompts.style.zIndex = "50";
+        dynamicPrompts.style.pointerEvents = "none";
+        document.body.appendChild(dynamicPrompts);
+    }
+
+    let storePopup = document.getElementById("store-popup");
+    if (!storePopup) {
+        storePopup = document.createElement("div");
+        storePopup.id = "store-popup";
+        storePopup.className = "chunky-panel";
+        storePopup.style.border = "4px solid var(--neon-amber)";
+        storePopup.style.padding = "20px 40px";
+        storePopup.style.display = "none";
+        storePopup.style.position = "relative"; 
+        dynamicPrompts.appendChild(storePopup);
+    }
+
     let interactionPrompt = document.getElementById("interaction-prompt");
     if (!interactionPrompt) {
         interactionPrompt = document.createElement("div");
         interactionPrompt.id = "interaction-prompt";
-        interactionPrompt.style.position = "fixed";
-        interactionPrompt.style.top = "60%";
-        interactionPrompt.style.left = "50%";
-        interactionPrompt.style.transform = "translate(-50%, -50%)";
         interactionPrompt.style.display = "none";
         interactionPrompt.style.background = "#1e293b";
         interactionPrompt.style.border = "4px solid #f8fafc";
@@ -592,9 +637,9 @@ export function ensureOverlay(getActiveRoom: () => any, getActionContext: () => 
         interactionPrompt.style.fontWeight = "900";
         interactionPrompt.style.fontSize = "20px";
         interactionPrompt.style.boxShadow = "0 10px 20px rgba(0,0,0,0.5)";
-        interactionPrompt.style.zIndex = "50";
+        interactionPrompt.style.position = "relative";
         interactionPrompt.innerHTML = "Press <span class='hud-key'>F</span> to Interact";
-        document.body.appendChild(interactionPrompt);
+        dynamicPrompts.appendChild(interactionPrompt);
     }
 
     let pointersContainer = document.getElementById("event-pointers-container");
@@ -737,7 +782,10 @@ export function ensureOverlay(getActiveRoom: () => any, getActionContext: () => 
         window.addEventListener("keydown", (e) => {
             if (e.key === "Escape") {
                 const currentDisplay = teamModal!.style.display;
-                teamModal!.style.display = currentDisplay === "none" ? "block" : "none";
+                closeAllHUDModals(); 
+                if (currentDisplay === "none") {
+                    teamModal!.style.display = "block";
+                }
             }
         });
     }
@@ -770,12 +818,12 @@ export function ensureOverlay(getActiveRoom: () => any, getActionContext: () => 
         document.body.appendChild(craftModal);
 
         document.getElementById("close-craft-modal")!.onclick = () => {
-            craftModal!.style.display = "none";
+            closeAllHUDModals();
         };
 
         window.addEventListener("keydown", (e) => {
             if (e.key === "Escape" && craftModal!.style.display === "block") {
-                craftModal!.style.display = "none";
+                closeAllHUDModals();
             }
         });
     }
@@ -840,8 +888,7 @@ export function ensureOverlay(getActiveRoom: () => any, getActionContext: () => 
                     if (e.button === 0) { 
                         if (travRank >= 3) {
                             activeRoom.send("teleportToMarker");
-                            isWorldMapOpen = false;
-                            worldMapContainer.style.display = "none";
+                            closeAllHUDModals();
                         }
                     } else if (e.button === 2) { 
                         if (coreRank >= 5) {
@@ -858,21 +905,8 @@ export function ensureOverlay(getActiveRoom: () => any, getActionContext: () => 
         document.body.appendChild(worldMapContainer);
 
         document.getElementById("close-world-map")!.onclick = () => {
-            isWorldMapOpen = false;
-            worldMapContainer.style.display = "none";
+            closeAllHUDModals();
         };
-    }
-
-    let storePopup = document.getElementById("store-popup");
-    if (!storePopup) {
-        storePopup = document.createElement("div");
-        storePopup.id = "store-popup";
-        storePopup.className = "chunky-panel hud-absolute-center";
-        storePopup.style.bottom = "25%";
-        storePopup.style.border = "4px solid var(--neon-amber)";
-        storePopup.style.padding = "20px 40px";
-        storePopup.style.display = "none";
-        document.body.appendChild(storePopup);
     }
 
     let bottomCenterContainer = document.getElementById("hud-bottom-center");
@@ -995,6 +1029,12 @@ export function ensureOverlay(getActiveRoom: () => any, getActionContext: () => 
             document.getElementById("med-upgrade-content")!.style.display = "none";
             document.getElementById("med-feedback")!.innerText = "";
         };
+        
+        window.addEventListener("keydown", (e) => {
+            if (e.key === "Escape" && medUI!.style.display === "block") {
+                closeAllHUDModals();
+            }
+        });
     }
     
     let bottomRightContainer = document.getElementById("hud-bottom-right");
@@ -1075,6 +1115,7 @@ export function ensureOverlay(getActiveRoom: () => any, getActionContext: () => 
     
     return overlay;
 }
+
 // --- 2. PER-FRAME HUD UPDATE LOGIC ---
 export function updateHUD(
     dt: number,
@@ -1725,6 +1766,13 @@ export function openCraftingMenu(activeRoom: any, playerState: any) {
     const list = document.getElementById("crafting-recipe-list");
     if (!modal || !list || !activeRoom || !playerState) return;
 
+    if (modal.style.display === "block") {
+        closeAllHUDModals();
+        return;
+    }
+
+    closeAllHUDModals();
+    
     let html = "";
     
     CRAFTING_RECIPES.forEach(r => {
@@ -1773,6 +1821,13 @@ export function openCraftingMenu(activeRoom: any, playerState: any) {
 
 export function openStoreMenu(activeRoom: any, playerState: any, storeState: any) {
     let modal = document.getElementById("store-management-modal");
+    
+    if (modal && modal.style.display === "block" && (window as any).currentStoreId === storeState.id) {
+        closeAllHUDModals();
+        return;
+    }
+    closeAllHUDModals();
+
     if (!modal) {
         modal = document.createElement("div");
         modal.id = "store-management-modal";
@@ -1790,9 +1845,13 @@ export function openStoreMenu(activeRoom: any, playerState: any, storeState: any
         document.body.appendChild(modal);
 
         window.addEventListener("keydown", (e) => {
-            if (e.key === "Escape" && modal!.style.display === "block") modal!.style.display = "none";
+            if (e.key === "Escape" && modal!.style.display === "block") {
+                closeAllHUDModals();
+            }
         });
     }
+    
+    (window as any).currentStoreId = storeState.id;
 
     const isOwner = storeState.ownerId === playerState.name;
     const isUnowned = storeState.ownerId === "";
@@ -1881,7 +1940,7 @@ export function openStoreMenu(activeRoom: any, playerState: any, storeState: any
         const target = e.target as HTMLElement;
 
         if (target.closest('.store-close-btn')) {
-            modal!.style.display = 'none';
+            closeAllHUDModals();
         } else if (target.closest('.buy-prop-btn') && !target.closest('.buy-prop-btn')!.hasAttribute('disabled')) {
             activeRoom.send("buyStore", { storeId: storeState.id }); 
             setTimeout(() => openStoreMenu(activeRoom, playerState, storeState), 100);

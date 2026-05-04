@@ -185,7 +185,7 @@ export function renderQuestTracker(me: any) {
         tracker = document.createElement("div");
         tracker.id = "quest-tracker";
         tracker.style.position = "fixed";
-        tracker.style.top = "20px";
+        tracker.style.top = "250px"; // FIXED: Shifted down to clear the minimap and top-right HUD container
         tracker.style.right = "20px";
         tracker.style.display = "flex";
         tracker.style.flexDirection = "column";

@@ -12,6 +12,42 @@ export let isCasinoUIOpen = false;
 export let activeChestId: string | null = null;
 export let activeStallType: string | null = null;
 
+// --- GLOBAL MODAL MANAGER UTILITY ---
+// Solves Z-Index Overlap by ensuring mutually exclusive modal states
+export function closeAllModals() {
+    isTeleportUIOpen = false;
+    isInventoryUIOpen = false;
+    isChestUIOpen = false;
+    isShopUIOpen = false;
+    isEventInviteOpen = false;
+    isMirrorUIOpen = false;
+    isCasinoUIOpen = false;
+    activeChestId = null;
+    activeStallType = null;
+
+    const modalIds = [
+        "teleport-modal", 
+        "casino-modal", 
+        "inventory-modal", 
+        "chest-modal", 
+        "shop-modal", 
+        "blueprint-modal", 
+        "event-invite-modal", 
+        "mirror-modal"
+    ];
+
+    modalIds.forEach(id => {
+        const el = document.getElementById(id);
+        if (el && document.body.contains(el)) {
+            document.body.removeChild(el);
+        }
+    });
+
+    if ((window as any).casinoAnimInterval) {
+        clearInterval((window as any).casinoAnimInterval);
+    }
+}
+
 // --- GLOBAL LUXURY FUI STYLES INJECTION ---
 function injectGlobalChunkyStyles() {
     if (!document.getElementById("chunky-ui-styles")) {
@@ -276,7 +312,13 @@ export function renderChunkyHUD(player: any) {
 
 // --- TELEPORT UI ---
 export function openTeleportUI(activeRoom: any, keys: any) {
-    if (isTeleportUIOpen || !activeRoom) return;
+    if (!activeRoom) return;
+    if (isTeleportUIOpen) {
+        closeAllModals();
+        return;
+    }
+    
+    closeAllModals();
     isTeleportUIOpen = true;
     injectGlobalChunkyStyles();
 
@@ -316,26 +358,29 @@ export function openTeleportUI(activeRoom: any, keys: any) {
     `;
 
     document.getElementById("close-teleport-btn")!.onclick = () => {
-      isTeleportUIOpen = false;
-      if (document.body.contains(modal!)) document.body.removeChild(modal!);
+      closeAllModals();
     };
 
     document.getElementById("tp-town")!.onclick = () => {
       activeRoom.send("teleport", { destination: "town" });
-      isTeleportUIOpen = false;
-      if (document.body.contains(modal!)) document.body.removeChild(modal!);
+      closeAllModals();
     };
 
     document.getElementById("tp-elven")!.onclick = () => {
       activeRoom.send("teleport", { destination: "elven", x: 1155, z: 0 });
-      isTeleportUIOpen = false;
-      if (document.body.contains(modal!)) document.body.removeChild(modal!);
+      closeAllModals();
     };
 }
 
 // --- CASINO UI ---
 export function openCasinoUI(activeRoom: any, keys: any, gameType: string) {
-    if (isCasinoUIOpen || !activeRoom) return;
+    if (!activeRoom) return;
+    if (isCasinoUIOpen) {
+        closeAllModals();
+        return;
+    }
+    
+    closeAllModals();
     isCasinoUIOpen = true;
     
     if (typeof (window as any).injectGlobalChunkyStyles === "function") {
@@ -507,9 +552,7 @@ export function openCasinoUI(activeRoom: any, keys: any, gameType: string) {
     });
 
     document.getElementById("close-casino-btn")!.onclick = () => {
-        isCasinoUIOpen = false;
-        if ((window as any).casinoAnimInterval) clearInterval((window as any).casinoAnimInterval);
-        if (document.body.contains(modal!)) document.body.removeChild(modal!);
+        closeAllModals();
     };
 
     const getBet = () => parseInt(betInput.value) || 0;
@@ -611,7 +654,13 @@ export function openCasinoUI(activeRoom: any, keys: any, gameType: string) {
 
 // --- INVENTORY UI ---
 export function openInventoryUI(activeRoom: any, keys: any, playerClass: string) {
-    if (isInventoryUIOpen || !activeRoom) return;
+    if (!activeRoom) return;
+    if (isInventoryUIOpen) {
+        closeAllModals();
+        return;
+    }
+    
+    closeAllModals();
     isInventoryUIOpen = true;
     injectGlobalChunkyStyles();
 
@@ -674,8 +723,7 @@ export function openInventoryUI(activeRoom: any, keys: any, playerClass: string)
     modal.style.display = "block";
 
     document.getElementById("close-inv-btn")!.onclick = () => {
-        isInventoryUIOpen = false;
-        modal!.style.display = "none";
+        closeAllModals();
     };
 
     refreshInventoryUI(activeRoom, playerClass);
@@ -762,7 +810,13 @@ export function refreshInventoryUI(activeRoom: any, playerClass: string) {
 
 // --- CHEST UI ---
 export function openChestUI(activeRoom: any, keys: any, chestId: string) {
-    if (isChestUIOpen || !activeRoom) return;
+    if (!activeRoom) return;
+    if (isChestUIOpen) {
+        closeAllModals();
+        return;
+    }
+    
+    closeAllModals();
     isChestUIOpen = true;
     activeChestId = chestId;
     injectGlobalChunkyStyles();
@@ -820,9 +874,7 @@ export function openChestUI(activeRoom: any, keys: any, chestId: string) {
     modal.style.display = "block";
 
     document.getElementById("close-chest-btn")!.onclick = () => {
-        isChestUIOpen = false;
-        activeChestId = null;
-        modal!.style.display = "none";
+        closeAllModals();
     };
 
     refreshChestUI(activeRoom);
@@ -884,7 +936,13 @@ export function refreshChestUI(activeRoom: any) {
 
 // --- SHOP UI ---
 export function openShopUI(activeRoom: any, keys: any, stallType: string) {
-    if (isShopUIOpen || !activeRoom) return;
+    if (!activeRoom) return;
+    if (isShopUIOpen) {
+        closeAllModals();
+        return;
+    }
+    
+    closeAllModals();
     isShopUIOpen = true;
     activeStallType = stallType;
     injectGlobalChunkyStyles();
@@ -949,9 +1007,7 @@ export function openShopUI(activeRoom: any, keys: any, stallType: string) {
     modal.style.display = "block";
 
     document.getElementById("close-shop-btn")!.onclick = () => {
-        isShopUIOpen = false;
-        activeStallType = null;
-        modal!.style.display = "none";
+        closeAllModals();
     };
 
     refreshShopUI(activeRoom);
@@ -1049,6 +1105,13 @@ export function refreshShopUI(activeRoom: any) {
 
 export function openBlueprintSelector(activeScene: any, keys: any) {
     if (!activeScene || !(activeScene.constructor.name === "TownScene")) return;
+    
+    if (document.getElementById("blueprint-modal")) {
+        closeAllModals();
+        return;
+    }
+    
+    closeAllModals();
     injectGlobalChunkyStyles();
     
     for (const key in keys) {
@@ -1094,7 +1157,7 @@ export function openBlueprintSelector(activeScene: any, keys: any) {
                 activeScene.currentBlueprintType = type;
                 activeScene.isBuildMode = true;
                 activeScene.isBuyMode = false;
-                document.body.removeChild(modal);
+                closeAllModals();
             };
         }
     };
@@ -1104,11 +1167,12 @@ export function openBlueprintSelector(activeScene: any, keys: any) {
     setupBtn("bp-shop", "shop");
 
     document.getElementById("close-bp-btn")!.onclick = () => {
-        document.body.removeChild(modal);
+        closeAllModals();
     };
 }
 
 export async function showCharacterCreation(): Promise<{ classId: string, pathwayId: string, auraStyle: string }> {
+  closeAllModals();
   injectGlobalChunkyStyles();
   return new Promise((resolve) => {
     const container = document.createElement("div");
@@ -1217,7 +1281,13 @@ export async function showCharacterCreation(): Promise<{ classId: string, pathwa
 }
 
 export function openEventInviteUI(activeRoom: any, eventName: string, targetZone: string) {
-    if (isEventInviteOpen || !activeRoom) return;
+    if (!activeRoom) return;
+    if (isEventInviteOpen) {
+        closeAllModals();
+        return;
+    }
+    
+    closeAllModals();
     isEventInviteOpen = true;
     injectGlobalChunkyStyles();
 
@@ -1252,24 +1322,27 @@ export function openEventInviteUI(activeRoom: any, eventName: string, targetZone
     `;
 
     document.getElementById("close-event-invite-btn")!.onclick = () => {
-        isEventInviteOpen = false;
-        if (document.body.contains(modal!)) document.body.removeChild(modal!);
+        closeAllModals();
     };
 
     document.getElementById("decline-event-btn")!.onclick = () => {
-        isEventInviteOpen = false;
-        if (document.body.contains(modal!)) document.body.removeChild(modal!);
+        closeAllModals();
     };
 
     document.getElementById("join-event-btn")!.onclick = () => {
         activeRoom.send("teleport", { destination: targetZone }); 
-        isEventInviteOpen = false;
-        if (document.body.contains(modal!)) document.body.removeChild(modal!);
+        closeAllModals();
     };
 }
 
 export function openMirrorUI(activeRoom: any, keys: any) {
-    if (isMirrorUIOpen || !activeRoom) return;
+    if (!activeRoom) return;
+    if (isMirrorUIOpen) {
+        closeAllModals();
+        return;
+    }
+    
+    closeAllModals();
     isMirrorUIOpen = true;
     injectGlobalChunkyStyles();
 
@@ -1343,8 +1416,7 @@ export function openMirrorUI(activeRoom: any, keys: any) {
     modal.style.display = "block";
 
     document.getElementById("close-mirror-btn")!.onclick = () => {
-        isMirrorUIOpen = false;
-        if (document.body.contains(modal!)) document.body.removeChild(modal!);
+        closeAllModals();
     };
 
     document.getElementById("save-mirror-btn")!.onclick = () => {
@@ -1356,7 +1428,6 @@ export function openMirrorUI(activeRoom: any, keys: any) {
 
         activeRoom.send("updateAppearance", { gender, skinColor, hairStyle, hairColor, eyeColor });
 
-        isMirrorUIOpen = false;
-        if (document.body.contains(modal!)) document.body.removeChild(modal!);
+        closeAllModals();
     };
 }
